@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --cyan: #00CCCC;
+    --rose: #E8197A;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #0f0f12;
+    color: #ffffff;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 204, 204, 0.3);
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Shared input/select/textarea base style used across all forms */
+  .input-base {
+    @apply w-full border rounded-lg px-3.5 py-2.5 text-white text-sm outline-none transition-colors;
+    background-color: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.10);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .input-base::placeholder {
+    color: rgba(255,255,255,0.20);
+  }
+  .input-base:focus {
+    border-color: #00CCCC;
+    background-color: rgba(0,204,204,0.05);
+  }
+  select.input-base option {
+    background: #16161b;
+  }
+}
+
+@layer utilities {
+  .font-mono-data {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}

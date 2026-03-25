@@ -1,0 +1,80 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import path from 'path';
+import { rateLimit } from 'express-rate-limit';
+import { errorHandler } from './middleware/error.middleware';
+
+// ── Route imports ──────────────────────────────────────────────
+import authRoutes       from './routes/auth.routes';
+import dashboardRoutes  from './routes/dashboard.routes';
+import maintenanceRoutes from './routes/maintenance.routes';
+import newsRoutes       from './routes/news.routes';
+import visitorRoutes    from './routes/visitor.routes';
+import choreRoutes      from './routes/chore.routes';
+import walletRoutes     from './routes/wallet.routes';
+import profileRoutes    from './routes/profile.routes';
+import documentRoutes   from './routes/document.routes';
+import housemateRoutes  from './routes/housemate.routes';
+import adminRoutes      from './routes/admin.routes';
+
+const app = express();
+
+// ── Security middleware ────────────────────────────────────────
+app.use(helmet());
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+
+// ── Rate limiting ──────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { success: false, error: 'Too many requests, please try again later.' },
+});
+
+// ── Body parsing ───────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ── Static file serving (local uploads) ───────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// ── Health check ───────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({
+    success: true,
+    service: 'ResiHub API',
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  });
+});
+
+// ── API Routes ─────────────────────────────────────────────────
+app.use('/api/auth',        authLimiter, authRoutes);
+app.use('/api/dashboard',   dashboardRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/news',        newsRoutes);
+app.use('/api/visitors',    visitorRoutes);
+app.use('/api/chores',      choreRoutes);
+app.use('/api/wallet',      walletRoutes);
+app.use('/api/profile',     profileRoutes);
+app.use('/api/documents',   documentRoutes);
+app.use('/api/housemates',  housemateRoutes);
+app.use('/api/admin',    adminRoutes);
+
+// ── 404 handler ───────────────────────────────────────────────
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.method} ${req.originalUrl} not found`,
+  });
+});
+
+// ── Global error handler (must be last) ───────────────────────
+app.use(errorHandler);
+
+export default app;
