@@ -16,7 +16,8 @@ import walletRoutes     from './routes/wallet.routes';
 import profileRoutes    from './routes/profile.routes';
 import documentRoutes   from './routes/document.routes';
 import housemateRoutes  from './routes/housemate.routes';
-import adminRoutes      from './routes/admin.routes';
+import adminRoutes       from './routes/admin.routes';
+import applicationRoutes from './routes/application.routes';
 
 const app = express();
 
@@ -64,7 +65,8 @@ app.use('/api/wallet',      walletRoutes);
 app.use('/api/profile',     profileRoutes);
 app.use('/api/documents',   documentRoutes);
 app.use('/api/housemates',  housemateRoutes);
-app.use('/api/admin',    adminRoutes);
+app.use('/api/admin',       adminRoutes);
+app.use('/api/application', applicationRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use('*', (req, res) => {

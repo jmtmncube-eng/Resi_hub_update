@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/layout/ProtectedRoute';
-import { DashboardLayout } from './components/layout/DashboardLayout';
-import { ROUTES } from './constants/routes';
+import { AuthProvider }     from './contexts/AuthContext';
+import { ProtectedRoute }   from './components/layout/ProtectedRoute';
+import { DashboardLayout }  from './components/layout/DashboardLayout';
+import { ErrorBoundary }    from './components/ErrorBoundary';
+import { ROUTES }           from './constants/routes';
+import type { Role }        from './types/auth.types';
 
 // ── Auth ───────────────────────────────────────────────────────
 import Login from './pages/auth/Login';
@@ -17,6 +19,10 @@ import Wallet      from './pages/student/Wallet';
 import Profile     from './pages/student/Profile';
 import Documents   from './pages/student/Documents';
 
+// ── Pending Student ────────────────────────────────────────────
+import ApplicationStatus from './pages/student/ApplicationStatus';
+import BrowseRooms       from './pages/student/BrowseRooms';
+
 // ── Admin ───────────────────────────────────────────────────────
 import AdminOverview    from './pages/admin/AdminOverview';
 import AdminOccupancy   from './pages/admin/AdminOccupancy';
@@ -27,18 +33,21 @@ import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
 import AdminAccounts    from './pages/admin/AdminAccounts';
 
-// ── Placeholder — for pages not yet built ─────────────────────
-function ComingSoon({ page }: { page: string }) {
+/** Wraps a page component with DashboardLayout + ErrorBoundary */
+function Page({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="text-center">
-        <div className="text-4xl mb-4">🚧</div>
-        <h2 className="text-xl font-semibold text-white mb-1">{page}</h2>
-        <p className="text-white/40 font-mono text-sm">Coming in the next phase</p>
-      </div>
-    </div>
+    <ProtectedRoute allowedRoles={roles}>
+      <DashboardLayout>
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </DashboardLayout>
+    </ProtectedRoute>
   );
 }
+
+const ACTIVE:  Role[] = ['ACTIVE_STUDENT'];
+const PENDING: Role[] = ['PENDING_STUDENT'];
+const BOTH:    Role[] = ['ACTIVE_STUDENT', 'PENDING_STUDENT'];
+const ADMIN:   Role[] = ['ADMIN'];
 
 function App() {
   return (
@@ -50,100 +59,30 @@ function App() {
           <Route path={ROUTES.LOGIN} element={<Login />} />
 
           {/* ── Active Student ─────────────────────────────── */}
-          <Route path={ROUTES.DASHBOARD} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Dashboard /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.MAINTENANCE} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Maintenance /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.UPDATES} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT', 'PENDING_STUDENT']}>
-              <DashboardLayout><Updates /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.VISITORS} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Visitors /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.HOUSEMATES} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Housemates /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.WALLET} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Wallet /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.PROFILE} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT', 'PENDING_STUDENT']}>
-              <DashboardLayout><Profile /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.DOCUMENTS} element={
-            <ProtectedRoute allowedRoles={['ACTIVE_STUDENT']}>
-              <DashboardLayout><Documents /></DashboardLayout>
-            </ProtectedRoute>
-          } />
+          <Route path={ROUTES.DASHBOARD}   element={<Page roles={ACTIVE}><Dashboard /></Page>} />
+          <Route path={ROUTES.MAINTENANCE} element={<Page roles={ACTIVE}><Maintenance /></Page>} />
+          <Route path={ROUTES.VISITORS}    element={<Page roles={ACTIVE}><Visitors /></Page>} />
+          <Route path={ROUTES.HOUSEMATES}  element={<Page roles={ACTIVE}><Housemates /></Page>} />
+          <Route path={ROUTES.WALLET}      element={<Page roles={ACTIVE}><Wallet /></Page>} />
+          <Route path={ROUTES.DOCUMENTS}   element={<Page roles={ACTIVE}><Documents /></Page>} />
+
+          {/* ── Active + Pending ───────────────────────────── */}
+          <Route path={ROUTES.UPDATES}  element={<Page roles={BOTH}><Updates /></Page>} />
+          <Route path={ROUTES.PROFILE}  element={<Page roles={BOTH}><Profile /></Page>} />
 
           {/* ── Pending Student ────────────────────────────── */}
-          <Route path={ROUTES.APPLICATION} element={
-            <ProtectedRoute allowedRoles={['PENDING_STUDENT']}>
-              <DashboardLayout><ComingSoon page="Application Status" /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ROOMS} element={
-            <ProtectedRoute allowedRoles={['PENDING_STUDENT']}>
-              <DashboardLayout><ComingSoon page="Browse Rooms" /></DashboardLayout>
-            </ProtectedRoute>
-          } />
+          <Route path={ROUTES.APPLICATION} element={<Page roles={PENDING}><ApplicationStatus /></Page>} />
+          <Route path={ROUTES.ROOMS}       element={<Page roles={PENDING}><BrowseRooms /></Page>} />
 
           {/* ── Admin ──────────────────────────────────────── */}
-          <Route path={ROUTES.ADMIN} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminOverview /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_OCCUPANCY} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminOccupancy /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminAllocations /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_MAINTENANCE} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminMaintenance /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_NEWS} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminNews /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_VISITORS} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminVisitors /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_REWARDS} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminRewards /></DashboardLayout>
-            </ProtectedRoute>
-          } />
-          <Route path={ROUTES.ADMIN_ACCOUNTS} element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardLayout><AdminAccounts /></DashboardLayout>
-            </ProtectedRoute>
-          } />
+          <Route path={ROUTES.ADMIN}             element={<Page roles={ADMIN}><AdminOverview /></Page>} />
+          <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Page roles={ADMIN}><AdminOccupancy /></Page>} />
+          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Page roles={ADMIN}><AdminAllocations /></Page>} />
+          <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={ADMIN}><AdminMaintenance /></Page>} />
+          <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />
+          <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
+          <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
+          <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
 
           {/* ── Default ────────────────────────────────────── */}
           <Route path="/"  element={<Navigate to={ROUTES.LOGIN} replace />} />
