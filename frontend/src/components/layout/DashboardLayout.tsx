@@ -4,9 +4,11 @@ import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
   Building2, SquareStack, Ticket, Megaphone, ClipboardList, Gift, BookUser,
+  Sun, Moon,
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { ROUTES } from '../../constants/routes';
+import { useAuth }  from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { ROUTES }   from '../../constants/routes';
 
 const studentNav = [
   { to: ROUTES.DASHBOARD,   label: 'Dashboard',   icon: LayoutDashboard },
@@ -36,8 +38,9 @@ const adminNav = [
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
-  const navigate         = useNavigate();
+  const { user, logout }        = useAuth();
+  const { theme, toggleTheme }  = useTheme();
+  const navigate                = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems =
@@ -106,6 +109,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-white/40 font-mono truncate">{user?.email}</p>
           </div>
         </div>
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"

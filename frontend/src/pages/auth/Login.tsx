@@ -16,9 +16,9 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 const DEMO_ACCOUNTS = [
-  { label: 'Active Student',   email: 'sarah@campus.edu',   password: 'pass123'  },
-  { label: 'Pending Student',  email: 'aisha@campus.edu',   password: 'pass123'  },
-  { label: 'Admin',            email: 'admin@resihub.co',   password: 'admin123' },
+  { label: 'Admin',            email: 'admin@resihub.co',  password: 'admin123' },
+  { label: 'Active Student',   email: 'sarah@campus.edu',  password: 'pass123'  },
+  { label: 'Pending Student',  email: 'aisha@campus.edu',  password: 'pass123'  },
 ];
 
 export default function Login() {
@@ -85,10 +85,10 @@ export default function Login() {
                 type="email"
                 autoComplete="email"
                 placeholder="you@campus.edu"
-                className={`w-full bg-white/4 border rounded-lg px-3.5 py-2.5 text-white text-sm font-mono placeholder-white/20 outline-none transition-colors ${
+                className={`input-login ${
                   errors.email
                     ? 'border-red-500 focus:border-red-400'
-                    : 'border-white/10 focus:border-rh-cyan focus:bg-rh-cyan/5'
+                    : 'border-white/10 focus:border-rh-cyan'
                 }`}
               />
               {errors.email && (
@@ -107,10 +107,10 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className={`w-full bg-white/4 border rounded-lg px-3.5 py-2.5 pr-10 text-white text-sm font-mono placeholder-white/20 outline-none transition-colors ${
+                  className={`input-login pr-10 ${
                     errors.password
                       ? 'border-red-500 focus:border-red-400'
-                      : 'border-white/10 focus:border-rh-cyan focus:bg-rh-cyan/5'
+                      : 'border-white/10 focus:border-rh-cyan'
                   }`}
                 />
                 <button
