@@ -1,6 +1,9 @@
 # Development Dockerfile — Backend
 FROM node:18-alpine
 
+# Install OpenSSL 1.1 required by Prisma query engine on Alpine
+RUN apk add --no-cache openssl openssl-dev libc6-compat
+
 WORKDIR /app
 
 # Install dependencies first (layer caching)
