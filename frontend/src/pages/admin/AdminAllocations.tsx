@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 import {
   getAllocations, createAllocation, updateAllocation,
   getAccounts, getOccupancy,
   AdminAllocation,
 } from '../../services/admin.service';
 
-const statusColor: Record<string, string> = {
-  ACTIVE:   'text-green-400 border-green-500/30 bg-green-500/8',
-  RESERVED: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/8',
-  ENDED:    'text-red-400 border-red-500/30 bg-red-500/8',
+const STATUS_BADGE: Record<string, string> = {
+  ACTIVE:   'badge-cyan',
+  RESERVED: 'badge-gray',
+  ENDED:    'badge-rose',
 };
 
 export default function AdminAllocations() {
@@ -64,21 +65,19 @@ export default function AdminAllocations() {
   });
 
   if (isError) return (
-    <div className="text-rh-rose text-sm p-6">Failed to load allocations. Is the backend running?</div>
+    <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load allocations. Is the backend running?</p>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 appear">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Allocations</h1>
-          <p className="text-white/40 text-sm mt-1">{allocations.length} total allocations</p>
+          <h1 className="page-title">Allocations</h1>
+          <p className="page-sub">{allocations.length} total allocations</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 rounded-lg bg-rh-cyan text-rh-dark text-sm font-semibold hover:bg-rh-cyan/90 transition-colors"
-        >
+        <button onClick={() => setShowModal(true)} className="btn-primary" style={{ padding: '9px 18px', fontSize: 13 }}>
           + New Allocation
         </button>
       </div>
@@ -89,49 +88,52 @@ export default function AdminAllocations() {
         placeholder="Search by student name or room..."
         value={search}
         onChange={e => setSearch(e.target.value)}
-        className="input-base max-w-sm"
+        className="input-base"
+        style={{ maxWidth: 320 }}
       />
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-2 border-rh-cyan border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(5)].map((_, i) => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />)}
         </div>
       ) : (
-        <div className="bg-white/4 border border-white/8 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="rh-table">
               <thead>
-                <tr className="border-b border-white/8 text-white/40 text-xs uppercase tracking-wider">
-                  <th className="text-left p-4">Student</th>
-                  <th className="text-left p-4">Room</th>
-                  <th className="text-left p-4">Rent</th>
-                  <th className="text-left p-4">Status</th>
-                  <th className="text-left p-4">Move-in</th>
-                  <th className="text-left p-4"></th>
+                <tr>
+                  <th>Student</th>
+                  <th>Room</th>
+                  <th>Rent</th>
+                  <th>Status</th>
+                  <th>Move-in</th>
+                  <th></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/4">
+              <tbody>
                 {allocations.map(a => (
                   <tr key={a.id}>
                     {editId === a.id ? (
                       <>
-                        <td className="p-4 text-white/70">{a.user.name}</td>
-                        <td className="p-4 text-white/70">{a.room.block}-{a.room.number}</td>
-                        <td className="p-4">
+                        <td style={{ color: 'var(--text2)' }}>{a.user.name}</td>
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text2)' }}>{a.room.block}-{a.room.number}</td>
+                        <td>
                           <input
                             type="number"
                             value={editForm.rent}
                             onChange={e => setEditForm(f => ({ ...f, rent: e.target.value }))}
                             placeholder={String(a.rent)}
-                            className="input-base w-28"
+                            className="input-base"
+                            style={{ width: 110 }}
                           />
                         </td>
-                        <td className="p-4">
+                        <td>
                           <select
                             value={editForm.status}
                             onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
-                            className="input-base w-36"
+                            className="input-base"
+                            style={{ width: 144 }}
                           >
                             <option value="">Keep ({a.status})</option>
                             <option value="ACTIVE">ACTIVE</option>
@@ -139,47 +141,46 @@ export default function AdminAllocations() {
                             <option value="ENDED">ENDED</option>
                           </select>
                         </td>
-                        <td className="p-4" />
-                        <td className="p-4">
-                          <div className="flex gap-2">
+                        <td />
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               onClick={() => updateMut.mutate(a.id)}
                               disabled={updateMut.isPending}
-                              className="text-xs px-3 py-1 rounded bg-rh-cyan text-rh-dark font-semibold hover:bg-rh-cyan/80"
-                            >Save</button>
-                            <button
-                              onClick={() => setEditId(null)}
-                              className="text-xs px-3 py-1 rounded bg-white/8 text-white/60 hover:bg-white/12"
-                            >Cancel</button>
+                              className="btn-primary"
+                              style={{ padding: '5px 12px', fontSize: 12 }}
+                            >
+                              {updateMut.isPending ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
+                            </button>
+                            <button onClick={() => setEditId(null)} className="btn-ghost" style={{ padding: '5px 10px', fontSize: 12 }}>Cancel</button>
                           </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="p-4">
-                          <p className="text-white font-medium">{a.user.name}</p>
-                          <p className="text-white/40 text-xs">{a.user.email}</p>
+                        <td>
+                          <p style={{ fontWeight: 500, color: 'var(--text)' }}>{a.user.name}</p>
+                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{a.user.email}</p>
                         </td>
-                        <td className="p-4">
-                          <p className="text-white font-mono">Blk {a.room.block} – {a.room.number}</p>
-                          <p className="text-white/40 text-xs">{a.room.type}</p>
+                        <td>
+                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text)' }}>Blk {a.room.block} – {a.room.number}</p>
+                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{a.room.type}</p>
                         </td>
-                        <td className="p-4 text-white font-mono">R{Number(a.rent).toLocaleString()}</td>
-                        <td className="p-4">
-                          <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${statusColor[a.status] ?? 'border-white/10 text-white/40'}`}>
-                            {a.status}
-                          </span>
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text)' }}>R{Number(a.rent).toLocaleString()}</td>
+                        <td>
+                          <span className={`badge ${STATUS_BADGE[a.status] ?? 'badge-gray'}`}>{a.status}</span>
                         </td>
-                        <td className="p-4 text-white/40 text-xs">
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
                           {a.moveIn ? new Date(a.moveIn).toLocaleDateString() : '—'}
                         </td>
-                        <td className="p-4">
+                        <td>
                           <button
                             onClick={() => {
                               setEditId(a.id);
                               setEditForm({ rent: String(a.rent), status: a.status });
                             }}
-                            className="text-xs px-3 py-1 rounded bg-white/8 text-white/60 hover:bg-white/12"
+                            className="btn-ghost"
+                            style={{ padding: '5px 12px', fontSize: 12 }}
                           >
                             Edit
                           </button>
@@ -192,20 +193,20 @@ export default function AdminAllocations() {
             </table>
           </div>
           {allocations.length === 0 && (
-            <p className="text-center py-10 text-white/30">No allocations found</p>
+            <p style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text3)', fontSize: 13 }}>No allocations found</p>
           )}
         </div>
       )}
 
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-rh-bg2 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-lg font-bold text-white">New Allocation</h2>
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>New Allocation</p>
 
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="text-white/50 text-xs mb-1 block">Student</label>
+                <label className="field-label">Student</label>
                 <select
                   value={form.userId}
                   onChange={e => setForm(f => ({ ...f, userId: e.target.value }))}
@@ -221,7 +222,7 @@ export default function AdminAllocations() {
               </div>
 
               <div>
-                <label className="text-white/50 text-xs mb-1 block">Room (vacant only)</label>
+                <label className="field-label">Room (vacant only)</label>
                 <select
                   value={form.roomId}
                   onChange={e => setForm(f => ({ ...f, roomId: e.target.value }))}
@@ -235,7 +236,7 @@ export default function AdminAllocations() {
               </div>
 
               <div>
-                <label className="text-white/50 text-xs mb-1 block">Monthly Rent (R)</label>
+                <label className="field-label">Monthly Rent (R)</label>
                 <input
                   type="number"
                   value={form.rent}
@@ -246,7 +247,7 @@ export default function AdminAllocations() {
               </div>
 
               <div>
-                <label className="text-white/50 text-xs mb-1 block">Status</label>
+                <label className="field-label">Status</label>
                 <select
                   value={form.status}
                   onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
@@ -259,20 +260,22 @@ export default function AdminAllocations() {
             </div>
 
             {createMut.isError && (
-              <p className="text-rh-rose text-xs">{(createMut.error as Error).message}</p>
+              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--rose)', marginTop: 10 }}>{(createMut.error as Error).message}</p>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
               <button
                 onClick={() => createMut.mutate()}
                 disabled={createMut.isPending || !form.userId || !form.roomId || !form.rent}
-                className="flex-1 py-2.5 rounded-lg bg-rh-cyan text-rh-dark font-semibold text-sm disabled:opacity-50"
+                className="btn-primary"
+                style={{ flex: 1, padding: '10px 0', fontSize: 13 }}
               >
                 {createMut.isPending ? 'Creating…' : 'Create'}
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 py-2.5 rounded-lg bg-white/8 text-white/70 text-sm hover:bg-white/12"
+                className="btn-ghost"
+                style={{ flex: 1, padding: '10px 0', fontSize: 13 }}
               >
                 Cancel
               </button>

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Users } from 'lucide-react';
 import { getAdminVisitors, AdminVisitorPass } from '../../services/admin.service';
 
-const statusColor: Record<string, string> = {
-  UPCOMING:  'text-yellow-400 border-yellow-500/30 bg-yellow-500/8',
-  ACTIVE:    'text-rh-cyan border-rh-cyan/30 bg-rh-cyan/8',
-  EXPIRED:   'text-red-400 border-red-500/30 bg-red-500/8',
-  CANCELLED: 'text-white/30 border-white/10 bg-white/4',
+const STATUS_BADGE: Record<string, string> = {
+  UPCOMING:  'badge-gray',
+  ACTIVE:    'badge-cyan',
+  EXPIRED:   'badge-rose',
+  CANCELLED: 'badge-gray',
 };
 
 export default function AdminVisitors() {
@@ -22,17 +23,18 @@ export default function AdminVisitors() {
   const past     = passes.filter(p => isPast(p.date));
 
   if (isError) return (
-    <div className="text-rh-rose text-sm p-6">Failed to load visitor passes. Is the backend running?</div>
+    <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load visitor passes. Is the backend running?</p>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 appear">
+
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Visitor Log</h1>
-        <p className="text-white/40 text-sm mt-1">
-          {today.length} today · {upcoming.length} upcoming · {past.length} past
-        </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <h1 className="page-title">Visitor Log</h1>
+          <p className="page-sub">{today.length} today · {upcoming.length} upcoming · {past.length} past</p>
+        </div>
       </div>
 
       {/* Search */}
@@ -41,48 +43,55 @@ export default function AdminVisitors() {
         placeholder="Search by visitor or resident name…"
         value={search}
         onChange={e => setSearch(e.target.value)}
-        className="input-base max-w-sm"
+        className="input-base"
+        style={{ maxWidth: 320 }}
       />
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-2 border-rh-cyan border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(5)].map((_, i) => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />)}
+        </div>
+      ) : passes.length === 0 ? (
+        <div className="card empty-state">
+          <Users size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No visitor passes found</p>
+          <p>Passes will appear here once students create them</p>
         </div>
       ) : (
-        <div className="bg-white/4 border border-white/8 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="rh-table">
               <thead>
-                <tr className="border-b border-white/8 text-white/40 text-xs uppercase tracking-wider">
-                  <th className="text-left p-4">Visitor</th>
-                  <th className="text-left p-4">Resident</th>
-                  <th className="text-left p-4">Purpose</th>
-                  <th className="text-left p-4">Visit Date</th>
-                  <th className="text-left p-4">Check-in</th>
-                  <th className="text-left p-4">Status</th>
+                <tr>
+                  <th>Visitor</th>
+                  <th>Resident</th>
+                  <th>Purpose</th>
+                  <th>Visit Date</th>
+                  <th>Check-in</th>
+                  <th>Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/4">
+              <tbody>
                 {passes.map(p => (
-                  <tr key={p.id} className="hover:bg-white/2 transition-colors">
-                    <td className="p-4">
-                      <p className="text-white font-medium">{p.visitorName}</p>
-                      <p className="text-white/40 text-xs">{p.visitorPhone}</p>
+                  <tr key={p.id}>
+                    <td>
+                      <p style={{ fontWeight: 500, color: 'var(--text)' }}>{p.visitorName}</p>
+                      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{p.visitorPhone}</p>
                     </td>
-                    <td className="p-4">
-                      <p className="text-white/80">{p.host.name}</p>
-                      <p className="text-white/30 text-xs">{p.host.email}</p>
+                    <td>
+                      <p style={{ color: 'var(--text2)' }}>{p.host.name}</p>
+                      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{p.host.email}</p>
                     </td>
-                    <td className="p-4 text-white/60 max-w-[180px] truncate">{p.purpose}</td>
-                    <td className="p-4 text-white/60 font-mono text-xs whitespace-nowrap">
+                    <td style={{ color: 'var(--text2)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.purpose}</td>
+                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
                       {new Date(p.date).toLocaleDateString()}
                     </td>
-                    <td className="p-4 text-white/40 font-mono text-xs whitespace-nowrap">
+                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap' }}>
                       {p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
-                    <td className="p-4">
-                      <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${statusColor[p.status] ?? 'border-white/10 text-white/40'}`}>
+                    <td>
+                      <span className={`badge ${STATUS_BADGE[p.status] ?? 'badge-gray'}`}>
                         {p.status.replace('_', ' ')}
                       </span>
                     </td>
@@ -91,9 +100,6 @@ export default function AdminVisitors() {
               </tbody>
             </table>
           </div>
-          {passes.length === 0 && (
-            <p className="text-center py-10 text-white/30">No visitor passes found</p>
-          )}
         </div>
       )}
     </div>

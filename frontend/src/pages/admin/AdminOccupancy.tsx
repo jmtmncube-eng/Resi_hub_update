@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getOccupancy, AdminRoom } from '../../services/admin.service';
 
-const typeColor: Record<string, string> = {
-  SINGLE:  'text-blue-400 border-blue-500/30',
-  DOUBLE:  'text-green-400 border-green-500/30',
-  STUDIO:  'text-orange-400 border-orange-500/30',
+const typeColor: Record<string, { color: string; bg: string }> = {
+  SINGLE:  { color: '#60a5fa', bg: 'rgba(96,165,250,.12)' },
+  DOUBLE:  { color: '#4ade80', bg: 'rgba(74,222,128,.12)' },
+  STUDIO:  { color: '#fb923c', bg: 'rgba(251,146,60,.12)'  },
 };
 
 export default function AdminOccupancy() {
@@ -23,90 +23,93 @@ export default function AdminOccupancy() {
   const vacant   = rooms.filter(r => r.status === 'VACANT').length;
 
   if (isError) return (
-    <div className="text-rh-rose text-sm p-6">Failed to load occupancy data. Is the backend running?</div>
+    <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load occupancy data. Is the backend running?</p>
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-6 appear">
+
+      {/* Header + block filter */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Occupancy</h1>
-          <p className="text-white/40 text-sm mt-1">
-            {occupied} occupied · {vacant} vacant
-          </p>
+          <h1 className="page-title">Occupancy</h1>
+          <p className="page-sub">{occupied} occupied · {vacant} vacant</p>
         </div>
 
-        {/* Block filter */}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setSelectedBlock('')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
-              selectedBlock === ''
-                ? 'border-rh-cyan bg-rh-cyan/10 text-rh-cyan'
-                : 'border-white/10 text-white/50 hover:border-white/20'
-            }`}
-          >
-            All
-          </button>
-          {blocks.map(b => (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {(['', ...blocks]).map(b => (
             <button
-              key={b}
+              key={b || 'all'}
               onClick={() => setSelectedBlock(b)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
-                selectedBlock === b
-                  ? 'border-rh-cyan bg-rh-cyan/10 text-rh-cyan'
-                  : 'border-white/10 text-white/50 hover:border-white/20'
-              }`}
+              style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 12,
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontWeight: selectedBlock === b ? 600 : 400,
+                background: selectedBlock === b ? 'var(--cyan)' : 'var(--hover)',
+                color: selectedBlock === b ? '#0f0f12' : 'var(--text3)',
+                border: `1px solid ${selectedBlock === b ? 'var(--cyan)' : 'var(--border2)'}`,
+                cursor: 'pointer', transition: 'all .18s',
+              }}
             >
-              Block {b}
+              {b ? `Block ${b}` : 'All'}
             </button>
           ))}
         </div>
       </div>
 
       {/* Legend */}
-      <div className="flex gap-4 text-xs text-white/40">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-rh-cyan/30 border border-rh-cyan/50" />
+      <div style={{ display: 'flex', gap: 16 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(0,204,204,.3)', border: '1px solid rgba(0,204,204,.5)', display: 'inline-block' }} />
           Occupied
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-white/8 border border-white/10" />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--bg3)', border: '1px solid var(--border)', display: 'inline-block' }} />
           Vacant
         </span>
       </div>
 
-      {/* Grid */}
+      {/* Room grid */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-2 border-rh-cyan border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}>
+          <div style={{ width: 32, height: 32, border: '2px solid var(--cyan)', borderTopColor: 'transparent', borderRadius: '50%' }} className="animate-spin" />
+        </div>
+      ) : rooms.length === 0 ? (
+        <div className="card empty-state" style={{ padding: '40px 24px' }}>
+          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No rooms found</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {rooms.map(room => {
             const isOccupied = room.status === 'OCCUPIED';
             const resident   = room.allocation?.user;
+            const tc = typeColor[room.type] ?? { color: 'var(--text3)', bg: 'var(--bg3)' };
             return (
               <div
                 key={room.id}
-                className={`rounded-xl p-3 border transition-all ${
-                  isOccupied
-                    ? 'bg-rh-cyan/8 border-rh-cyan/30'
-                    : 'bg-white/4 border-white/8 hover:border-white/20'
-                }`}
+                style={{
+                  borderRadius: 12, padding: '12px', border: '1px solid',
+                  borderColor: isOccupied ? 'rgba(0,204,204,.3)' : 'var(--border)',
+                  background: isOccupied ? 'rgba(0,204,204,.06)' : 'var(--bg3)',
+                  transition: 'all .18s',
+                }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-mono font-semibold text-sm">{room.number}</span>
-                  <span className={`text-xs font-mono px-1.5 py-0.5 rounded border ${typeColor[room.type] ?? 'text-white/40 border-white/10'}`}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{room.number}</span>
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                    padding: '1px 6px', borderRadius: 4,
+                    background: tc.bg, color: tc.color,
+                    border: `1px solid ${tc.color}33`,
+                  }}>
                     {room.type.charAt(0)}
                   </span>
                 </div>
-                <p className="text-white/30 text-xs">Blk {room.block}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>Blk {room.block}</p>
                 {resident ? (
-                  <p className="text-rh-cyan text-xs mt-2 truncate">{resident.name}</p>
+                  <p style={{ fontSize: 11, color: 'var(--cyan)', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{resident.name}</p>
                 ) : (
-                  <p className="text-white/20 text-xs mt-2">
+                  <p style={{ fontSize: 11, color: 'var(--text4)', marginTop: 6 }}>
                     {room.status === 'RESERVED' ? 'Reserved' : 'Vacant'}
                   </p>
                 )}
@@ -114,10 +117,6 @@ export default function AdminOccupancy() {
             );
           })}
         </div>
-      )}
-
-      {rooms.length === 0 && !isLoading && (
-        <div className="text-center py-16 text-white/30">No rooms found</div>
       )}
     </div>
   );

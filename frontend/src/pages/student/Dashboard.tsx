@@ -34,74 +34,70 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 appear">
+
       {/* Welcome banner */}
-      <div className="bg-rh-bg2 border border-white/7 rounded-2xl px-6 py-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-rh-cyan/20 flex items-center justify-center text-rh-cyan font-bold text-lg flex-shrink-0">
-            {user?.name?.slice(0,2).toUpperCase()}
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-white">
-              Good {getGreeting()}, {user?.name?.split(' ')[0]} 👋
-            </h1>
-            <p className="text-white/45 text-sm mt-0.5">
-              {allocation ? `Room ${allocation.room.number} · ${allocation.room.block}` : 'No active room'}
-            </p>
-          </div>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="avatar avatar-cyan" style={{ width: 48, height: 48, fontSize: 16, fontWeight: 700 }}>
+          {user?.name?.slice(0,2).toUpperCase()}
+        </div>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--text)', marginBottom: 2 }}>
+            Good {getGreeting()}, {user?.name?.split(' ')[0]} 👋
+          </h1>
+          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)' }}>
+            {allocation ? `Room ${allocation.room.number} · ${allocation.room.block}` : 'No active room'}
+          </p>
         </div>
       </div>
 
-      {/* Stats row */}
+      {/* KPI stat row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Rent"
+          label="Monthly Rent"
           value={allocation ? `R${Number(allocation.rent).toLocaleString()}` : '—'}
-          sub={allocation?.status === 'ACTIVE' ? 'Active lease' : 'No allocation'}
+          note={allocation?.status === 'ACTIVE' ? 'Active lease' : 'No allocation'}
           color="cyan"
-          icon={<span className="text-xl">🏠</span>}
         />
         <StatCard
-          label="Balance"
+          label="Balance Due"
           value={allocation ? `R${Number(allocation.balance).toLocaleString()}` : '—'}
-          sub={Number(allocation?.balance ?? 0) > 0 ? 'Outstanding' : 'All clear'}
+          note={Number(allocation?.balance ?? 0) > 0 ? 'Outstanding' : 'All clear'}
           color={Number(allocation?.balance ?? 0) > 0 ? 'rose' : 'cyan'}
-          icon={<span className="text-xl">💳</span>}
         />
         <StatCard
           label="Credits"
           value={`${wallet?.credits ?? 0} 🪙`}
-          sub="Redeemable rewards"
+          note="Redeemable rewards"
           color="cyan"
-          icon={<Wallet size={20} />}
         />
         <StatCard
           label="Open Tickets"
           value={String(openTickets.length)}
-          sub={openTickets.length === 0 ? 'All resolved' : 'In progress'}
+          note={openTickets.length === 0 ? 'All resolved' : 'In progress'}
           color={openTickets.length > 0 ? 'rose' : 'cyan'}
-          icon={<Wrench size={20} />}
         />
       </div>
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
         {/* Maintenance tickets */}
         <Section
           title="Maintenance"
-          icon={<Wrench size={15} />}
+          icon={<Wrench size={14} />}
           linkTo={ROUTES.MAINTENANCE}
           linkLabel="View all"
           empty={openTickets.length === 0}
           emptyMsg="No open tickets 🎉"
         >
           {openTickets.map(t => (
-            <div key={t.id} className="flex items-start gap-3 py-3 border-b border-white/5 last:border-0">
+            <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }} className="last:border-0">
               <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[t.priority]}`} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium truncate">{t.category}</p>
-                <p className="text-xs text-white/40 truncate mt-0.5">{t.location}</p>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.category}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{t.location}</p>
               </div>
-              <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLOR[t.status]}`}>
+              <span className={`badge ${STATUS_COLOR[t.status]}`} style={{ flexShrink: 0, fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none' }}>
                 {t.status.replace('_', ' ')}
               </span>
             </div>
@@ -111,21 +107,21 @@ export default function Dashboard() {
         {/* Pinned news */}
         <Section
           title="Pinned Notices"
-          icon={<Newspaper size={15} />}
+          icon={<Newspaper size={14} />}
           linkTo={ROUTES.UPDATES}
           linkLabel="View all"
           empty={pinnedNews.length === 0}
           emptyMsg="No pinned notices"
         >
           {pinnedNews.map(n => (
-            <div key={n.id} className="py-3 border-b border-white/5 last:border-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full" style={{ background: n.tagColor + '20', color: n.tagColor }}>
+            <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }} className="last:border-0">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, padding: '2px 8px', borderRadius: 20, background: n.tagColor + '20', color: n.tagColor, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                   {n.tag}
                 </span>
-                <span className="text-[11px] text-white/30">{n.date}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{n.date}</span>
               </div>
-              <p className="text-sm text-white font-medium leading-snug">{n.title}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.5 }}>{n.title}</p>
             </div>
           ))}
         </Section>
@@ -133,26 +129,24 @@ export default function Dashboard() {
         {/* Upcoming visitors */}
         <Section
           title="Upcoming Visitors"
-          icon={<QrCode size={15} />}
+          icon={<QrCode size={14} />}
           linkTo={ROUTES.VISITORS}
           linkLabel="Manage"
           empty={upcomingVisitors.length === 0}
           emptyMsg="No upcoming visitors"
         >
           {upcomingVisitors.map(v => (
-            <div key={v.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
-              <div className="w-8 h-8 rounded-full bg-rh-rose/15 flex items-center justify-center text-rh-rose text-xs font-bold flex-shrink-0">
+            <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }} className="last:border-0">
+              <div className="avatar avatar-rose" style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700 }}>
                 {v.visitorName.slice(0,2).toUpperCase()}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium truncate">{v.visitorName}</p>
-                <p className="text-xs text-white/40">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.visitorName}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
                   {format(new Date(v.date), 'dd MMM')} · {v.timeFrom}–{v.timeTo}
                 </p>
               </div>
-              <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
-                v.status === 'ACTIVE' ? 'bg-green-500/15 text-green-400' : 'bg-rh-cyan/15 text-rh-cyan'
-              }`}>
+              <span className={`badge ${v.status === 'ACTIVE' ? 'badge-cyan' : 'badge-gray'}`} style={{ flexShrink: 0 }}>
                 {v.status}
               </span>
             </div>
@@ -162,46 +156,42 @@ export default function Dashboard() {
         {/* Active chores */}
         <Section
           title="Chore Board"
-          icon={<ClipboardList size={15} />}
+          icon={<ClipboardList size={14} />}
           linkTo={ROUTES.HOUSEMATES}
           linkLabel="View all"
           empty={activeChores.length === 0}
           emptyMsg="All chores done! 🏆"
         >
           {activeChores.map(c => (
-            <div key={c.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
-              <span className="text-lg flex-shrink-0">{c.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium truncate">{c.name}</p>
-                <p className="text-xs text-white/40 truncate">{c.frequency}</p>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }} className="last:border-0">
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{c.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{c.frequency}</p>
               </div>
               {c.claimedById
-                ? <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-rh-cyan/15 text-rh-cyan">Claimed</span>
-                : <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-white/40">Open</span>
+                ? <span className="badge badge-cyan" style={{ flexShrink: 0 }}>Claimed</span>
+                : <span className="badge badge-gray" style={{ flexShrink: 0 }}>Open</span>
               }
             </div>
           ))}
         </Section>
+
       </div>
     </div>
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────
+/* ── Sub-components ─────────────────────────────────────────────── */
 
-function StatCard({ label, value, sub, color, icon }: {
-  label: string; value: string; sub: string; color: 'cyan'|'rose'; icon: React.ReactNode;
+function StatCard({ label, value, note, color }: {
+  label: string; value: string; note: string; color: 'cyan' | 'rose';
 }) {
   return (
-    <div className="bg-rh-bg2 border border-white/7 rounded-xl p-4">
-      <div className={`w-8 h-8 rounded-lg mb-3 flex items-center justify-center ${
-        color === 'cyan' ? 'bg-rh-cyan/15 text-rh-cyan' : 'bg-rh-rose/15 text-rh-rose'
-      }`}>
-        {icon}
-      </div>
-      <p className="text-xl font-bold text-white">{value}</p>
-      <p className="text-xs text-white/40 mt-0.5">{label}</p>
-      <p className="text-[11px] text-white/25 font-mono mt-1">{sub}</p>
+    <div className={`kpi-card ${color === 'rose' ? 'rose' : ''}`}>
+      <span className="kpi-card-label">{label}</span>
+      <p className="kpi-card-value">{value}</p>
+      <p className="kpi-card-note">{note}</p>
     </div>
   );
 }
@@ -211,18 +201,18 @@ function Section({ title, icon, linkTo, linkLabel, empty, emptyMsg, children }: 
   empty: boolean; emptyMsg: string; children: React.ReactNode;
 }) {
   return (
-    <div className="bg-rh-bg2 border border-white/7 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-white/70">
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)' }}>
           {icon}
-          <span className="text-sm font-semibold text-white">{title}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
         </div>
-        <Link to={linkTo} className="text-xs text-rh-cyan hover:text-rh-cyan/80 transition-colors">
+        <Link to={linkTo} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', textDecoration: 'none' }}>
           {linkLabel} →
         </Link>
       </div>
       {empty
-        ? <p className="text-sm text-white/30 py-4 text-center">{emptyMsg}</p>
+        ? <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '20px 0' }}>{emptyMsg}</p>
         : children
       }
     </div>
@@ -231,13 +221,13 @@ function Section({ title, icon, linkTo, linkLabel, empty, emptyMsg, children }: 
 
 function PageSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-24 bg-rh-bg2 rounded-2xl" />
+    <div className="space-y-6">
+      <div className="skeleton h-20 rounded-xl" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-rh-bg2 rounded-xl" />)}
+        {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-48 bg-rh-bg2 rounded-2xl" />)}
+        {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-48 rounded-xl" />)}
       </div>
     </div>
   );
@@ -245,11 +235,11 @@ function PageSkeleton() {
 
 function ErrorState() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="text-center">
-        <AlertCircle size={32} className="text-rh-rose mx-auto mb-3" />
-        <p className="text-white font-medium">Failed to load dashboard</p>
-        <p className="text-white/40 text-sm mt-1">Please refresh the page</p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div style={{ textAlign: 'center' }}>
+        <AlertCircle size={32} style={{ color: 'var(--rose)', margin: '0 auto 12px' }} />
+        <p style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Failed to load dashboard</p>
+        <p style={{ fontSize: 13, color: 'var(--text3)' }}>Please refresh the page</p>
       </div>
     </div>
   );

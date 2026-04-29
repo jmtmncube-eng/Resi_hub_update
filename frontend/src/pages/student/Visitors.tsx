@@ -19,11 +19,11 @@ const formSchema = z.object({
 });
 type FormData = z.infer<typeof formSchema>;
 
-const STATUS_STYLE: Record<string, string> = {
-  UPCOMING:  'bg-rh-cyan/15 text-rh-cyan',
-  ACTIVE:    'bg-green-500/15 text-green-400',
-  EXPIRED:   'bg-white/5 text-white/30',
-  CANCELLED: 'bg-red-500/10 text-red-400',
+const STATUS_BADGE: Record<string, string> = {
+  UPCOMING:  'badge-cyan',
+  ACTIVE:    'badge-cyan',
+  EXPIRED:   'badge-gray',
+  CANCELLED: 'badge-rose',
 };
 
 export default function Visitors() {
@@ -53,23 +53,28 @@ export default function Visitors() {
 
   return (
     <div className="space-y-5 appear">
-      <div className="flex items-center justify-between">
+
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 className="text-xl font-semibold text-white">Visitor Passes</h1>
-          <p className="text-sm text-white/40 mt-0.5">Invite and manage your guests</p>
+          <h1 className="page-title">Visitor Passes</h1>
+          <p className="page-sub">Invite and manage your guests</p>
         </div>
         <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-rh-cyan text-rh-bg text-sm font-semibold rounded-lg hover:bg-rh-cyan/90 transition-colors">
-          {showForm ? <X size={15} /> : <Plus size={15} />}
+          className={showForm ? 'btn-ghost' : 'btn-primary'}
+          style={{ flexShrink: 0, padding: '9px 16px', fontSize: 13 }}>
+          {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? 'Cancel' : 'Invite Guest'}
         </button>
       </div>
 
       {/* Invite form */}
       {showForm && (
-        <div className="bg-rh-bg2 border border-white/7 rounded-2xl p-5">
-          <h2 className="text-base font-semibold text-white mb-4">New Visitor Pass</h2>
-          <form onSubmit={handleSubmit(d => invite(d))} className="space-y-4">
+        <div className="card" style={{ padding: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--text)', marginBottom: 20 }}>
+            New Visitor Pass
+          </h2>
+          <form onSubmit={handleSubmit(d => invite(d))} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Visitor Name" error={errors.visitorName?.message}>
                 <input {...register('visitorName')} placeholder="Full name" className="input-base" />
@@ -90,29 +95,32 @@ export default function Visitors() {
                 <input {...register('timeTo')} type="time" className="input-base" />
               </Field>
             </div>
-            <button type="submit" disabled={isPending}
-              className="flex items-center gap-2 px-5 py-2.5 bg-rh-cyan text-rh-bg text-sm font-semibold rounded-lg hover:bg-rh-cyan/90 disabled:opacity-60 transition-colors">
-              {isPending && <Loader2 size={14} className="animate-spin" />}
-              Generate Pass
-            </button>
+            <div>
+              <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
+                {isPending && <Loader2 size={13} className="animate-spin" />}
+                Generate Pass
+              </button>
+            </div>
           </form>
         </div>
       )}
 
       {/* QR Modal */}
       {qrPass && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setQrPass(null)}>
-          <div className="bg-rh-bg2 border border-white/10 rounded-2xl p-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white">Visitor QR Code</h3>
-              <button onClick={() => setQrPass(null)} className="text-white/40 hover:text-white"><X size={16} /></button>
+        <div className="modal-overlay" onClick={() => setQrPass(null)}>
+          <div className="modal-card" style={{ maxWidth: 320 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Visitor QR Code</h3>
+              <button onClick={() => setQrPass(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
             </div>
-            <div className="bg-white rounded-xl p-4 flex items-center justify-center mb-4">
+            <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
               <QRCodeSVG value={qrPass.qrCode} size={180} />
             </div>
-            <p className="text-sm font-semibold text-white text-center">{qrPass.visitorName}</p>
-            <p className="text-xs text-white/40 font-mono text-center mt-1">{qrPass.qrCode}</p>
-            <p className="text-xs text-white/40 text-center mt-1">
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>{qrPass.visitorName}</p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', textAlign: 'center', marginTop: 4 }}>{qrPass.qrCode}</p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 4 }}>
               {format(new Date(qrPass.date), 'dd MMM yyyy')} · {qrPass.timeFrom}–{qrPass.timeTo}
             </p>
           </div>
@@ -120,40 +128,37 @@ export default function Visitors() {
       )}
 
       {/* Pass list */}
-      <div className="space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {isLoading
-          ? [...Array(3)].map((_, i) => <div key={i} className="h-24 bg-rh-bg2 rounded-xl animate-pulse" />)
+          ? [...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 88, borderRadius: 10 }} />)
           : passes.length === 0
             ? (
-              <div className="bg-rh-bg2 border border-white/7 rounded-2xl py-12 text-center">
-                <QrCode size={28} className="text-white/20 mx-auto mb-3" />
-                <p className="text-white/40 text-sm">No visitor passes yet</p>
+              <div className="card empty-state">
+                <QrCode size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+                <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No visitor passes yet</p>
+                <p>Invite a guest to get started</p>
               </div>
             )
             : passes.map(pass => (
-              <div key={pass.id} className="bg-rh-bg2 border border-white/7 rounded-xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-rh-rose/15 flex items-center justify-center text-rh-rose font-bold text-sm flex-shrink-0">
+              <div key={pass.id} className="card-sm" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+                <div className="avatar avatar-rose" style={{ width: 40, height: 40, fontSize: 13, fontWeight: 700 }}>
                   {pass.visitorName.slice(0,2).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white">{pass.visitorName}</p>
-                  <p className="text-xs text-white/40 font-mono">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{pass.visitorName}</p>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
                     {format(new Date(pass.date), 'dd MMM yyyy')} · {pass.timeFrom}–{pass.timeTo}
                   </p>
-                  <p className="text-xs text-white/30 mt-0.5">{pass.purpose}</p>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{pass.purpose}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${STATUS_STYLE[pass.status]}`}>
-                    {pass.status}
-                  </span>
-                  <button onClick={() => setQrPass(pass)}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
-                    <QrCode size={14} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <span className={`badge ${STATUS_BADGE[pass.status] || 'badge-gray'}`}>{pass.status}</span>
+                  <button onClick={() => setQrPass(pass)} style={{ padding: 6, borderRadius: 6, background: 'var(--hover)', border: '1px solid var(--border)', color: 'var(--text2)', cursor: 'pointer', display: 'flex' }}>
+                    <QrCode size={13} />
                   </button>
-                  {(pass.status === 'UPCOMING') && (
-                    <button onClick={() => cancel(pass.id)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors">
-                      <Trash2 size={14} />
+                  {pass.status === 'UPCOMING' && (
+                    <button onClick={() => cancel(pass.id)} style={{ padding: 6, borderRadius: 6, background: 'var(--hover)', border: '1px solid var(--border)', color: 'var(--rose)', cursor: 'pointer', display: 'flex' }}>
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>
@@ -168,9 +173,9 @@ export default function Visitors() {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm text-white/60 mb-1.5">{label}</label>
+      <label className="field-label">{label}</label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p style={{ marginTop: 4, fontSize: 11, color: '#f87171', fontFamily: "'IBM Plex Mono', monospace" }}>{error}</p>}
     </div>
   );
 }

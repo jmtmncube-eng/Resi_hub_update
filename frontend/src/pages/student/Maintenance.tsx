@@ -18,23 +18,23 @@ const formSchema = z.object({
 });
 type FormData = z.infer<typeof formSchema>;
 
-const STATUS_STYLE: Record<TicketStatus, string> = {
-  OPEN:        'bg-yellow-500/15 text-yellow-400 border-yellow-500/20',
-  IN_PROGRESS: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  RESOLVED:    'bg-green-500/15 text-green-400 border-green-500/20',
-  CLOSED:      'bg-white/5 text-white/40 border-white/10',
+const STATUS_STYLE: Record<TicketStatus, { badge: string; bg: string; text: string }> = {
+  OPEN:        { badge: 'badge-rose',  bg: 'rgba(232,25,122,.1)',   text: '#E8197A' },
+  IN_PROGRESS: { badge: 'badge-cyan',  bg: 'rgba(0,204,204,.1)',    text: '#00CCCC' },
+  RESOLVED:    { badge: 'badge-cyan',  bg: 'rgba(0,204,204,.08)',   text: '#00CCCC' },
+  CLOSED:      { badge: 'badge-gray',  bg: 'rgba(128,128,128,.08)', text: 'rgba(128,128,128,.8)' },
 };
 
 const PRIORITY_COLOR: Record<TicketPriority, string> = {
-  LOW:       'text-white/40',
-  NORMAL:    'text-rh-cyan',
-  HIGH:      'text-orange-400',
-  EMERGENCY: 'text-red-400',
+  LOW:       'var(--text3)',
+  NORMAL:    'var(--cyan)',
+  HIGH:      '#fb923c',
+  EMERGENCY: '#f87171',
 };
 
 export default function Maintenance() {
-  const [tab,      setTab]      = useState<'list'|'report'>('list');
-  const [files,    setFiles]    = useState<File[]>([]);
+  const [tab,   setTab]   = useState<'list'|'report'>('list');
+  const [files, setFiles] = useState<File[]>([]);
   const qc = useQueryClient();
 
   const { data: tickets = [], isLoading } = useQuery({
@@ -65,26 +65,30 @@ export default function Maintenance() {
 
   return (
     <div className="space-y-5 appear">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 className="text-xl font-semibold text-white">Maintenance</h1>
-          <p className="text-sm text-white/40 mt-0.5">Report and track issues in your room</p>
+          <h1 className="page-title">Maintenance</h1>
+          <p className="page-sub">Report and track issues in your room</p>
         </div>
         <button
           onClick={() => setTab(tab === 'report' ? 'list' : 'report')}
-          className="flex items-center gap-2 px-4 py-2 bg-rh-cyan text-rh-bg text-sm font-semibold rounded-lg hover:bg-rh-cyan/90 transition-colors"
+          className={tab === 'report' ? 'btn-ghost' : 'btn-primary'}
+          style={{ flexShrink: 0, padding: '9px 16px', fontSize: 13 }}
         >
-          {tab === 'report' ? <X size={15} /> : <Plus size={15} />}
+          {tab === 'report' ? <X size={14} /> : <Plus size={14} />}
           {tab === 'report' ? 'Cancel' : 'Report Issue'}
         </button>
       </div>
 
       {/* Report form */}
       {tab === 'report' && (
-        <div className="bg-rh-bg2 border border-white/7 rounded-2xl p-5">
-          <h2 className="text-base font-semibold text-white mb-4">New Maintenance Request</h2>
-          <form onSubmit={handleSubmit(d => submit(d))} className="space-y-4">
+        <div className="card" style={{ padding: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--text)', marginBottom: 20 }}>
+            New Maintenance Request
+          </h2>
+          <form onSubmit={handleSubmit(d => submit(d))} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Category" error={errors.category?.message}>
                 <select {...register('category')} className="input-base">
@@ -99,80 +103,95 @@ export default function Maintenance() {
                 </select>
               </Field>
             </div>
+
             <Field label="Location" error={errors.location?.message}>
               <input {...register('location')} placeholder="e.g. Room 204 bathroom" className="input-base" />
             </Field>
+
             <Field label="Description" error={errors.description?.message}>
-              <textarea {...register('description')} rows={4} placeholder="Describe the issue in detail..." className="input-base" />
+              <textarea {...register('description')} rows={4} placeholder="Describe the issue in detail…" className="input-base" />
             </Field>
 
             {/* Media upload */}
             <div>
-              <label className="block text-sm text-white/60 mb-1.5">Photos / Videos (optional)</label>
-              <label className="flex items-center gap-2 w-fit cursor-pointer px-3 py-2 bg-white/5 hover:bg-white/8 border border-white/10 rounded-lg text-sm text-white/60 transition-colors">
-                <ImagePlus size={15} />
+              <label className="field-label" style={{ marginBottom: 8 }}>Photos / Videos (optional)</label>
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                padding: '8px 14px', background: 'var(--hover)', border: '1px solid var(--border2)',
+                borderRadius: 8, fontSize: 13, color: 'var(--text2)', transition: 'all .18s',
+              }}>
+                <ImagePlus size={14} />
                 Add media
-                <input type="file" multiple accept="image/*,video/*" className="hidden"
+                <input type="file" multiple accept="image/*,video/*" style={{ display: 'none' }}
                   onChange={e => setFiles(Array.from(e.target.files ?? []))} />
               </label>
               {files.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {files.map((f, i) => (
-                    <span key={i} className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-white/50">{f.name}</span>
+                    <span key={i} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, background: 'var(--bg3)', padding: '3px 8px', borderRadius: 4, color: 'var(--text2)' }}>
+                      {f.name}
+                    </span>
                   ))}
                 </div>
               )}
             </div>
 
-            <button type="submit" disabled={isPending}
-              className="flex items-center gap-2 px-5 py-2.5 bg-rh-cyan text-rh-bg text-sm font-semibold rounded-lg hover:bg-rh-cyan/90 disabled:opacity-60 transition-colors">
-              {isPending && <Loader2 size={14} className="animate-spin" />}
-              {isPending ? 'Submitting…' : 'Submit Request'}
-            </button>
+            <div>
+              <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
+                {isPending && <Loader2 size={13} className="animate-spin" />}
+                {isPending ? 'Submitting…' : 'Submit Request'}
+              </button>
+            </div>
           </form>
         </div>
       )}
 
       {/* Ticket list */}
       {tab === 'list' && (
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {isLoading
-            ? [...Array(3)].map((_, i) => <div key={i} className="h-24 bg-rh-bg2 rounded-xl animate-pulse" />)
+            ? [...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 96, borderRadius: 10 }} />)
             : tickets.length === 0
               ? <EmptyTickets onReport={() => setTab('report')} />
-              : tickets.map(t => (
-                  <div key={t.id} className="bg-rh-bg2 border border-white/7 rounded-xl p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-rh-cyan/10 flex items-center justify-center text-rh-cyan flex-shrink-0">
-                          <Wrench size={16} />
+              : tickets.map(t => {
+                  const s = STATUS_STYLE[t.status];
+                  return (
+                    <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(0,204,204,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyan)', flexShrink: 0 }}>
+                            <Wrench size={16} />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.category}</p>
+                            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{t.location}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-white">{t.category}</p>
-                          <p className="text-xs text-white/40">{t.location}</p>
+                        <span className={`badge ${s.badge}`} style={{ flexShrink: 0 }}>
+                          {t.status.replace('_',' ')}
+                        </span>
+                      </div>
+
+                      <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 12, lineHeight: 1.6 }}>{t.description}</p>
+
+                      {t.adminNote && (
+                        <div style={{ marginTop: 10, background: 'rgba(0,204,204,.06)', border: '1px solid rgba(0,204,204,.15)', borderRadius: 8, padding: '8px 12px' }}>
+                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Admin note</p>
+                          <p style={{ fontSize: 12, color: 'var(--text2)' }}>{t.adminNote}</p>
                         </div>
+                      )}
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: PRIORITY_COLOR[t.priority], fontWeight: 500 }}>
+                          {t.priority} priority
+                        </span>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+                          {format(new Date(t.createdAt), 'dd MMM yyyy')}
+                        </span>
                       </div>
-                      <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border flex-shrink-0 ${STATUS_STYLE[t.status]}`}>
-                        {t.status.replace('_',' ')}
-                      </span>
                     </div>
-                    <p className="text-sm text-white/60 mt-3 leading-relaxed">{t.description}</p>
-                    {t.adminNote && (
-                      <div className="mt-3 bg-rh-cyan/8 border border-rh-cyan/15 rounded-lg px-3 py-2">
-                        <p className="text-xs text-rh-cyan/80 font-medium mb-0.5">Admin note</p>
-                        <p className="text-xs text-white/60">{t.adminNote}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mt-3">
-                      <span className={`text-xs font-mono font-medium ${PRIORITY_COLOR[t.priority]}`}>
-                        {t.priority} priority
-                      </span>
-                      <span className="text-xs text-white/25 font-mono">
-                        {format(new Date(t.createdAt), 'dd MMM yyyy')}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
           }
         </div>
       )}
@@ -183,21 +202,20 @@ export default function Maintenance() {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm text-white/60 mb-1.5">{label}</label>
+      <label className="field-label">{label}</label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p style={{ marginTop: 4, fontSize: 11, color: '#f87171', fontFamily: "'IBM Plex Mono', monospace" }}>{error}</p>}
     </div>
   );
 }
 
 function EmptyTickets({ onReport }: { onReport: () => void }) {
   return (
-    <div className="bg-rh-bg2 border border-white/7 rounded-2xl py-12 text-center">
-      <Wrench size={28} className="text-white/20 mx-auto mb-3" />
-      <p className="text-white/50 font-medium">No maintenance requests yet</p>
-      <p className="text-white/25 text-sm mt-1">Everything working well? Report an issue if not.</p>
-      <button onClick={onReport}
-        className="mt-4 px-4 py-2 bg-rh-cyan/10 text-rh-cyan text-sm font-medium rounded-lg hover:bg-rh-cyan/15 transition-colors">
+    <div className="card empty-state">
+      <Wrench size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+      <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No maintenance requests yet</p>
+      <p>Everything working well? Report an issue if not.</p>
+      <button onClick={onReport} className="btn-primary" style={{ marginTop: 16, fontSize: 13, padding: '9px 18px' }}>
         Report an issue
       </button>
     </div>

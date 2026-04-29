@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Users, Loader2 } from 'lucide-react';
 import { getAccounts, updateAccount, AdminAccount } from '../../services/admin.service';
 
-const roleColor: Record<string, string> = {
-  ADMIN:           'text-rh-rose border-rh-rose/30 bg-rh-rose/8',
-  ACTIVE_STUDENT:  'text-green-400 border-green-500/30 bg-green-500/8',
-  PENDING_STUDENT: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/8',
+const ROLE_BADGE: Record<string, string> = {
+  ADMIN:           'badge-rose',
+  ACTIVE_STUDENT:  'badge-cyan',
+  PENDING_STUDENT: 'badge-gray',
 };
 
 const roleLabel: Record<string, string> = {
@@ -16,8 +17,8 @@ const roleLabel: Record<string, string> = {
 
 export default function AdminAccounts() {
   const qc = useQueryClient();
-  const [search, setSearch]   = useState('');
-  const [editId, setEditId]   = useState<string | null>(null);
+  const [search, setSearch]     = useState('');
+  const [editId, setEditId]     = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', role: '', phone: '' });
 
   const { data: accounts = [], isLoading, isError } = useQuery<AdminAccount[]>({
@@ -45,17 +46,16 @@ export default function AdminAccounts() {
   };
 
   if (isError) return (
-    <div className="text-rh-rose text-sm p-6">Failed to load accounts. Is the backend running?</div>
+    <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load accounts. Is the backend running?</p>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 appear">
+
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Accounts</h1>
-        <p className="text-white/40 text-sm mt-1">
-          {totals.active} active · {totals.pending} pending · {totals.admin} admins
-        </p>
+        <h1 className="page-title">Accounts</h1>
+        <p className="page-sub">{totals.active} active · {totals.pending} pending · {totals.admin} admins</p>
       </div>
 
       {/* Search */}
@@ -64,37 +64,43 @@ export default function AdminAccounts() {
         placeholder="Search by name or email…"
         value={search}
         onChange={e => setSearch(e.target.value)}
-        className="input-base max-w-sm"
+        className="input-base"
+        style={{ maxWidth: 320 }}
       />
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-2 border-rh-cyan border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(6)].map((_, i) => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />)}
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="card empty-state">
+          <Users size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No accounts found</p>
         </div>
       ) : (
-        <div className="bg-white/4 border border-white/8 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="rh-table">
               <thead>
-                <tr className="border-b border-white/8 text-white/40 text-xs uppercase tracking-wider">
-                  <th className="text-left p-4">User</th>
-                  <th className="text-left p-4">Role</th>
-                  <th className="text-left p-4">Room</th>
-                  <th className="text-left p-4">Credits</th>
-                  <th className="text-left p-4">Joined</th>
-                  <th className="text-left p-4"></th>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Room</th>
+                  <th>Credits</th>
+                  <th>Joined</th>
+                  <th></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/4">
+              <tbody>
                 {accounts.map(a => (
-                  <tr key={a.id} className="hover:bg-white/2 transition-colors">
+                  <tr key={a.id}>
                     {editId === a.id ? (
                       <>
-                        <td className="p-4" colSpan={3}>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <td colSpan={3}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
                             <div>
-                              <label className="text-white/40 text-xs mb-1 block">Name</label>
+                              <label className="field-label">Name</label>
                               <input
                                 type="text"
                                 value={editForm.name}
@@ -104,7 +110,7 @@ export default function AdminAccounts() {
                               />
                             </div>
                             <div>
-                              <label className="text-white/40 text-xs mb-1 block">Role</label>
+                              <label className="field-label">Role</label>
                               <select
                                 value={editForm.role}
                                 onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
@@ -117,7 +123,7 @@ export default function AdminAccounts() {
                               </select>
                             </div>
                             <div>
-                              <label className="text-white/40 text-xs mb-1 block">Phone</label>
+                              <label className="field-label">Phone</label>
                               <input
                                 type="text"
                                 value={editForm.phone}
@@ -128,67 +134,64 @@ export default function AdminAccounts() {
                             </div>
                           </div>
                         </td>
-                        <td className="p-4" />
-                        <td className="p-4" />
-                        <td className="p-4">
-                          <div className="flex gap-2">
+                        <td />
+                        <td />
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
                             <button
                               onClick={() => updateMut.mutate(a.id)}
                               disabled={updateMut.isPending}
-                              className="text-xs px-3 py-1.5 rounded bg-rh-cyan text-rh-dark font-semibold"
+                              className="btn-primary"
+                              style={{ padding: '5px 12px', fontSize: 12 }}
                             >
-                              {updateMut.isPending ? '…' : 'Save'}
+                              {updateMut.isPending ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
                             </button>
-                            <button
-                              onClick={() => setEditId(null)}
-                              className="text-xs px-3 py-1.5 rounded bg-white/8 text-white/60"
-                            >
-                              Cancel
-                            </button>
+                            <button onClick={() => setEditId(null)} className="btn-ghost" style={{ padding: '5px 10px', fontSize: 12 }}>Cancel</button>
                           </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             {a.avatarUrl ? (
-                              <img src={a.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                              <img src={a.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/40 text-xs">
+                              <div className="avatar avatar-cyan" style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700 }}>
                                 {a.name.charAt(0).toUpperCase()}
                               </div>
                             )}
                             <div>
-                              <p className="text-white font-medium">{a.name}</p>
-                              <p className="text-white/40 text-xs">{a.email}</p>
+                              <p style={{ fontWeight: 500, color: 'var(--text)' }}>{a.name}</p>
+                              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{a.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="p-4">
-                          <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${roleColor[a.role]}`}>
+                        <td>
+                          <span className={`badge ${ROLE_BADGE[a.role] ?? 'badge-gray'}`}>
                             {roleLabel[a.role] ?? a.role}
                           </span>
                         </td>
-                        <td className="p-4 text-white/60 text-xs font-mono">
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text2)' }}>
                           {a.allocation?.room
                             ? `Blk ${a.allocation.room.block} – ${a.allocation.room.number}`
-                            : <span className="text-white/25">No room</span>
+                            : <span style={{ color: 'var(--text4)' }}>No room</span>
                           }
                         </td>
-                        <td className="p-4 text-rh-cyan font-mono text-sm">
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: 'var(--cyan)' }}>
                           {a.wallet?.credits ?? 0}
                         </td>
-                        <td className="p-4 text-white/30 text-xs">
+                        <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
                           {new Date(a.createdAt).toLocaleDateString()}
                         </td>
-                        <td className="p-4">
+                        <td>
                           <button
                             onClick={() => {
                               setEditId(a.id);
                               setEditForm({ name: a.name, role: a.role, phone: a.phone ?? '' });
                             }}
-                            className="text-xs px-3 py-1.5 rounded bg-white/8 text-white/60 hover:bg-white/12"
+                            className="btn-ghost"
+                            style={{ padding: '5px 12px', fontSize: 12 }}
                           >
                             Edit
                           </button>
@@ -200,9 +203,6 @@ export default function AdminAccounts() {
               </tbody>
             </table>
           </div>
-          {accounts.length === 0 && (
-            <p className="text-center py-10 text-white/30">No accounts found</p>
-          )}
         </div>
       )}
     </div>

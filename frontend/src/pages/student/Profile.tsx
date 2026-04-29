@@ -20,6 +20,8 @@ export default function Profile() {
   const [saved, setSaved] = useState(false);
   const fileRef     = useRef<HTMLInputElement>(null);
 
+  const isAdmin = user?.role === 'ADMIN';
+
   const { register, handleSubmit, formState: { errors, isDirty } } = useForm<FormData>({
     defaultValues: {
       name:       user?.name       ?? '',
@@ -44,50 +46,47 @@ export default function Profile() {
     if (file) uploadAv(file);
   }
 
+  const roleLabel = isAdmin ? 'Admin' : user?.role === 'ACTIVE_STUDENT' ? 'Resident' : 'Applicant';
+
   return (
-    <div className="space-y-5 appear max-w-2xl">
+    <div className="space-y-5 appear" style={{ maxWidth: 680 }}>
       <div>
-        <h1 className="text-xl font-semibold text-white">Profile</h1>
-        <p className="text-sm text-white/40 mt-0.5">Your personal details and bio</p>
+        <h1 className="page-title">Profile</h1>
+        <p className="page-sub">Your personal details and bio</p>
       </div>
 
       {/* Avatar section */}
-      <div className="bg-rh-bg2 border border-white/7 rounded-2xl p-5">
-        <div className="flex items-center gap-5">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-rh-cyan/20 flex items-center justify-center text-rh-cyan font-bold text-2xl overflow-hidden">
+      <div className="card" style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ position: 'relative' }}>
+            <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`} style={{ width: 72, height: 72, fontSize: 22, fontWeight: 700 }}>
               {user?.avatarUrl
-                ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                ? <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : user?.name?.slice(0,2).toUpperCase()
               }
             </div>
-            <button onClick={() => fileRef.current?.click()}
-              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-rh-cyan flex items-center justify-center text-rh-bg hover:bg-rh-cyan/80 transition-colors">
-              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
+            <button onClick={() => fileRef.current?.click()} style={{
+              position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%',
+              background: 'var(--cyan)', color: '#0f0f12', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {uploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
             </button>
           </div>
           <div>
-            <p className="text-base font-semibold text-white">{user?.name}</p>
-            <p className="text-sm text-white/40 font-mono">{user?.email}</p>
-            <span className={`mt-1.5 inline-flex text-[11px] font-mono px-2 py-0.5 rounded-full ${
-              user?.role === 'ADMIN'
-                ? 'bg-rh-rose/15 text-rh-rose'
-                : user?.role === 'ACTIVE_STUDENT'
-                  ? 'bg-rh-cyan/15 text-rh-cyan'
-                  : 'bg-yellow-500/15 text-yellow-400'
-            }`}>
-              {user?.role?.replace('_', ' ')}
-            </span>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{user?.name}</p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>{user?.email}</p>
+            <span className={`badge ${isAdmin ? 'badge-rose' : 'badge-cyan'}`}>{roleLabel}</span>
           </div>
         </div>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
       </div>
 
       {/* Edit form */}
-      <form onSubmit={handleSubmit(d => save(d))} className="bg-rh-bg2 border border-white/7 rounded-2xl p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-white">Personal Details</h2>
+      <form onSubmit={handleSubmit(d => save(d))} className="card" style={{ padding: '20px 24px' }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 20 }}>Personal Details</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ marginBottom: 16 }}>
           <Field label="Full Name" error={errors.name?.message}>
             <input {...register('name')} className="input-base" />
           </Field>
@@ -106,22 +105,21 @@ export default function Profile() {
           <textarea {...register('bio')} rows={3} placeholder="Tell your housemates a bit about yourself…" className="input-base" />
         </Field>
 
-        <div className="flex items-center gap-3">
-          <button type="submit" disabled={saving || !isDirty}
-            className="flex items-center gap-2 px-5 py-2.5 bg-rh-cyan text-rh-bg text-sm font-semibold rounded-lg hover:bg-rh-cyan/90 disabled:opacity-50 transition-colors">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
+          <button type="submit" disabled={saving || !isDirty} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
-          {saved && <span className="text-xs text-green-400 font-mono">✓ Saved!</span>}
+          {saved && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: '#4ade80' }}>✓ Saved!</span>}
         </div>
       </form>
 
       {/* Room info (read-only) */}
       {user?.allocation && (
-        <div className="bg-rh-bg2 border border-white/7 rounded-2xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-3">Room Information</h2>
+        <div className="card" style={{ padding: '20px 24px' }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>Room Information</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <InfoTile label="Room" value={`Room ${user.allocation.room.number}`} />
+            <InfoTile label="Room"   value={`Room ${user.allocation.room.number}`} />
             <InfoTile label="Block"  value={user.allocation.room.block} />
             <InfoTile label="Type"   value={user.allocation.room.type} />
             <InfoTile label="Rent"   value={`R${Number(user.allocation.rent).toLocaleString()}/mo`} />
@@ -136,18 +134,18 @@ export default function Profile() {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-white/50 mb-1.5">{label}</label>
+      <label className="field-label">{label}</label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      {error && <p style={{ marginTop: 4, fontSize: 11, color: '#f87171', fontFamily: "'IBM Plex Mono', monospace" }}>{error}</p>}
     </div>
   );
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-rh-bg3 rounded-lg px-3 py-2.5">
-      <p className="text-[10px] text-white/30 font-mono uppercase tracking-wider">{label}</p>
-      <p className="text-sm text-white font-medium mt-0.5">{value}</p>
+    <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px' }}>
+      <p className="micro-label" style={{ marginBottom: 4 }}>{label}</p>
+      <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{value}</p>
     </div>
   );
 }

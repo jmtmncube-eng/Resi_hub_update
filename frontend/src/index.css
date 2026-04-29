@@ -1,159 +1,649 @@
+/* ── Google Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Autofill override (dark mode default) ───────────────────── */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-text-fill-color: #ffffff !important;
-  -webkit-box-shadow: 0 0 0px 1000px #1e1e28 inset !important;
-  transition: background-color 9999s ease-in-out 0s;
-  caret-color: #ffffff;
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — CSS Custom Properties
+   Dark theme is default; html.light overrides to light values
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --cyan:      #00CCCC;
+  --rose:      #E8197A;
+
+  /* Dark theme (default) */
+  --bg:        #0f0f12;
+  --bg2:       #16161b;
+  --bg3:       #1e1e26;
+  --border:    rgba(255,255,255,.07);
+  --border2:   rgba(255,255,255,.13);
+  --text:      #fff;
+  --text2:     rgba(255,255,255,.65);
+  --text3:     rgba(255,255,255,.32);
+  --text4:     rgba(255,255,255,.12);
+  --input-bg:  rgba(255,255,255,.04);
+  --sel-bg:    #18181e;
+  --hover:     rgba(255,255,255,.04);
+  --shadow:    rgba(0,0,0,.45);
 }
 
-html.light input:-webkit-autofill,
-html.light input:-webkit-autofill:hover,
-html.light input:-webkit-autofill:focus,
-html.light input:-webkit-autofill:active {
-  -webkit-text-fill-color: #111118 !important;
-  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
-  caret-color: #111118;
+html.light {
+  --bg:        #f2f4f7;
+  --bg2:       #ffffff;
+  --bg3:       #e8eaef;
+  --border:    rgba(0,0,0,.08);
+  --border2:   rgba(0,0,0,.15);
+  --text:      #0f0f12;
+  --text2:     rgba(15,15,18,.65);
+  --text3:     rgba(15,15,18,.4);
+  --text4:     rgba(15,15,18,.16);
+  --input-bg:  rgba(0,0,0,.03);
+  --sel-bg:    #f0f0f0;
+  --hover:     rgba(0,0,0,.025);
+  --shadow:    rgba(0,0,0,.1);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL RESET & BASE
+   ═══════════════════════════════════════════════════════════════ */
 
 @layer base {
-  :root {
-    --cyan: #00CCCC;
-    --rose: #E8197A;
-  }
-
-  * { box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html { scroll-behavior: smooth; }
 
   body {
-    background-color: #0f0f12;
-    color: #ffffff;
+    background:  var(--bg);
+    color:       var(--text);
     font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size:   14px;
+    line-height: 1.7;
+    min-height:  100vh;
+    overflow-x:  hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition:  background .22s, color .22s;
+  }
+
+  button {
+    cursor:      pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    transition:  all .18s;
+  }
+
+  textarea { resize: vertical; }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    color:       var(--text);
   }
 
   /* Custom scrollbar */
   ::-webkit-scrollbar       { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(0,204,204,0.3); border-radius: 4px; }
-}
+  ::-webkit-scrollbar-thumb { background: rgba(0,204,204,.3); border-radius: 4px; }
 
-@layer components {
-  .input-base {
-    @apply w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none transition-colors;
-    background-color: #1e1e28;
-    border-color: rgba(255,255,255,0.10);
-    color: #ffffff;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  .input-base::placeholder { color: rgba(255,255,255,0.20); }
-  .input-base:focus {
-    border-color: #00CCCC;
-    background-color: rgba(0,204,204,0.05);
-  }
-  select.input-base option { background: #16161b; }
-
-  /* Login-specific inputs (not using .input-base, styled inline in component) */
-  .input-login {
-    @apply w-full border rounded-lg px-3.5 py-2.5 text-sm font-mono outline-none transition-colors;
-    background-color: #1e1e28;
-    color: #ffffff;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  .input-login::placeholder { color: rgba(255,255,255,0.20); }
-}
-
-@layer utilities {
-  .font-mono-data { font-family: 'IBM Plex Mono', monospace; }
+  html.light ::-webkit-scrollbar-thumb { background: rgba(0,204,204,.4); }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LIGHT MODE OVERRIDES
-   Applied when <html class="light"> is set by ThemeContext
+   ANIMATIONS
    ═══════════════════════════════════════════════════════════════ */
 
-html.light body {
-  background-color: #f0f2f5;
-  color: #111118;
+@keyframes appear {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 
-/* ── Backgrounds ─────────────────────────────────────────────── */
-html.light .bg-rh-bg  { background-color: #f0f2f5 !important; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer components {
+
+  /* ── Appear animation ─────────────────────────────────────── */
+  .appear { animation: appear .3s ease forwards; }
+
+  /* ── Typography helpers ───────────────────────────────────── */
+  .section-title {
+    font-size:      28px;
+    font-weight:    700;
+    letter-spacing: -.03em;
+    color:          var(--text);
+  }
+  .section-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   12px;
+    color:       var(--text3);
+    margin-top:  4px;
+  }
+  .micro-label {
+    font-family:     'IBM Plex Mono', monospace;
+    font-size:       10px;
+    color:           var(--text3);
+    letter-spacing:  .09em;
+    text-transform:  uppercase;
+    display:         block;
+  }
+  .font-mono-data { font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── Inputs & form controls ───────────────────────────────── */
+  .input-base {
+    @apply w-full rounded-lg outline-none transition-all;
+    background:  var(--input-bg);
+    border:      1px solid var(--border2);
+    padding:     10px 14px;
+    color:       var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   13px;
+    width:       100%;
+  }
+  .input-base::placeholder { color: var(--text4); }
+  .input-base:focus {
+    border-color: #00CCCC;
+    background:   rgba(0,204,204,.06);
+  }
+  select.input-base option { background: var(--sel-bg); color: var(--text); }
+
+  .input-login {
+    @apply w-full rounded-lg outline-none transition-all;
+    background:  var(--input-bg);
+    border:      1px solid var(--border2);
+    padding:     10px 14px;
+    color:       var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   13px;
+    width:       100%;
+  }
+  .input-login::placeholder { color: var(--text4); }
+  .input-login:focus {
+    border-color: #00CCCC;
+    background:   rgba(0,204,204,.06);
+  }
+
+  .field-label {
+    font-family:    'IBM Plex Mono', monospace;
+    font-size:      10px;
+    color:          var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    display:        block;
+    margin-bottom:  6px;
+  }
+
+  /* ── Cards ────────────────────────────────────────────────── */
+  .card {
+    background:    var(--bg2);
+    border:        1px solid var(--border);
+    border-radius: 12px;
+    padding:       24px;
+  }
+  .card-sm {
+    background:    var(--bg2);
+    border:        1px solid var(--border);
+    border-radius: 10px;
+    padding:       18px;
+  }
+
+  /* KPI stat card with top accent stripe */
+  .kpi-card {
+    background:    var(--bg2);
+    border:        1px solid var(--border);
+    border-radius: 12px;
+    padding:       20px 22px;
+    position:      relative;
+    overflow:      hidden;
+  }
+  .kpi-card::before {
+    content:    '';
+    position:   absolute;
+    top:        0; left: 0; right: 0;
+    height:     2px;
+    background: var(--cyan);
+  }
+  .kpi-card.rose::before { background: var(--rose); }
+  .kpi-card-label {
+    font-family:    'IBM Plex Mono', monospace;
+    font-size:      10px;
+    color:          var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-bottom:  8px;
+    display:        block;
+  }
+  .kpi-card-value {
+    font-size:      26px;
+    font-weight:    700;
+    letter-spacing: -.02em;
+    color:          var(--text);
+    line-height:    1.1;
+  }
+  .kpi-card-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   10px;
+    color:       var(--text3);
+    margin-top:  4px;
+  }
+
+  /* Section header (used inside cards) */
+  .card-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    margin-bottom:   16px;
+  }
+  .card-title {
+    font-size:   14px;
+    font-weight: 600;
+    color:       var(--text);
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────── */
+  .btn-primary {
+    background:    #00CCCC;
+    color:         #0f0f12;
+    border:        none;
+    border-radius: 8px;
+    padding:       11px 22px;
+    font-weight:   600;
+    font-size:     14px;
+    font-family:   'Space Grotesk', sans-serif;
+    cursor:        pointer;
+    transition:    all .18s;
+    display:       inline-flex;
+    align-items:   center;
+    gap:           8px;
+  }
+  .btn-primary:hover:not(:disabled) { background: #00aaaa; }
+  .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+  .btn-rose {
+    background:    #E8197A;
+    color:         #fff;
+    border:        none;
+    border-radius: 8px;
+    padding:       11px 22px;
+    font-weight:   600;
+    font-size:     14px;
+    font-family:   'Space Grotesk', sans-serif;
+    cursor:        pointer;
+    transition:    all .18s;
+    display:       inline-flex;
+    align-items:   center;
+    gap:           8px;
+  }
+  .btn-rose:hover:not(:disabled) { background: #c9145f; }
+  .btn-rose:disabled { opacity: .6; cursor: not-allowed; }
+
+  .btn-ghost {
+    background:    transparent;
+    border:        1px solid var(--border2);
+    color:         var(--text2);
+    border-radius: 8px;
+    padding:       9px 20px;
+    font-size:     13px;
+    font-family:   'Space Grotesk', sans-serif;
+    cursor:        pointer;
+    transition:    all .18s;
+    display:       inline-flex;
+    align-items:   center;
+    gap:           8px;
+  }
+  .btn-ghost:hover { border-color: var(--cyan); color: var(--text); }
+
+  .btn-logout {
+    border:        1px solid rgba(232,25,122,.3);
+    color:         #E8197A;
+    background:    transparent;
+    border-radius: 6px;
+    padding:       5px 12px;
+    font-family:   'IBM Plex Mono', monospace;
+    font-size:     11px;
+    cursor:        pointer;
+    transition:    all .18s;
+  }
+  .btn-logout:hover { background: rgba(232,25,122,.1); }
+
+  .btn-theme {
+    background:    var(--bg3);
+    border:        1px solid var(--border2);
+    border-radius: 20px;
+    padding:       5px 12px;
+    font-family:   'IBM Plex Mono', monospace;
+    font-size:     11px;
+    color:         var(--text2);
+    cursor:        pointer;
+    transition:    all .18s;
+    display:       inline-flex;
+    align-items:   center;
+    gap:           6px;
+  }
+  .btn-theme:hover { border-color: #00CCCC; color: var(--text); }
+
+  /* ── Badges / chips ───────────────────────────────────────── */
+  .badge {
+    display:        inline-block;
+    padding:        3px 10px;
+    border-radius:  20px;
+    font-family:    'IBM Plex Mono', monospace;
+    font-size:      10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border:         1px solid;
+    line-height:    1.6;
+  }
+  .badge-cyan  { border-color: #00CCCC;               color: #00CCCC;              }
+  .badge-rose  { border-color: #E8197A;               color: #E8197A;              }
+  .badge-gray  { border-color: rgba(128,128,128,.5);  color: rgba(128,128,128,.8); }
+  .badge-fill-cyan { background: rgba(0,204,204,.12); border-color: rgba(0,204,204,.2); color: #00CCCC; }
+  .badge-fill-rose { background: rgba(232,25,122,.12); border-color: rgba(232,25,122,.2); color: #E8197A; }
+
+  /* ── Avatars ──────────────────────────────────────────────── */
+  .avatar {
+    border-radius: 50%;
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-family:   'IBM Plex Mono', monospace;
+    font-weight:   500;
+    flex-shrink:   0;
+    overflow:      hidden;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar-cyan {
+    background: rgba(0,204,204,.1);
+    border:     2px solid #00CCCC;
+    color:      #00CCCC;
+  }
+  .avatar-rose {
+    background: rgba(232,25,122,.1);
+    border:     2px solid #E8197A;
+    color:      #E8197A;
+  }
+  .avatar-neutral {
+    background: var(--bg3);
+    border:     1px solid var(--border2);
+    color:      var(--text2);
+  }
+
+  /* ── Navigation items ─────────────────────────────────────── */
+  .nav-item {
+    display:       flex;
+    align-items:   center;
+    gap:           10px;
+    padding:       7px 12px;
+    border-radius: 7px;
+    font-size:     13px;
+    font-weight:   400;
+    color:         var(--text3);
+    transition:    all .18s;
+    text-decoration: none;
+    border:        none;
+    background:    transparent;
+    width:         100%;
+    cursor:        pointer;
+  }
+  .nav-item:hover    { color: var(--text2); background: var(--hover); }
+  .nav-item.active   { background: rgba(0,204,204,.1); color: #00CCCC; font-weight: 600; }
+
+  /* ── Modal overlay ────────────────────────────────────────── */
+  .modal-overlay {
+    position:        fixed;
+    inset:           0;
+    background:      rgba(0,0,0,.65);
+    backdrop-filter: blur(3px);
+    z-index:         9000;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    padding:         16px;
+  }
+  .modal-card {
+    background:    var(--bg2);
+    border:        1px solid var(--border2);
+    border-radius: 14px;
+    padding:       28px 32px;
+    max-width:     500px;
+    width:         100%;
+    position:      relative;
+    overflow:      hidden;
+    animation:     appear .25s ease forwards;
+  }
+  .modal-card::before {
+    content:    '';
+    position:   absolute;
+    top:        0; left: 0; right: 0;
+    height:     3px;
+    background: #00CCCC;
+  }
+  .modal-card.rose::before { background: linear-gradient(90deg, #00CCCC, #E8197A); }
+  .modal-title {
+    font-size:      18px;
+    font-weight:    700;
+    letter-spacing: -.02em;
+    color:          var(--text);
+    margin-bottom:  4px;
+  }
+  .modal-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   12px;
+    color:       var(--text3);
+    margin-bottom: 20px;
+  }
+
+  /* ── Toast notifications ──────────────────────────────────── */
+  .toast-container {
+    position:       fixed;
+    bottom:         24px;
+    right:          24px;
+    z-index:        9999;
+    display:        flex;
+    flex-direction: column;
+    gap:            8px;
+    pointer-events: none;
+  }
+  .toast {
+    padding:       12px 20px;
+    border-radius: 8px;
+    font-family:   'IBM Plex Mono', monospace;
+    font-size:     12px;
+    font-weight:   500;
+    border:        1px solid;
+    animation:     toastIn .22s ease forwards;
+  }
+  .toast-success { background: var(--bg2); color: #00CCCC; border-color: #00CCCC; }
+  .toast-error   { background: #E8197A;    color: #fff;    border-color: #E8197A; }
+
+  /* ── Detail grid (alternating rows) ──────────────────────── */
+  .detail-grid { display: grid; grid-template-columns: 140px 1fr; }
+  .detail-row  { display: contents; }
+  .detail-row:nth-child(even) > * { background: var(--bg3); }
+  .detail-row:nth-child(odd)  > * { background: var(--bg2); }
+  .detail-key {
+    font-family:    'IBM Plex Mono', monospace;
+    font-size:      10px;
+    color:          var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    padding:        10px 14px;
+  }
+  .detail-val {
+    font-size: 13px;
+    color:     var(--text);
+    padding:   10px 14px;
+  }
+
+  /* ── Page layout helpers ──────────────────────────────────── */
+  .page-wrap {
+    padding:   36px 36px;
+    max-width: 1200px;
+  }
+  .page-header { margin-bottom: 28px; }
+  .page-title {
+    font-size:      24px;
+    font-weight:    700;
+    letter-spacing: -.025em;
+    color:          var(--text);
+  }
+  .page-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:   12px;
+    color:       var(--text3);
+    margin-top:  4px;
+  }
+
+  /* ── Divider ──────────────────────────────────────────────── */
+  .divider {
+    border:     none;
+    border-top: 1px solid var(--border);
+    margin:     16px 0;
+  }
+
+  /* ── Table styles ─────────────────────────────────────────── */
+  .rh-table { width: 100%; border-collapse: collapse; }
+  .rh-table th {
+    font-family:    'IBM Plex Mono', monospace;
+    font-size:      10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color:          var(--text3);
+    padding:        10px 14px;
+    text-align:     left;
+    border-bottom:  1px solid var(--border);
+  }
+  .rh-table td {
+    font-size:     13px;
+    color:         var(--text2);
+    padding:       12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .rh-table tr:hover td { background: var(--hover); }
+  .rh-table tr:last-child td { border-bottom: none; }
+
+  /* ── Skeleton loader ──────────────────────────────────────── */
+  .skeleton {
+    background:      linear-gradient(90deg, var(--bg3) 25%, var(--bg2) 50%, var(--bg3) 75%);
+    background-size: 200% 100%;
+    animation:       shimmer 1.4s infinite;
+    border-radius:   6px;
+  }
+
+  /* ── Stat section row (admin) ─────────────────────────────── */
+  .stat-row {
+    display:       flex;
+    align-items:   center;
+    gap:           10px;
+    padding:       10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-row:last-child { border-bottom: none; }
+
+  /* ── Empty state ──────────────────────────────────────────── */
+  .empty-state {
+    text-align:  center;
+    padding:     48px 24px;
+  }
+  .empty-state p { color: var(--text3); font-size: 13px; margin-top: 8px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTOFILL OVERRIDE
+   ═══════════════════════════════════════════════════════════════ */
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text) !important;
+  -webkit-box-shadow:      0 0 0px 1000px var(--bg3) inset !important;
+  transition:              background-color 9999s ease-in-out 0s;
+  caret-color:             var(--text);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TAILWIND LIGHT-MODE SURFACE OVERRIDES
+   (Tailwind opacity utilities need explicit overrides for light)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Backgrounds */
+html.light .bg-rh-bg  { background-color: #f2f4f7 !important; }
 html.light .bg-rh-bg2 { background-color: #ffffff !important; }
-html.light .bg-rh-bg3 { background-color: #f8f9fa !important; }
+html.light .bg-rh-bg3 { background-color: #e8eaef !important; }
 
-/* White opacity surfaces → dark opacity surfaces */
-html.light .bg-white\/2  { background-color: rgba(0,0,0,0.02) !important; }
-html.light .bg-white\/3  { background-color: rgba(0,0,0,0.03) !important; }
-html.light .bg-white\/4  { background-color: rgba(0,0,0,0.04) !important; }
-html.light .bg-white\/5  { background-color: rgba(0,0,0,0.05) !important; }
-html.light .bg-white\/6  { background-color: rgba(0,0,0,0.06) !important; }
-html.light .bg-white\/8  { background-color: rgba(0,0,0,0.08) !important; }
-html.light .bg-white\/10 { background-color: rgba(0,0,0,0.10) !important; }
-html.light .bg-white\/12 { background-color: rgba(0,0,0,0.12) !important; }
-html.light .bg-white\/15 { background-color: rgba(0,0,0,0.15) !important; }
+html.light .bg-white\/2  { background-color: rgba(0,0,0,.02) !important; }
+html.light .bg-white\/3  { background-color: rgba(0,0,0,.03) !important; }
+html.light .bg-white\/4  { background-color: rgba(0,0,0,.04) !important; }
+html.light .bg-white\/5  { background-color: rgba(0,0,0,.05) !important; }
+html.light .bg-white\/6  { background-color: rgba(0,0,0,.06) !important; }
+html.light .bg-white\/8  { background-color: rgba(0,0,0,.08) !important; }
+html.light .bg-white\/10 { background-color: rgba(0,0,0,.10) !important; }
+html.light .bg-white\/12 { background-color: rgba(0,0,0,.12) !important; }
+html.light .bg-white\/15 { background-color: rgba(0,0,0,.15) !important; }
 
-/* ── Hover states ────────────────────────────────────────────── */
-html.light .hover\:bg-white\/2:hover  { background-color: rgba(0,0,0,0.02) !important; }
-html.light .hover\:bg-white\/3:hover  { background-color: rgba(0,0,0,0.03) !important; }
-html.light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.05) !important; }
-html.light .hover\:bg-white\/6:hover  { background-color: rgba(0,0,0,0.06) !important; }
-html.light .hover\:bg-white\/8:hover  { background-color: rgba(0,0,0,0.08) !important; }
-html.light .hover\:bg-white\/12:hover { background-color: rgba(0,0,0,0.12) !important; }
+/* Hover states */
+html.light .hover\:bg-white\/2:hover  { background-color: rgba(0,0,0,.02) !important; }
+html.light .hover\:bg-white\/3:hover  { background-color: rgba(0,0,0,.03) !important; }
+html.light .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,.05) !important; }
+html.light .hover\:bg-white\/6:hover  { background-color: rgba(0,0,0,.06) !important; }
+html.light .hover\:bg-white\/8:hover  { background-color: rgba(0,0,0,.08) !important; }
+html.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,.10) !important; }
+html.light .hover\:bg-white\/12:hover { background-color: rgba(0,0,0,.12) !important; }
 
-/* ── Borders ─────────────────────────────────────────────────── */
-html.light .border-white\/4  { border-color: rgba(0,0,0,0.06) !important; }
-html.light .border-white\/7  { border-color: rgba(0,0,0,0.07) !important; }
-html.light .border-white\/8  { border-color: rgba(0,0,0,0.08) !important; }
-html.light .border-white\/10 { border-color: rgba(0,0,0,0.10) !important; }
-html.light .border-white\/15 { border-color: rgba(0,0,0,0.15) !important; }
-html.light .divide-white\/4 > * + * { border-color: rgba(0,0,0,0.06) !important; }
+/* Borders */
+html.light .border-white\/4  { border-color: rgba(0,0,0,.06) !important; }
+html.light .border-white\/7  { border-color: rgba(0,0,0,.07) !important; }
+html.light .border-white\/8  { border-color: rgba(0,0,0,.08) !important; }
+html.light .border-white\/10 { border-color: rgba(0,0,0,.10) !important; }
+html.light .border-white\/15 { border-color: rgba(0,0,0,.15) !important; }
+html.light .divide-white\/4 > * + * { border-color: rgba(0,0,0,.06) !important; }
+html.light .divide-white\/7 > * + * { border-color: rgba(0,0,0,.07) !important; }
 
-/* ── Text ────────────────────────────────────────────────────── */
-html.light .text-white        { color: #111118 !important; }
-html.light .text-white\/20    { color: rgba(17,17,24,0.20) !important; }
-html.light .text-white\/25    { color: rgba(17,17,24,0.25) !important; }
-html.light .text-white\/30    { color: rgba(17,17,24,0.30) !important; }
-html.light .text-white\/35    { color: rgba(17,17,24,0.35) !important; }
-html.light .text-white\/40    { color: rgba(17,17,24,0.40) !important; }
-html.light .text-white\/50    { color: rgba(17,17,24,0.50) !important; }
-html.light .text-white\/60    { color: rgba(17,17,24,0.60) !important; }
-html.light .text-white\/70    { color: rgba(17,17,24,0.70) !important; }
-html.light .text-white\/80    { color: rgba(17,17,24,0.80) !important; }
+/* Text */
+html.light .text-white        { color: #0f0f12 !important; }
+html.light .text-white\/20    { color: rgba(15,15,18,.20) !important; }
+html.light .text-white\/25    { color: rgba(15,15,18,.25) !important; }
+html.light .text-white\/30    { color: rgba(15,15,18,.30) !important; }
+html.light .text-white\/35    { color: rgba(15,15,18,.35) !important; }
+html.light .text-white\/40    { color: rgba(15,15,18,.40) !important; }
+html.light .text-white\/45    { color: rgba(15,15,18,.45) !important; }
+html.light .text-white\/50    { color: rgba(15,15,18,.50) !important; }
+html.light .text-white\/60    { color: rgba(15,15,18,.60) !important; }
+html.light .text-white\/70    { color: rgba(15,15,18,.70) !important; }
+html.light .text-white\/80    { color: rgba(15,15,18,.80) !important; }
 
-/* ── Inputs ──────────────────────────────────────────────────── */
-html.light .input-base {
-  background-color: #ffffff;
-  border-color: rgba(0,0,0,0.15);
-  color: #111118;
-}
-html.light .input-base::placeholder { color: rgba(17,17,24,0.30); }
-html.light .input-base:focus {
-  border-color: #00CCCC;
-  background-color: rgba(0,204,204,0.05);
-}
-html.light select.input-base option { background: #ffffff; color: #111118; }
-
+/* Inputs */
+html.light .input-base,
 html.light .input-login {
-  background-color: #ffffff;
-  border-color: rgba(0,0,0,0.15);
-  color: #111118;
+  background:   rgba(0,0,0,.03);
+  border-color: rgba(0,0,0,.15);
+  color:        #0f0f12;
 }
-html.light .input-login::placeholder { color: rgba(17,17,24,0.30); }
+html.light .input-base::placeholder,
+html.light .input-login::placeholder { color: rgba(15,15,18,.25); }
+html.light .input-base:focus,
+html.light .input-login:focus {
+  border-color: #00CCCC;
+  background:   rgba(0,204,204,.05);
+}
+html.light select.input-base option { background: #fff; color: #0f0f12; }
 
-/* ── Login page card ─────────────────────────────────────────── */
-html.light .min-h-screen.bg-rh-bg { background-color: #f0f2f5 !important; }
-
-/* ── Sidebar (rh-bg2 with border) ────────────────────────────── */
+/* Sidebar */
 html.light aside { background-color: #ffffff !important; }
+html.light body  { background-color: #f2f4f7; color: #0f0f12; }
 
-/* ── Scrollbar in light mode ─────────────────────────────────── */
-html.light ::-webkit-scrollbar-thumb { background: rgba(0,204,204,0.4); }
+/* Toast in light mode */
+html.light .toast-success { background: #ffffff; }

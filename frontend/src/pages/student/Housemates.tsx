@@ -11,26 +11,17 @@ export default function Housemates() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const { data: hmData, isLoading: hmLoading } = useQuery({
-    queryKey: ['housemates'],
-    queryFn:  getHousemates,
-  });
-
-  const { data: chores = [], isLoading: cLoading } = useQuery<Chore[]>({
-    queryKey: ['chores'],
-    queryFn:  () => getChores(),
-  });
+  const { data: hmData, isLoading: hmLoading } = useQuery({ queryKey: ['housemates'], queryFn: getHousemates });
+  const { data: chores = [], isLoading: cLoading } = useQuery<Chore[]>({ queryKey: ['chores'], queryFn: () => getChores() });
 
   const { mutate: claim, isPending: claiming } = useMutation({
     mutationFn: claimChore,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['chores'] }),
   });
-
   const { mutate: unclaim } = useMutation({
     mutationFn: unclaimChore,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['chores'] }),
   });
-
   const { mutate: complete } = useMutation({
     mutationFn: (id: string) => completeChore(id),
     onSuccess: () => {
@@ -42,17 +33,21 @@ export default function Housemates() {
   return (
     <div className="space-y-5 appear">
       <div>
-        <h1 className="text-xl font-semibold text-white">Housemates</h1>
-        <p className="text-sm text-white/40 mt-0.5">Your block community and shared chores</p>
+        <h1 className="page-title">Housemates</h1>
+        <p className="page-sub">Your block community and shared chores</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-rh-bg3 rounded-xl p-1 w-fit">
+      {/* Tab switcher */}
+      <div style={{ display: 'inline-flex', background: 'var(--bg3)', borderRadius: 10, padding: 4, gap: 2 }}>
         {(['mates', 'chores'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
-              tab === t ? 'bg-rh-bg2 text-white shadow-sm' : 'text-white/40 hover:text-white'
-            }`}>
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: '7px 16px', borderRadius: 7, fontSize: 13,
+            fontWeight: tab === t ? 600 : 400,
+            background: tab === t ? 'var(--bg2)' : 'transparent',
+            color: tab === t ? 'var(--text)' : 'var(--text3)',
+            border: 'none', cursor: 'pointer', transition: 'all .18s',
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}>
             {t === 'mates' ? 'Housemates' : 'Chore Board'}
           </button>
         ))}
@@ -63,29 +58,31 @@ export default function Housemates() {
         <div>
           {hmLoading
             ? <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-rh-bg2 rounded-xl animate-pulse" />)}
+                {[...Array(4)].map((_, i) => <div key={i} className="skeleton" style={{ height: 112, borderRadius: 10 }} />)}
               </div>
             : !hmData?.housemates?.length
               ? (
-                <div className="bg-rh-bg2 border border-white/7 rounded-2xl py-12 text-center">
-                  <Users size={28} className="text-white/20 mx-auto mb-3" />
-                  <p className="text-white/40 text-sm">No other residents in your block</p>
+                <div className="card empty-state">
+                  <Users size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+                  <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No other residents in your block</p>
                 </div>
               )
               : (
                 <>
-                  <p className="text-sm text-white/40 mb-3">{hmData.block} · {hmData.housemates.length} resident{hmData.housemates.length !== 1 ? 's' : ''}</p>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>
+                    {hmData.block} · {hmData.housemates.length} resident{hmData.housemates.length !== 1 ? 's' : ''}
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {hmData.housemates.map(hm => (
-                      <div key={hm.id} className="bg-rh-bg2 border border-white/7 rounded-xl p-4 flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-rh-cyan/15 flex items-center justify-center text-rh-cyan font-bold text-sm flex-shrink-0">
+                      <div key={hm.id} className="card-sm" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px' }}>
+                        <div className="avatar avatar-cyan" style={{ width: 40, height: 40, fontSize: 13, fontWeight: 700 }}>
                           {hm.name.slice(0,2).toUpperCase()}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{hm.name}</p>
-                          <p className="text-xs text-white/40 truncate">Room {hm.room.number} · {hm.room.type}</p>
-                          {hm.program && <p className="text-xs text-white/30 truncate mt-0.5">{hm.program}</p>}
-                          {hm.bio && <p className="text-xs text-white/25 mt-1 line-clamp-2">{hm.bio}</p>}
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hm.name}</p>
+                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Room {hm.room.number} · {hm.room.type}</p>
+                          {hm.program && <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hm.program}</p>}
+                          {hm.bio && <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{hm.bio}</p>}
                         </div>
                       </div>
                     ))}
@@ -98,19 +95,27 @@ export default function Housemates() {
 
       {/* Chore board tab */}
       {tab === 'chores' && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 text-xs text-white/30 font-mono mb-1">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rh-cyan inline-block" /> Claim +5 🪙</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Complete +20 🪙</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cyan)', display: 'inline-block' }} />
+              Claim +5 🪙
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+              Complete +20 🪙
+            </span>
           </div>
           {cLoading
-            ? [...Array(4)].map((_, i) => <div key={i} className="h-20 bg-rh-bg2 rounded-xl animate-pulse" />)
-            : chores.map(chore => <ChoreCard key={chore.id} chore={chore} userId={user!.id}
+            ? [...Array(4)].map((_, i) => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 10 }} />)
+            : chores.map(chore => (
+              <ChoreCard key={chore.id} chore={chore} userId={user!.id}
                 onClaim={() => claim(chore.id)}
                 onUnclaim={() => unclaim(chore.id)}
                 onComplete={() => complete(chore.id)}
                 loading={claiming}
-              />)
+              />
+            ))
           }
         </div>
       )}
@@ -127,45 +132,45 @@ function ChoreCard({ chore, userId, onClaim, onUnclaim, onComplete, loading }: {
   const claimed = !!chore.claimedById;
 
   return (
-    <div className={`bg-rh-bg2 border rounded-xl p-4 transition-colors ${
-      isDone ? 'border-green-500/20 opacity-60' : isMine ? 'border-rh-cyan/20' : 'border-white/7'
-    }`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="text-xl mt-0.5">{chore.icon}</span>
+    <div className="card-sm" style={{
+      padding: '14px 16px',
+      borderColor: isDone ? 'rgba(74,222,128,.2)' : isMine ? 'rgba(0,204,204,.2)' : 'var(--border)',
+      opacity: isDone ? .7 : 1,
+      transition: 'opacity .2s',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <span style={{ fontSize: 20, marginTop: 1 }}>{chore.icon}</span>
           <div>
-            <p className="text-sm font-semibold text-white">{chore.name}</p>
-            <p className="text-xs text-white/40 mt-0.5">{chore.frequency}</p>
-            <p className="text-xs text-white/30 mt-1">{chore.description}</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{chore.name}</p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{chore.frequency}</p>
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3, lineHeight: 1.5 }}>{chore.description}</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
           {isDone && (
-            <span className="flex items-center gap-1 text-[11px] text-green-400 font-mono">
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: '#4ade80' }}>
               <CheckCircle2 size={12} /> Done
             </span>
           )}
           {!isDone && isMine && (
-            <div className="flex gap-1.5">
-              <button onClick={onComplete}
-                className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs font-medium rounded-lg hover:bg-green-500/25 transition-colors">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={onComplete} style={{ padding: '5px 10px', background: 'rgba(74,222,128,.12)', color: '#4ade80', border: '1px solid rgba(74,222,128,.2)', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" }}>
                 Mark done
               </button>
-              <button onClick={onUnclaim}
-                className="px-2.5 py-1 bg-white/5 text-white/40 text-xs font-medium rounded-lg hover:bg-white/10 transition-colors">
+              <button onClick={onUnclaim} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }}>
                 Unclaim
               </button>
             </div>
           )}
           {!isDone && !claimed && (
-            <button onClick={onClaim} disabled={loading}
-              className="flex items-center gap-1 px-2.5 py-1 bg-rh-cyan/15 text-rh-cyan text-xs font-medium rounded-lg hover:bg-rh-cyan/25 disabled:opacity-50 transition-colors">
+            <button onClick={onClaim} disabled={loading} className="btn-primary" style={{ padding: '5px 12px', fontSize: 12 }}>
               {loading && <Loader2 size={11} className="animate-spin" />}
               Claim +5🪙
             </button>
           )}
           {!isDone && claimed && !isMine && (
-            <span className="text-[11px] font-mono text-white/30 px-2 py-0.5 bg-white/5 rounded-full">Claimed</span>
+            <span className="badge badge-gray">Claimed</span>
           )}
         </div>
       </div>

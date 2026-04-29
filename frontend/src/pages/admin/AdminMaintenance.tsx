@@ -1,20 +1,21 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Wrench } from 'lucide-react';
 import { getTickets, updateTicket } from '../../services/maintenance.service';
 import type { MaintenanceTicket } from '../../types';
 
-const statusColor: Record<string, string> = {
-  OPEN:        'text-red-400 border-red-500/30 bg-red-500/8',
-  IN_PROGRESS: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/8',
-  RESOLVED:    'text-green-400 border-green-500/30 bg-green-500/8',
-  CLOSED:      'text-white/30 border-white/10 bg-white/4',
+const STATUS_BADGE: Record<string, string> = {
+  OPEN:        'badge-rose',
+  IN_PROGRESS: 'badge-gray',
+  RESOLVED:    'badge-cyan',
+  CLOSED:      'badge-gray',
 };
 
-const priorityColor: Record<string, string> = {
-  EMERGENCY: 'text-red-400',
-  HIGH:      'text-orange-400',
-  NORMAL:    'text-white/60',
-  LOW:       'text-white/30',
+const PRIORITY_COLOR: Record<string, string> = {
+  EMERGENCY: 'var(--rose)',
+  HIGH:      '#fb923c',
+  NORMAL:    'var(--text2)',
+  LOW:       'var(--text4)',
 };
 
 const STATUSES   = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
@@ -50,67 +51,74 @@ export default function AdminMaintenance() {
   });
 
   if (isError) return (
-    <div className="text-rh-rose text-sm p-6">Failed to load tickets. Is the backend running?</div>
+    <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load tickets. Is the backend running?</p>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 appear">
+
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Maintenance</h1>
-        <p className="text-white/40 text-sm mt-1">{tickets.length} tickets</p>
+        <h1 className="page-title">Maintenance</h1>
+        <p className="page-sub">{tickets.length} tickets</p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <input
           type="text"
           placeholder="Search tickets…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input-base max-w-xs"
+          className="input-base"
+          style={{ maxWidth: 240 }}
         />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-base max-w-[160px]">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-base" style={{ maxWidth: 160 }}>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="input-base max-w-[160px]">
+        <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="input-base" style={{ maxWidth: 160 }}>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
 
-      {/* Tickets */}
+      {/* Tickets list */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-2 border-rh-cyan border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[...Array(4)].map((_, i) => <div key={i} className="skeleton" style={{ height: 96, borderRadius: 12 }} />)}
+        </div>
+      ) : tickets.length === 0 ? (
+        <div className="card empty-state">
+          <Wrench size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No tickets match your filters</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {tickets.map(t => (
-            <div key={t.id} className="bg-white/4 border border-white/8 rounded-xl p-4">
+            <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
               {editId === t.id ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-white font-semibold">{t.category}</span>
-                    <span className="text-white/40 text-xs">{t.location}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.category}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text3)' }}>{t.location}</span>
                   </div>
-                  <p className="text-white/60 text-sm">{t.description}</p>
+                  <p style={{ fontSize: 13, color: 'var(--text2)' }}>{t.description}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="text-white/40 text-xs mb-1 block">Status</label>
+                      <label className="field-label">Status</label>
                       <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))} className="input-base">
                         <option value="">Keep current ({t.status})</option>
                         {['OPEN','IN_PROGRESS','RESOLVED','CLOSED'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="text-white/40 text-xs mb-1 block">Priority</label>
+                      <label className="field-label">Priority</label>
                       <select value={editForm.priority} onChange={e => setEditForm(f => ({ ...f, priority: e.target.value }))} className="input-base">
                         <option value="">Keep current ({t.priority})</option>
                         {['EMERGENCY','HIGH','NORMAL','LOW'].map(p => <option key={p} value={p}>{p}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="text-white/40 text-xs mb-1 block">Admin Note</label>
+                      <label className="field-label">Admin Note</label>
                       <input
                         type="text"
                         value={editForm.adminNote}
@@ -120,36 +128,35 @@ export default function AdminMaintenance() {
                       />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => updateMut.mutate(t.id)}
                       disabled={updateMut.isPending}
-                      className="text-xs px-3 py-1.5 rounded bg-rh-cyan text-rh-dark font-semibold"
+                      className="btn-primary"
+                      style={{ padding: '7px 16px', fontSize: 12 }}
                     >
                       {updateMut.isPending ? 'Saving…' : 'Save'}
                     </button>
-                    <button onClick={() => setEditId(null)} className="text-xs px-3 py-1.5 rounded bg-white/8 text-white/60">Cancel</button>
+                    <button onClick={() => setEditId(null)} className="btn-ghost" style={{ padding: '7px 14px', fontSize: 12 }}>Cancel</button>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-white font-semibold">{t.category}</span>
-                      <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${statusColor[t.status]}`}>
-                        {t.status.replace('_', ' ')}
-                      </span>
-                      <span className={`text-xs font-mono font-semibold ${priorityColor[t.priority]}`}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.category}</span>
+                      <span className={`badge ${STATUS_BADGE[t.status] ?? 'badge-gray'}`}>{t.status.replace('_', ' ')}</span>
+                      <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600, color: PRIORITY_COLOR[t.priority] ?? 'var(--text3)' }}>
                         {t.priority}
                       </span>
                     </div>
-                    <p className="text-white/50 text-sm mt-1 truncate">{t.description}</p>
-                    <div className="flex gap-4 mt-2 text-xs text-white/30">
-                      <span>📍 {t.location}</span>
-                      <span>🕐 {new Date(t.createdAt).toLocaleDateString()}</span>
+                    <p style={{ fontSize: 13, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</p>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                      <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>📍 {t.location}</span>
+                      <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>🕐 {new Date(t.createdAt).toLocaleDateString()}</span>
                     </div>
                     {t.adminNote && (
-                      <p className="text-rh-cyan/70 text-xs mt-2 italic">Note: {t.adminNote}</p>
+                      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', marginTop: 8, fontStyle: 'italic' }}>Note: {t.adminNote}</p>
                     )}
                   </div>
                   <button
@@ -157,7 +164,8 @@ export default function AdminMaintenance() {
                       setEditId(t.id);
                       setEditForm({ status: '', priority: '', adminNote: t.adminNote ?? '' });
                     }}
-                    className="shrink-0 text-xs px-3 py-1.5 rounded bg-white/8 text-white/60 hover:bg-white/12"
+                    className="btn-ghost"
+                    style={{ padding: '6px 14px', fontSize: 12, flexShrink: 0 }}
                   >
                     Update
                   </button>
@@ -165,9 +173,6 @@ export default function AdminMaintenance() {
               )}
             </div>
           ))}
-          {tickets.length === 0 && (
-            <p className="text-center py-12 text-white/30">No tickets match your filters</p>
-          )}
         </div>
       )}
     </div>

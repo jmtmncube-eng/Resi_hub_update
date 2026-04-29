@@ -153,5 +153,42 @@
 
 ---
 
-**Document Version**: 1.4
-**Last Updated**: 2026-03-25
+### Session 5 — 2026-04-26
+
+**Goal**: Apply ResiHub visual design system across all frontend pages
+
+**Changes**
+- ✅ `frontend/src/index.css` — full rewrite: CSS custom properties (dark/light), Space Grotesk + IBM Plex Mono fonts, @keyframes, all component classes (.kpi-card, .badge-*, .btn-*, .avatar-*, .nav-item, .modal-*, .toast-*, .card, .card-sm, .skeleton, .field-label, .micro-label, .page-title, .page-sub, .empty-state, .rh-table, .detail-grid)
+- ✅ `DashboardLayout.tsx` — sidebar CSS vars, role badge, nav-item class, btn-theme/btn-logout, mobile header
+- ✅ `Login.tsx` — modal-card design, field-label inputs, btn-primary submit, card-sm demo accounts
+- ✅ `Dashboard.tsx` — kpi-card stat cards, badge-*, avatar-cyan, skeleton loaders
+- ✅ `Maintenance.tsx` — page-title/page-sub, btn-primary, card form, field-label, badge-* status
+- ✅ `Visitors.tsx` — modal-overlay + modal-card QR modal, avatar-rose, badge-*, field-label
+- ✅ `Wallet.tsx` — gradient balance hero, tab switcher CSS vars, card overflow, btn-primary, avatar-cyan + badge-cyan leaderboard
+- ✅ `Housemates.tsx` — card-sm housemate cards, avatar-cyan, card-sm chore cards, btn-primary/btn-ghost
+- ✅ `Documents.tsx` — micro-label groups, card overflow table, badge-* status, download links preserved
+- ✅ `Profile.tsx` — avatar-cyan/rose, badge-*, card sections, field-label, btn-primary save
+- ✅ `Updates.tsx` — pill filter chips, card-sm news items with pinned gradient, tag inline styles, skeleton
+- ✅ `AdminOverview.tsx` — kpi-card stat grid, badge-*, quick-action card with hover handlers, occupancy progress bar, micro-label
+- ✅ `AdminOccupancy.tsx` — pill block filter, CSS var room grid (occupied/vacant state), skeleton spinner
+- ✅ `AdminAllocations.tsx` — rh-table, modal-overlay + modal-card, btn-primary/btn-ghost, badge-* status, field-label
+- ✅ `AdminMaintenance.tsx` — card-sm ticket cards, filter inputs + selects, btn-primary/btn-ghost, badge-* + priority color, field-label
+- ✅ `AdminNews.tsx` — pill type filter, card create form, field-label, btn-primary, card-sm article list, type color badges, pin/delete actions
+- ✅ `AdminVisitors.tsx` — rh-table, badge-* status, skeleton, empty-state
+- ✅ `AdminRewards.tsx` — tab switcher CSS vars, card create form, card-sm voucher cards, btn-primary/btn-ghost, field-label, Loader2 spinner
+- ✅ `AdminAccounts.tsx` — rh-table, avatar-cyan, badge-rose/cyan/gray role badges, btn-primary/btn-ghost, field-label, Loader2, empty-state
+
+**Infrastructure Fixes Applied**
+- ✅ `docker/Dockerfile.backend` — added OpenSSL packages for Prisma on Alpine Linux
+- ✅ `backend/prisma/schema.prisma` — added `linux-musl-openssl-3.0.x` Prisma binary target
+- ✅ Git identity configured: `mbong@resihub.dev` / `Mbongeni`
+
+**Design Approach**
+- All styling uses CSS custom properties (var(--cyan), var(--rose), var(--bg), var(--bg2), var(--bg3), var(--border), var(--text), var(--text2), var(--text3), var(--text4), var(--shadow))
+- Light mode via `html.light` class overrides on CSS vars + Tailwind utility class overrides
+- All application logic, state, mutations, queries, routing, and functions left 100% intact
+
+---
+
+**Document Version**: 1.5
+**Last Updated**: 2026-04-26

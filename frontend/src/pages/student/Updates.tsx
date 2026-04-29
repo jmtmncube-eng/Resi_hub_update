@@ -16,57 +16,70 @@ export default function Updates() {
   return (
     <div className="space-y-5 appear">
       <div>
-        <h1 className="text-xl font-semibold text-white">Residence Updates</h1>
-        <p className="text-sm text-white/40 mt-0.5">Notices and announcements from management</p>
+        <h1 className="page-title">Residence Updates</h1>
+        <p className="page-sub">Notices and announcements from management</p>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              filter === f
-                ? 'bg-rh-cyan text-rh-bg'
-                : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/8'
-            }`}>
+          <button key={f} onClick={() => setFilter(f)} style={{
+            padding: '6px 14px',
+            borderRadius: 20,
+            fontSize: 12,
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontWeight: filter === f ? 600 : 400,
+            background: filter === f ? 'var(--cyan)' : 'var(--hover)',
+            color: filter === f ? '#0f0f12' : 'var(--text3)',
+            border: `1px solid ${filter === f ? 'var(--cyan)' : 'var(--border2)'}`,
+            cursor: 'pointer',
+            transition: 'all .18s',
+            textTransform: 'capitalize',
+          }}>
             {f}
           </button>
         ))}
       </div>
 
       {/* News list */}
-      <div className="space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {isLoading
-          ? [...Array(4)].map((_, i) => <div key={i} className="h-32 bg-rh-bg2 rounded-xl animate-pulse" />)
+          ? [...Array(4)].map((_, i) => <div key={i} className="skeleton" style={{ height: 120, borderRadius: 10 }} />)
           : news.length === 0
             ? (
-              <div className="bg-rh-bg2 border border-white/7 rounded-2xl py-12 text-center">
-                <Newspaper size={28} className="text-white/20 mx-auto mb-3" />
-                <p className="text-white/40 text-sm">No updates in this category</p>
+              <div className="card empty-state">
+                <Newspaper size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
+                <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No updates in this category</p>
+                <p>Check back later for news from management</p>
               </div>
             )
             : news.map(item => (
-              <div key={item.id} className={`bg-rh-bg2 border rounded-xl p-5 transition-colors ${
-                item.pinned ? 'border-rh-cyan/20' : 'border-white/7'
-              }`}>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: item.tagColor + '20', color: item.tagColor }}>
+              <div key={item.id} className="card-sm" style={{
+                padding: '18px 20px',
+                borderColor: item.pinned ? 'rgba(0,204,204,.25)' : 'var(--border)',
+                background: item.pinned ? 'linear-gradient(135deg, rgba(0,204,204,.04), var(--bg2))' : 'var(--bg2)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, padding: '2px 9px',
+                      borderRadius: 20, background: item.tagColor + '22', color: item.tagColor,
+                      textTransform: 'uppercase', letterSpacing: '.05em', border: `1px solid ${item.tagColor}33`,
+                    }}>
                       {item.tag}
                     </span>
                     {item.pinned && (
-                      <span className="flex items-center gap-1 text-[11px] font-mono text-rh-cyan">
-                        <Pin size={10} /> Pinned
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--cyan)' }}>
+                        <Pin size={9} /> Pinned
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-white/30 font-mono flex-shrink-0">{item.date}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', flexShrink: 0 }}>{item.date}</span>
                 </div>
-                <h3 className="text-base font-semibold text-white mb-1.5">{item.title}</h3>
-                <p className="text-sm text-white/55 leading-relaxed">{item.body}</p>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8, letterSpacing: '-.01em' }}>{item.title}</h3>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>{item.body}</p>
                 {item.author && (
-                  <p className="text-xs text-white/25 font-mono mt-3">— {item.author.name}</p>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 12 }}>— {item.author.name}</p>
                 )}
               </div>
             ))

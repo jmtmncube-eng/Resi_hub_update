@@ -51,10 +51,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     user?.role === 'ADMIN'           ? 'Admin'   :
     user?.role === 'ACTIVE_STUDENT'  ? 'Resident': 'Applicant';
 
-  const roleBgColor =
-    user?.role === 'ADMIN'           ? 'bg-rh-rose/15 text-rh-rose'   :
-    user?.role === 'ACTIVE_STUDENT'  ? 'bg-rh-cyan/15 text-rh-cyan'   :
-                                       'bg-yellow-500/15 text-yellow-400';
+  const isAdmin = user?.role === 'ADMIN';
 
   async function handleLogout() {
     await logout();
@@ -62,20 +59,46 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   const Sidebar = () => (
-    <aside className="w-60 h-full bg-rh-bg2 border-r border-white/7 flex flex-col">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/7">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-rh-cyan tracking-tight">ResiHub</span>
+    <aside style={{ width: 232, height: '100%', background: 'var(--bg2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Logo + role badge */}
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--cyan)', letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif" }}>
+            ResiHub
+          </span>
+          {/* 1px vertical divider */}
+          <span style={{ width: 1, height: 18, background: 'var(--border2)', display: 'inline-block' }} />
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: 10,
+            letterSpacing: '.06em',
+            textTransform: 'uppercase',
+            color: isAdmin ? 'var(--rose)' : 'var(--cyan)',
+          }}>
+            {roleLabel}
+          </span>
         </div>
-        <div className={`mt-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium ${roleBgColor}`}>
-          {roleLabel}
-        </div>
+        {/* Role pill badge */}
+        <span style={{
+          display: 'inline-block',
+          padding: '2px 10px',
+          borderRadius: 20,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '.05em',
+          border: `1px solid ${isAdmin ? 'rgba(232,25,122,.3)' : 'rgba(0,204,204,.3)'}`,
+          color: isAdmin ? 'var(--rose)' : 'var(--cyan)',
+          background: isAdmin ? 'rgba(232,25,122,.08)' : 'rgba(0,204,204,.08)',
+        }}>
+          {user?.email}
+        </span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        <ul className="space-y-0.5">
+      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
@@ -83,15 +106,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 end={to === ROUTES.ADMIN}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-rh-cyan/10 text-rh-cyan'
-                      : 'text-white/60 hover:text-white hover:bg-white/5'
-                  }`
+                  `nav-item${isActive ? ' active' : ''}`
                 }
               >
-                <Icon size={16} />
-                {label}
+                <Icon size={15} />
+                <span style={{ fontSize: 13 }}>{label}</span>
               </NavLink>
             </li>
           ))}
@@ -99,28 +118,32 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-4 border-t border-white/7">
-        <div className="flex items-center gap-3 px-2 py-2 mb-1">
-          <div className="w-8 h-8 rounded-full bg-rh-cyan/20 flex items-center justify-center text-rh-cyan text-xs font-bold flex-shrink-0">
+      <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
+        {/* User info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 4 }}>
+          <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`}
+               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
             {user?.name?.slice(0, 2).toUpperCase() || 'RH'}
           </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-white/40 font-mono truncate">{user?.email}</p>
+          <div style={{ overflow: 'hidden', flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name}
+            </p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.email}
+            </p>
           </div>
         </div>
-        <button
-          onClick={toggleTheme}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+
+        {/* Theme toggle */}
+        <button onClick={toggleTheme} className="btn-theme" style={{ width: '100%', marginBottom: 4, justifyContent: 'center' }}>
+          {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <LogOut size={16} />
+
+        {/* Logout */}
+        <button onClick={handleLogout} className="btn-logout" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <LogOut size={12} />
           Sign out
         </button>
       </div>
@@ -128,7 +151,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-rh-bg overflow-hidden">
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
       {/* Desktop sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar />
@@ -136,29 +159,44 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 flex flex-col w-60">
+        <div className="md:hidden" style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'flex' }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)' }} onClick={() => setSidebarOpen(false)} />
+          <div style={{ position: 'relative', zIndex: 50, display: 'flex', flexDirection: 'column', width: 232 }}>
             <Sidebar />
           </div>
         </div>
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/7 bg-rh-bg2">
-          <span className="text-lg font-bold text-rh-cyan">ResiHub</span>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Mobile top bar — sticky header */}
+        <div className="md:hidden" style={{
+          height: 56,
+          background: 'var(--bg2)',
+          borderBottom: '1px solid var(--border)',
+          padding: '0 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          boxShadow: '0 1px 14px var(--shadow)',
+        }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--cyan)', letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif" }}>
+            ResiHub
+          </span>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-white/60 hover:text-white"
+            style={{ background: 'none', border: 'none', color: 'var(--text2)', padding: 4 }}
           >
             {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 28px' }} className="appear">
           {children}
         </main>
       </div>
