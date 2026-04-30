@@ -1,10 +1,12 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { Camera, Loader2, Save } from 'lucide-react';
+import { toast } from 'sonner';
 import { updateProfile, uploadAvatar } from '../../services/profile.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const formSchema = z.object({
   name:       z.string().min(2).optional().or(z.literal('')),
@@ -16,8 +18,8 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export default function Profile() {
+  usePageTitle('Profile');
   const { user }    = useAuth();
-  const [saved, setSaved] = useState(false);
   const fileRef     = useRef<HTMLInputElement>(null);
 
   const isAdmin = user?.role === 'ADMIN';
@@ -34,11 +36,14 @@ export default function Profile() {
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: updateProfile,
-    onSuccess: () => { setSaved(true); setTimeout(() => setSaved(false), 2500); },
+    onSuccess: () => toast.success('Profile saved!'),
+    onError:   () => toast.error('Failed to save profile.'),
   });
 
   const { mutate: uploadAv, isPending: uploading } = useMutation({
     mutationFn: (file: File) => uploadAvatar(file),
+    onSuccess:  () => toast.success('Avatar updated!'),
+    onError:    () => toast.error('Failed to upload avatar.'),
   });
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -110,7 +115,6 @@ export default function Profile() {
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
-          {saved && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: '#4ade80' }}>✓ Saved!</span>}
         </div>
       </form>
 

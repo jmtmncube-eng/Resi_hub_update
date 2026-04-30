@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Newspaper } from 'lucide-react';
+import { toast } from 'sonner';
 import { getNews, createNews, togglePin, deleteNews } from '../../services/news.service';
 import type { NewsItem } from '../../types';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const TYPE_COLOR: Record<string, string> = {
   ANNOUNCEMENT: '#60a5fa',
@@ -18,10 +21,12 @@ const BLANK = {
 };
 
 export default function AdminNews() {
+  usePageTitle('News Manager');
   const qc = useQueryClient();
-  const [showForm, setShowForm]     = useState(false);
-  const [form, setForm]             = useState(BLANK);
-  const [filterType, setFilterType] = useState('ALL');
+  const [showForm,     setShowForm]     = useState(false);
+  const [form,         setForm]         = useState(BLANK);
+  const [filterType,   setFilterType]   = useState('ALL');
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const { data: news = [], isLoading } = useQuery<NewsItem[]>({
     queryKey: ['news'],
@@ -36,17 +41,29 @@ export default function AdminNews() {
       qc.invalidateQueries({ queryKey: ['news'] });
       setShowForm(false);
       setForm({ ...BLANK, date: new Date().toISOString().split('T')[0] });
+      toast.success('Article published!');
     },
+    onError: () => toast.error('Failed to publish article.'),
   });
 
   const pinMut = useMutation({
     mutationFn: (id: string) => togglePin(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['news'] }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['news'] });
+      const wasPinned = news.find(n => n.id === id)?.pinned;
+      toast.success(wasPinned ? 'Article unpinned.' : 'Article pinned!');
+    },
+    onError: () => toast.error('Failed to update pin.'),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteNews(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['news'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['news'] });
+      setDeleteTarget(null);
+      toast.success('Article deleted.');
+    },
+    onError: () => toast.error('Failed to delete article.'),
   });
 
   return (
@@ -212,9 +229,7 @@ export default function AdminNews() {
                     {n.pinned ? '📌' : '📍'}
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete "${n.title}"?`)) deleteMut.mutate(n.id);
-                    }}
+                    onClick={() => setDeleteTarget({ id: n.id, title: n.title })}
                     disabled={deleteMut.isPending}
                     style={{
                       padding: '5px 10px', fontSize: 13, borderRadius: 6, cursor: 'pointer',
@@ -230,6 +245,17 @@ export default function AdminNews() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete article"
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        loading={deleteMut.isPending}
+        onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

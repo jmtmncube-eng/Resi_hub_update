@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getApplicationStatus, ApplicationStatus as TApplicationStatus } from '../../services/application.service';
 import { ROUTES } from '../../constants/routes';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STEPS = [
   { key: 'submitted', label: 'Application Submitted',  desc: 'Your application is in the system.' },
@@ -24,6 +25,7 @@ const typeLabel: Record<string, string> = {
 };
 
 export default function ApplicationStatus() {
+  usePageTitle('My Application');
   const { data, isLoading, isError } = useQuery<TApplicationStatus>({
     queryKey: ['application-status'],
     queryFn:  () => getApplicationStatus(),

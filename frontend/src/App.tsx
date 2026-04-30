@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider }     from './contexts/AuthContext';
 import { ThemeProvider }    from './contexts/ThemeContext';
 import { ProtectedRoute }   from './components/layout/ProtectedRoute';
@@ -8,7 +9,8 @@ import { ROUTES }           from './constants/routes';
 import type { Role }        from './types/auth.types';
 
 // ── Auth ───────────────────────────────────────────────────────
-import Login from './pages/auth/Login';
+import Login    from './pages/auth/Login';
+import NotFound from './pages/NotFound';
 
 // ── Active Student ─────────────────────────────────────────────
 import Dashboard   from './pages/student/Dashboard';
@@ -55,6 +57,7 @@ function App() {
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
+        <Toaster richColors position="bottom-right" theme="dark" />
         <Routes>
 
           {/* ── Public ─────────────────────────────────────── */}
@@ -88,7 +91,7 @@ function App() {
 
           {/* ── Default ────────────────────────────────────── */}
           <Route path="/"  element={<Navigate to={ROUTES.LOGIN} replace />} />
-          <Route path="*"  element={<Navigate to={ROUTES.LOGIN} replace />} />
+          <Route path="*"  element={<NotFound />} />
 
         </Routes>
       </BrowserRouter>

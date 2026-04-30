@@ -4,8 +4,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Wrench, X, ImagePlus, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getMyTickets, createTicket } from '../../services/maintenance.service';
 import { TicketStatus, TicketPriority } from '../../types/domain.types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { format } from 'date-fns';
 
 const CATEGORIES = ['WiFi / Internet','Plumbing','Electrical','Furniture','Appliance','Structural','Pest Control','Cleaning','Security','Other'];
@@ -33,6 +35,7 @@ const PRIORITY_COLOR: Record<TicketPriority, string> = {
 };
 
 export default function Maintenance() {
+  usePageTitle('Maintenance');
   const [tab,   setTab]   = useState<'list'|'report'>('list');
   const [files, setFiles] = useState<File[]>([]);
   const qc = useQueryClient();
@@ -60,7 +63,9 @@ export default function Maintenance() {
       reset();
       setFiles([]);
       setTab('list');
+      toast.success('Maintenance request submitted!');
     },
+    onError: () => toast.error('Failed to submit request. Please try again.'),
   });
 
   return (

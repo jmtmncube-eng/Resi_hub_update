@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { getTickets, updateTicket } from '../../services/maintenance.service';
 import type { MaintenanceTicket } from '../../types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN:        'badge-rose',
@@ -22,6 +24,7 @@ const STATUSES   = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 const PRIORITIES = ['ALL', 'EMERGENCY', 'HIGH', 'NORMAL', 'LOW'];
 
 export default function AdminMaintenance() {
+  usePageTitle('Maintenance · Admin');
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter]     = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
@@ -47,7 +50,9 @@ export default function AdminMaintenance() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-tickets'] });
       setEditId(null);
+      toast.success('Ticket updated!');
     },
+    onError: () => toast.error('Failed to update ticket.'),
   });
 
   if (isError) return (

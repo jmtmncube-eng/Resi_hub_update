@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getAdminVouchers, createVoucher, updateVoucher, deleteVoucher,
   awardCredits, getAccounts,
   AdminVoucher, AdminAccount,
 } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const BLANK_V = { name: '', description: '', cost: '', stock: '', icon: '🎁' };
 const BLANK_A = { userId: '', amount: '', note: '' };
 
 export default function AdminRewards() {
+  usePageTitle('Rewards Manager');
   const qc = useQueryClient();
   const [tab, setTab]             = useState<'vouchers' | 'credits'>('vouchers');
   const [showVForm, setShowVForm] = useState(false);
@@ -20,6 +24,7 @@ export default function AdminRewards() {
     name?: string; description?: string; cost?: string; stock?: string; icon?: string; isActive?: boolean;
   }>({});
   const [aForm, setAForm]         = useState(BLANK_A);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: vouchers = [] } = useQuery<AdminVoucher[]>({
     queryKey: ['admin-vouchers'],
@@ -36,7 +41,13 @@ export default function AdminRewards() {
       name: vForm.name, description: vForm.description,
       cost: parseInt(vForm.cost), stock: parseInt(vForm.stock), icon: vForm.icon,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-vouchers'] }); setShowVForm(false); setVForm(BLANK_V); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      setShowVForm(false);
+      setVForm(BLANK_V);
+      toast.success('Voucher created!');
+    },
+    onError: () => toast.error('Failed to create voucher.'),
   });
 
   const updateV = useMutation({
@@ -47,12 +58,22 @@ export default function AdminRewards() {
       ...(editVForm.stock       && { stock:        parseInt(editVForm.stock) }),
       ...(editVForm.isActive    !== undefined && { isActive: editVForm.isActive }),
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-vouchers'] }); setEditVId(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      setEditVId(null);
+      toast.success('Voucher updated!');
+    },
+    onError: () => toast.error('Failed to update voucher.'),
   });
 
   const deleteV = useMutation({
     mutationFn: (id: string) => deleteVoucher(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-vouchers'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      setDeleteTarget(null);
+      toast.success('Voucher deleted.');
+    },
+    onError: () => toast.error('Failed to delete voucher.'),
   });
 
   const awardC = useMutation({
@@ -61,7 +82,11 @@ export default function AdminRewards() {
       amount: parseInt(aForm.amount),
       note: aForm.note,
     }),
-    onSuccess: () => { setAForm(BLANK_A); },
+    onSuccess: () => {
+      setAForm(BLANK_A);
+      toast.success('Credits awarded!');
+    },
+    onError: () => toast.error('Failed to award credits.'),
   });
 
   return (
@@ -174,7 +199,7 @@ export default function AdminRewards() {
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button onClick={() => { setEditVId(v.id); setEditVForm({}); }} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>Edit</button>
                         <button
-                          onClick={() => { if (confirm(`Delete "${v.name}"?`)) deleteV.mutate(v.id); }}
+                          onClick={() => setDeleteTarget({ id: v.id, name: v.name })}
                           style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer', background: 'rgba(232,25,122,.08)', border: '1px solid rgba(232,25,122,.2)', color: 'var(--rose)' }}
                         >
                           🗑
@@ -239,12 +264,6 @@ export default function AdminRewards() {
               </div>
             </div>
 
-            {awardC.isSuccess && (
-              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: '#4ade80', marginTop: 12 }}>✓ Credits awarded successfully!</p>
-            )}
-            {awardC.isError && (
-              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--rose)', marginTop: 10 }}>{(awardC.error as Error).message}</p>
-            )}
 
             <button
               onClick={() => awardC.mutate()}
@@ -257,6 +276,17 @@ export default function AdminRewards() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete voucher"
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        loading={deleteV.isPending}
+        onConfirm={() => deleteTarget && deleteV.mutate(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

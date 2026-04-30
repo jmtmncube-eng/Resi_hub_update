@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getAccounts, updateAccount, AdminAccount } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const ROLE_BADGE: Record<string, string> = {
   ADMIN:           'badge-rose',
@@ -16,6 +18,7 @@ const roleLabel: Record<string, string> = {
 };
 
 export default function AdminAccounts() {
+  usePageTitle('Accounts · Admin');
   const qc = useQueryClient();
   const [search, setSearch]     = useState('');
   const [editId, setEditId]     = useState<string | null>(null);
@@ -35,7 +38,9 @@ export default function AdminAccounts() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-accounts'] });
       setEditId(null);
+      toast.success('Account updated!');
     },
+    onError: () => toast.error('Failed to update account.'),
   });
 
   const totals = {

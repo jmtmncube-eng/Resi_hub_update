@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getAllocations, createAllocation, updateAllocation,
   getAccounts, getOccupancy,
   AdminAllocation,
 } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:   'badge-cyan',
@@ -14,6 +16,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function AdminAllocations() {
+  usePageTitle('Allocations · Admin');
   const qc = useQueryClient();
   const [search, setSearch]       = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -50,7 +53,9 @@ export default function AdminAllocations() {
       qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
       setShowModal(false);
       setForm({ userId: '', roomId: '', rent: '', status: 'ACTIVE' });
+      toast.success('Allocation created!');
     },
+    onError: () => toast.error('Failed to create allocation.'),
   });
 
   const updateMut = useMutation({
@@ -61,7 +66,9 @@ export default function AdminAllocations() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-allocations'] });
       setEditId(null);
+      toast.success('Allocation updated!');
     },
+    onError: () => toast.error('Failed to update allocation.'),
   });
 
   if (isError) return (

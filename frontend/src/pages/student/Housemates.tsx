@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getHousemates } from '../../services/housemate.service';
 import { getChores, claimChore, unclaimChore, completeChore } from '../../services/chore.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { Chore } from '../../types/domain.types';
 
 export default function Housemates() {
+  usePageTitle('Housemates');
   const [tab, setTab] = useState<'mates'|'chores'>('mates');
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -16,18 +19,22 @@ export default function Housemates() {
 
   const { mutate: claim, isPending: claiming } = useMutation({
     mutationFn: claimChore,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['chores'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['chores'] }); toast.success('Chore claimed! +5 🪙'); },
+    onError:   () => toast.error('Failed to claim chore.'),
   });
   const { mutate: unclaim } = useMutation({
     mutationFn: unclaimChore,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['chores'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['chores'] }); toast.success('Chore unclaimed.'); },
+    onError:   () => toast.error('Failed to unclaim chore.'),
   });
   const { mutate: complete } = useMutation({
     mutationFn: (id: string) => completeChore(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['chores'] });
       qc.invalidateQueries({ queryKey: ['wallet'] });
+      toast.success('Chore completed! +20 🪙');
     },
+    onError: () => toast.error('Failed to complete chore.'),
   });
 
   return (

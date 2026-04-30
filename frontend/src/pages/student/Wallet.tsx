@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trophy, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getWallet, getVouchers, getLeaderboard, redeemVoucher } from '../../services/wallet.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { format } from 'date-fns';
 
 const TX_ICON: Record<string, string>   = { EARN: '⬆', REDEEM: '🎟', ADJUST: '⚙' };
@@ -10,6 +12,7 @@ const TX_COLOR: Record<string, string>  = { EARN: '#4ade80', REDEEM: 'var(--rose
 const TX_BG: Record<string, string>     = { EARN: 'rgba(74,222,128,.1)', REDEEM: 'rgba(232,25,122,.1)', ADJUST: 'rgba(0,204,204,.1)' };
 
 export default function Wallet() {
+  usePageTitle('Wallet & Credits');
   const [tab, setTab] = useState<'balance'|'shop'|'leaderboard'>('balance');
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -23,7 +26,9 @@ export default function Wallet() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['wallet'] });
       qc.invalidateQueries({ queryKey: ['vouchers'] });
+      toast.success('Voucher redeemed! Check your email.');
     },
+    onError: () => toast.error('Failed to redeem voucher.'),
   });
 
   const tabs = [

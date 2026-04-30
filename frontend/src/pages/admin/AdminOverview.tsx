@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAdminStats, AdminStats } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function AdminOverview() {
+  usePageTitle('Admin Overview');
   const { data: stats, isLoading, isError } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
     queryFn: getAdminStats,

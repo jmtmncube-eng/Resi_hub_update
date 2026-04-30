@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getOccupancy, AdminRoom } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const typeColor: Record<string, { color: string; bg: string }> = {
   SINGLE:  { color: '#60a5fa', bg: 'rgba(96,165,250,.12)' },
@@ -9,6 +10,7 @@ const typeColor: Record<string, { color: string; bg: string }> = {
 };
 
 export default function AdminOccupancy() {
+  usePageTitle('Occupancy · Admin');
   const [selectedBlock, setSelectedBlock] = useState<string>('');
 
   const { data, isLoading, isError } = useQuery({

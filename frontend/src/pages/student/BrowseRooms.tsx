@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery }  from '@tanstack/react-query';
 import { getAvailableRooms, AvailableRoom } from '../../services/application.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const typeLabel: Record<string, string> = {
   SINGLE: 'Single',
@@ -23,6 +24,7 @@ const typeDesc: Record<string, string> = {
 const TYPE_FILTERS = ['All', 'SINGLE', 'DOUBLE', 'STUDIO'] as const;
 
 export default function BrowseRooms() {
+  usePageTitle('Browse Rooms');
   const [typeFilter, setTypeFilter] = useState<string>('All');
   const [blockFilter, setBlockFilter] = useState<string>('All');
 

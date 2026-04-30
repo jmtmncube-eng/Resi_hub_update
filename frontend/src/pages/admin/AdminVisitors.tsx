@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
 import { getAdminVisitors, AdminVisitorPass } from '../../services/admin.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STATUS_BADGE: Record<string, string> = {
   UPCOMING:  'badge-gray',
@@ -11,6 +12,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function AdminVisitors() {
+  usePageTitle('Visitors · Admin');
   const [search, setSearch] = useState('');
 
   const { data: passes = [], isLoading, isError } = useQuery<AdminVisitorPass[]>({

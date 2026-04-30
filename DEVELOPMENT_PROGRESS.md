@@ -190,5 +190,49 @@
 
 ---
 
-**Document Version**: 1.5
-**Last Updated**: 2026-04-26
+---
+
+### Session 6 — 2026-04-30
+
+**Goal**: UI/UX Polish — Toast notifications, 404 page, dynamic page titles, accessible confirm modals
+
+**New Files**
+- ✅ `frontend/src/hooks/usePageTitle.ts` — Sets `document.title = "${title} · ResiHub"` with cleanup on unmount
+- ✅ `frontend/src/components/ConfirmModal.tsx` — Accessible replace for native `confirm()`: Escape key, scroll-lock, loading state, danger/normal variants
+- ✅ `frontend/src/pages/NotFound.tsx` — Gradient 404 page with dot-grid decoration + "Go to homepage" CTA
+
+**App.tsx Changes**
+- ✅ Added `<Toaster richColors position="bottom-right" theme="dark" />` (sonner v2)
+- ✅ Added `import NotFound` + replaced catch-all redirect with `<Route path="*" element={<NotFound />} />`
+
+**Toast Notifications Added (all mutations)**
+- ✅ `Maintenance.tsx` — createTicket: success "Request submitted!" / error fallback
+- ✅ `Visitors.tsx` — createPass: success / error; cancelPass: success / error
+- ✅ `Profile.tsx` — updateProfile: success / error; uploadAvatar: success / error (removed old `saved` state)
+- ✅ `Housemates.tsx` — claim: "+5 🪙" / unclaim / complete "+20 🪙" — all with error toasts
+- ✅ `Wallet.tsx` — redeemVoucher: success / error
+- ✅ `AdminMaintenance.tsx` — updateTicket: success / error
+- ✅ `AdminNews.tsx` — create / pin / delete — all with success/error toasts
+- ✅ `AdminAllocations.tsx` — create / update — all with success/error toasts
+- ✅ `AdminRewards.tsx` — createV / updateV / deleteV / awardC — all with success/error toasts; removed inline success/error state UI
+- ✅ `AdminAccounts.tsx` — updateAccount: success / error
+
+**ConfirmModal Wired (replacing native confirm())**
+- ✅ `Visitors.tsx` — cancel visitor pass → ConfirmModal (danger variant)
+- ✅ `AdminNews.tsx` — delete article → ConfirmModal (danger variant)
+- ✅ `AdminRewards.tsx` — delete voucher → ConfirmModal (danger variant)
+
+**Dynamic Page Titles (usePageTitle added to all 19 pages)**
+- ✅ Dashboard, Maintenance, Updates, Visitors, Housemates, Wallet, Profile, Documents
+- ✅ ApplicationStatus, BrowseRooms
+- ✅ AdminOverview, AdminOccupancy, AdminAllocations, AdminMaintenance, AdminNews, AdminVisitors, AdminRewards, AdminAccounts
+
+**Bonus Fix**
+- ✅ Removed unused `Wallet` icon import from `Dashboard.tsx` (TS6133 error)
+
+**TypeScript**: `npx tsc --noEmit` → 0 errors
+
+---
+
+**Document Version**: 1.6
+**Last Updated**: 2026-04-30

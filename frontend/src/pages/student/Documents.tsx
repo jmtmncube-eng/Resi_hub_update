@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileText, Download, FileCheck, FileClock } from 'lucide-react';
 import { getMyDocuments } from '../../services/document.service';
 import { ResidentDocument } from '../../types/domain.types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const STATUS_BADGE: Record<string, string> = {
   Paid:    'badge-cyan',
@@ -23,6 +24,7 @@ const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 export default function Documents() {
+  usePageTitle('Documents');
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ['documents'],
     queryFn:  getMyDocuments,

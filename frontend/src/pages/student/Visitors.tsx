@@ -5,8 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { QrCode, Plus, X, Loader2, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 import { getMyPasses, createPass, cancelPass } from '../../services/visitor.service';
 import { VisitorPass } from '../../types/domain.types';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import ConfirmModal from '../../components/ConfirmModal';
 import { format } from 'date-fns';
 
 const formSchema = z.object({
@@ -27,8 +30,10 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function Visitors() {
-  const [showForm, setShowForm] = useState(false);
-  const [qrPass,   setQrPass]  = useState<VisitorPass | null>(null);
+  usePageTitle('Visitor Passes');
+  const [showForm,       setShowForm]       = useState(false);
+  const [qrPass,         setQrPass]         = useState<VisitorPass | null>(null);
+  const [cancelTarget,   setCancelTarget]   = useState<string | null>(null);
   const qc = useQueryClient();
 
   const { data: passes = [], isLoading } = useQuery({
@@ -43,12 +48,23 @@ export default function Visitors() {
 
   const { mutate: invite, isPending } = useMutation({
     mutationFn: createPass,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['visitors'] }); reset(); setShowForm(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['visitors'] });
+      reset();
+      setShowForm(false);
+      toast.success('Visitor pass created!');
+    },
+    onError: () => toast.error('Failed to create visitor pass.'),
   });
 
-  const { mutate: cancel } = useMutation({
+  const { mutate: cancel, isPending: cancelling } = useMutation({
     mutationFn: cancelPass,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['visitors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['visitors'] });
+      setCancelTarget(null);
+      toast.success('Visitor pass cancelled.');
+    },
+    onError: () => toast.error('Failed to cancel pass.'),
   });
 
   return (
@@ -157,7 +173,7 @@ export default function Visitors() {
                     <QrCode size={13} />
                   </button>
                   {pass.status === 'UPCOMING' && (
-                    <button onClick={() => cancel(pass.id)} style={{ padding: 6, borderRadius: 6, background: 'var(--hover)', border: '1px solid var(--border)', color: 'var(--rose)', cursor: 'pointer', display: 'flex' }}>
+                    <button onClick={() => setCancelTarget(pass.id)} style={{ padding: 6, borderRadius: 6, background: 'var(--hover)', border: '1px solid var(--border)', color: 'var(--rose)', cursor: 'pointer', display: 'flex' }}>
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -166,6 +182,16 @@ export default function Visitors() {
             ))
         }
       </div>
+      <ConfirmModal
+        open={!!cancelTarget}
+        title="Cancel visitor pass"
+        message="This will cancel the pass and the visitor won't be able to enter. Are you sure?"
+        confirmLabel="Cancel Pass"
+        danger
+        loading={cancelling}
+        onConfirm={() => cancelTarget && cancel(cancelTarget)}
+        onCancel={() => setCancelTarget(null)}
+      />
     </div>
   );
 }

@@ -84,6 +84,15 @@
 - [x] Login page + DashboardLayout restyled
 
 ### Phase 6 — Polish, Testing & Deployment
+
+**Polish — Completed 2026-04-30**
+- [x] `sonner` toast notifications on all mutations (success + error) across all 10 pages with mutations
+- [x] `usePageTitle` hook wired to all 19 pages — dynamic `document.title = "${page} · ResiHub"`
+- [x] `ConfirmModal` component — replaces native `confirm()` in Visitors, AdminNews, AdminRewards
+- [x] `NotFound` 404 page — gradient 404, dot-grid, "Go to homepage" CTA
+- [x] `App.tsx` — `<Toaster>` (dark theme, bottom-right) + `* → <NotFound />` catch-all
+
+**Remaining**
 - [ ] Unit tests (backend services)
 - [ ] Integration tests (API endpoints)
 - [ ] E2E tests (Playwright)
@@ -154,5 +163,5 @@
 
 ---
 
-**Document Version**: 1.4
-**Last Updated**: 2026-03-25
+**Document Version**: 1.5
+**Last Updated**: 2026-04-30

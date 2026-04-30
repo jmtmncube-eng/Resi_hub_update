@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Newspaper, Pin } from 'lucide-react';
 import { getNews } from '../../services/news.service';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const FILTERS = ['All', 'maintenance', 'wifi', 'grounds', 'notice'];
 
 export default function Updates() {
+  usePageTitle('Residence Updates');
   const [filter, setFilter] = useState('All');
 
   const { data: news = [], isLoading } = useQuery({

@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Wrench, QrCode, Newspaper, ClipboardList, Wallet, AlertCircle } from 'lucide-react';
+import { Wrench, QrCode, Newspaper, ClipboardList, AlertCircle } from 'lucide-react';
 import { getDashboard } from '../../services/dashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { format } from 'date-fns';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -21,6 +22,7 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  usePageTitle('Dashboard');
   const { user } = useAuth();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard'],
