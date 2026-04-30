@@ -61,9 +61,13 @@ export default function Login() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg)' }}>
+      <style>{`
+        @media (max-width: 767px) { .rh-scene-panel { display: none !important; } }
+        @media (min-width: 768px) { .rh-scene-panel { display: flex !important; } .rh-mobile-brand { display: none !important; } }
+      `}</style>
 
-      {/* ── Left panel: Isometric scene (desktop only) ────── */}
-      <div className="hidden lg:flex" style={{
+      {/* ── Left panel: Isometric scene ─────────────────── */}
+      <div className="rh-scene-panel" style={{
         flex: 1,
         background: 'linear-gradient(160deg, #06080f 0%, #0a1220 45%, #08101a 100%)',
         borderRight: '1px solid rgba(0,204,204,.08)',
@@ -92,17 +96,19 @@ export default function Login() {
 
       {/* ── Right panel: Login form ───────────────────────── */}
       <div style={{
+        flexShrink: 0,
         width: '100%',
+        maxWidth: 480,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px 20px',
-      }} className="lg:w-[480px] lg:flex-none">
+      }}>
 
         <div style={{ width: '100%', maxWidth: 420 }} className="appear">
 
           {/* Mobile-only brand header */}
-          <div className="lg:hidden" style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div className="rh-mobile-brand" style={{ textAlign: 'center', marginBottom: 28 }}>
             <h1 style={{
               fontSize: 30, fontWeight: 800, color: 'var(--cyan)',
               letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif",
