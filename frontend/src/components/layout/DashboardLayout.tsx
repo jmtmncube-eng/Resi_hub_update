@@ -28,7 +28,6 @@ const pendingNav = [
 
 const adminNav = [
   { to: ROUTES.ADMIN,             label: 'Overview',    icon: LayoutDashboard },
-  { to: ROUTES.ADMIN_OCCUPANCY,   label: 'Occupancy',   icon: Building2       },
   { to: ROUTES.ADMIN_ALLOCATIONS, label: 'Allocations', icon: SquareStack     },
   { to: ROUTES.ADMIN_PAYMENTS,    label: 'Payments',    icon: CreditCard      },
   { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets',     icon: Ticket          },
@@ -36,7 +35,7 @@ const adminNav = [
   { to: ROUTES.ADMIN_VISITORS,    label: 'Visitors',    icon: QrCode          },
   { to: ROUTES.ADMIN_REWARDS,     label: 'Rewards',     icon: Gift            },
   { to: ROUTES.ADMIN_ACCOUNTS,    label: 'Accounts',    icon: BookUser        },
-  { to: ROUTES.ADMIN_SETTINGS,    label: 'Settings',    icon: Settings        },
+  { to: ROUTES.ADMIN_SETTINGS,    label: 'Residence',   icon: Building2       },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

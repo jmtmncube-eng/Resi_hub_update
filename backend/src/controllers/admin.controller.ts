@@ -22,6 +22,30 @@ export async function getOccupancy(req: Request, res: Response, next: NextFuncti
   } catch (e) { next(e); }
 }
 
+// ── Room Setup ─────────────────────────────────────────────────
+export async function setupRooms(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { count, type, blocks, pricePerRoom } = req.body as {
+      count: number; type: string; blocks: number; pricePerRoom: number;
+    };
+    if (!count || count < 1 || count > 500) {
+      res.status(400).json({ success: false, error: 'count must be 1–500' });
+      return;
+    }
+    if (!['SINGLE','DOUBLE','TRIPLE','QUAD','STUDIO'].includes(type)) {
+      res.status(400).json({ success: false, error: 'Invalid room type' });
+      return;
+    }
+    const data = await adminService.setupRooms({
+      count: Math.floor(count),
+      type:  type as 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO',
+      blocks: Math.max(1, Math.min(10, Math.floor(blocks ?? 1))),
+      pricePerRoom: Number(pricePerRoom) || 0,
+    });
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 // ── Allocations ───────────────────────────────────────────────
 export async function getAllocations(req: Request, res: Response, next: NextFunction) {
   try {

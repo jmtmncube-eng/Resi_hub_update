@@ -79,6 +79,51 @@ export async function getBlocks() {
   return rooms.map(r => r.block);
 }
 
+// ── Room Setup ─────────────────────────────────────────────────
+const BLOCK_LETTERS = ['A','B','C','D','E','F','G','H','J','K'];
+
+export async function setupRooms({
+  count, type, blocks, pricePerRoom,
+}: {
+  count: number;
+  type: 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
+  blocks: number;
+  pricePerRoom: number;
+}) {
+  // Only remove VACANT rooms — never delete rooms with active allocations
+  await prisma.room.deleteMany({ where: { status: 'VACANT' } });
+
+  const perBlock = Math.ceil(count / blocks);
+  const toCreate: Array<{
+    number: string; block: string; type: typeof type; price: number; status: 'VACANT';
+  }> = [];
+  let created = 0;
+
+  for (let b = 0; b < blocks && created < count; b++) {
+    const letter = BLOCK_LETTERS[b] ?? String.fromCharCode(65 + b);
+    for (let r = 1; r <= perBlock && created < count; r++) {
+      toCreate.push({
+        number: `${letter}${100 + r}`,
+        block:  letter,
+        type,
+        price:  pricePerRoom,
+        status: 'VACANT',
+      });
+      created++;
+    }
+  }
+
+  await prisma.room.createMany({ data: toCreate });
+  return prisma.room.findMany({
+    include: {
+      allocation: {
+        include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      },
+    },
+    orderBy: [{ block: 'asc' }, { number: 'asc' }],
+  });
+}
+
 // ── Allocations ───────────────────────────────────────────────
 export async function getAllAllocations(search?: string) {
   return prisma.allocation.findMany({

@@ -29,7 +29,6 @@ import BrowseRooms       from './pages/student/BrowseRooms';
 
 // ── Admin ───────────────────────────────────────────────────────
 import AdminOverview    from './pages/admin/AdminOverview';
-import AdminOccupancy   from './pages/admin/AdminOccupancy';
 import AdminAllocations from './pages/admin/AdminAllocations';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminNews        from './pages/admin/AdminNews';
@@ -85,7 +84,7 @@ function App() {
 
           {/* ── Admin ──────────────────────────────────────── */}
           <Route path={ROUTES.ADMIN}             element={<Page roles={ADMIN}><AdminOverview /></Page>} />
-          <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Page roles={ADMIN}><AdminOccupancy /></Page>} />
+          <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Navigate to={ROUTES.ADMIN_SETTINGS} replace />} />
           <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Page roles={ADMIN}><AdminAllocations /></Page>} />
           <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={ADMIN}><AdminMaintenance /></Page>} />
           <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />

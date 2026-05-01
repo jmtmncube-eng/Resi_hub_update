@@ -116,6 +116,14 @@ export const rejectPaymentProof = async (id: string) => {
   return res.data.data;
 };
 
+// ── Room Setup ────────────────────────────────────────────────
+export const setupRooms = async (body: {
+  count: number; type: string; blocks: number; pricePerRoom: number;
+}) => {
+  const res = await api.post('/admin/setup-rooms', body);
+  return res.data.data as AdminRoom[];
+};
+
 // ── Settings ──────────────────────────────────────────────────
 export const getSettings = async () => {
   const res = await api.get('/settings');

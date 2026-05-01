@@ -22,6 +22,7 @@ router.get('/stats',          ctrl.getStats);
 
 // ── Occupancy ─────────────────────────────────────────────────
 router.get('/occupancy',      ctrl.getOccupancy);
+router.post('/setup-rooms',   ctrl.setupRooms);
 
 // ── Allocations ───────────────────────────────────────────────
 router.get('/allocations',                                   ctrl.getAllocations);

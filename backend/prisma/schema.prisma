@@ -25,6 +25,8 @@ enum Role {
 enum RoomType {
   SINGLE
   DOUBLE
+  TRIPLE
+  QUAD
   STUDIO
 }
 
