@@ -11,7 +11,7 @@ import { useTheme }    from '../../contexts/ThemeContext';
 import { ROUTES }      from '../../constants/routes';
 import { WelcomeTour } from '../WelcomeTour';
 import { UserMenu }    from '../UserMenu';
-import { Brand }       from '../Brand';
+import { Brand }       from '../Brand';   // kept — used in the sidebar header
 import { LiveNotifier } from '../LiveNotifier';
 import { IdleLogout }   from '../IdleLogout';
 
@@ -206,25 +206,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           zIndex: 100,
           boxShadow: '0 1px 14px var(--shadow)',
         }}>
-          {/* Left: hamburger + brand (mobile only) */}
-          <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-              className="press-soft"
-              style={{
-                background: 'var(--bg3)', border: '1px solid var(--border)',
-                borderRadius: 8, color: 'var(--text2)',
-                padding: 8, display: 'flex',
-              }}
-            >
-              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-            <Brand size="sm" />
-          </div>
-          {/* Spacer that pushes UserMenu to the right on desktop (no brand re-shown there;
-              the sidebar already carries the ResiHub brand) */}
-          <div className="hidden md:block" style={{ flex: 1 }} />
+          {/* Mobile-only hamburger. Brand never shows here — the sidebar (which
+              the hamburger opens) already carries it, and a duplicate in the
+              top bar is wasted real estate. */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            className="press-soft md:hidden"
+            style={{
+              background: 'var(--bg3)', border: '1px solid var(--border)',
+              borderRadius: 8, color: 'var(--text2)',
+              padding: 8, display: 'flex',
+            }}
+          >
+            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+          {/* Flex spacer so UserMenu always pins to the right */}
+          <div style={{ flex: 1 }} />
           <UserMenu />
         </div>
 
