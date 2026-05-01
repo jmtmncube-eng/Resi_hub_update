@@ -5,7 +5,8 @@ import { authenticate } from '../middleware/auth.middleware';
 const router = Router();
 router.use(authenticate);
 
-router.get('/',     ctrl.getMyDocuments);
-router.get('/:id',  ctrl.getDocument);
+router.get('/',           ctrl.getMyDocuments);
+router.get('/:id',        ctrl.getDocument);
+router.post('/:id/sign',  ctrl.signDocument);
 
 export default router;

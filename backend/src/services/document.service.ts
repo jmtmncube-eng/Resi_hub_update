@@ -16,3 +16,20 @@ export async function getDocumentById(id: string, userId: string, role: string) 
   }
   return doc;
 }
+
+export async function signDocument(id: string, userId: string, signedByName: string) {
+  const doc = await prisma.document.findUnique({ where: { id } });
+  if (!doc)              throw new AppError('Document not found', 404);
+  if (doc.userId !== userId) throw new AppError('Not authorised', 403);
+  if (doc.type !== 'CONTRACT') throw new AppError('Only contracts can be signed', 400);
+  if (doc.status === 'Signed')  throw new AppError('Contract already signed', 409);
+
+  return prisma.document.update({
+    where: { id },
+    data: {
+      status:       'Signed',
+      signedAt:     new Date(),
+      signedByName: signedByName.trim(),
+    },
+  });
+}

@@ -10,6 +10,7 @@ import type { Role }        from './types/auth.types';
 
 // ── Auth ───────────────────────────────────────────────────────
 import Login    from './pages/auth/Login';
+import Register from './pages/auth/Register';
 import NotFound from './pages/NotFound';
 
 // ── Active Student ─────────────────────────────────────────────
@@ -61,7 +62,8 @@ function App() {
         <Routes>
 
           {/* ── Public ─────────────────────────────────────── */}
-          <Route path={ROUTES.LOGIN} element={<Login />} />
+          <Route path={ROUTES.LOGIN}    element={<Login />} />
+          <Route path={ROUTES.REGISTER} element={<Register />} />
 
           {/* ── Active Student ─────────────────────────────── */}
           <Route path={ROUTES.DASHBOARD}   element={<Page roles={ACTIVE}><Dashboard /></Page>} />

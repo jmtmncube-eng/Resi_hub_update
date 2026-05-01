@@ -116,14 +116,16 @@ export interface LeaderboardEntry {
 export type DocumentType = 'INVOICE' | 'CONTRACT' | 'LETTER';
 
 export interface ResidentDocument {
-  id:        string;
-  userId:    string;
-  type:      DocumentType;
-  period:    string;
-  amount?:   string;
-  status:    string;
-  fileUrl?:  string;
-  createdAt: string;
+  id:            string;
+  userId:        string;
+  type:          DocumentType;
+  period:        string;
+  amount?:       string;
+  status:        string;
+  fileUrl?:      string;
+  signedAt?:     string;
+  signedByName?: string;
+  createdAt:     string;
 }
 
 // ── Dashboard ───────────────────────────────────────────────────

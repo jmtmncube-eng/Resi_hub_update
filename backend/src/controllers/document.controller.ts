@@ -14,3 +14,15 @@ export async function getDocument(req: AuthRequest, res: Response, next: NextFun
     res.json({ success: true, data: doc });
   } catch (err) { next(err); }
 }
+
+export async function signDocument(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { signedByName } = req.body as { signedByName?: string };
+    if (!signedByName?.trim()) {
+      res.status(400).json({ success: false, error: 'signedByName is required' });
+      return;
+    }
+    const doc = await svc.signDocument(req.params.id, req.user!.userId, signedByName);
+    res.json({ success: true, data: doc });
+  } catch (err) { next(err); }
+}

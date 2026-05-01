@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Download, FileCheck, FileClock } from 'lucide-react';
+import { FileText, Download, FileCheck, FileClock, PenLine, Eye } from 'lucide-react';
 import { getMyDocuments } from '../../services/document.service';
 import { ResidentDocument } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import InvoiceModal from '../../components/InvoiceModal';
+import ContractSignModal from '../../components/ContractSignModal';
 
 const STATUS_BADGE: Record<string, string> = {
   Paid:    'badge-cyan',
@@ -25,6 +28,9 @@ const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
 
 export default function Documents() {
   usePageTitle('Documents');
+  const [invoiceDoc,  setInvoiceDoc]  = useState<ResidentDocument | null>(null);
+  const [contractDoc, setContractDoc] = useState<ResidentDocument | null>(null);
+
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ['documents'],
     queryFn:  getMyDocuments,
@@ -56,48 +62,90 @@ export default function Documents() {
           : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {[
-                { label: 'Invoices', items: invoices },
-                { label: 'Contracts', items: contracts },
-                { label: 'Letters', items: letters },
+                { label: 'Invoices',   items: invoices,  note: 'Click to view and download your rent invoices.' },
+                { label: 'Contracts',  items: contracts, note: 'Review and sign your lease agreement digitally.' },
+                { label: 'Letters',    items: letters,   note: 'Official correspondence from management.' },
               ].filter(g => g.items.length > 0).map(group => (
                 <div key={group.label}>
-                  <p className="micro-label" style={{ marginBottom: 10 }}>{group.label}</p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+                    <p className="micro-label">{group.label}</p>
+                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text4)' }}>{group.note}</p>
+                  </div>
                   <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                    {group.items.map(doc => <DocRow key={doc.id} doc={doc} />)}
+                    {group.items.map(doc => (
+                      <DocRow
+                        key={doc.id}
+                        doc={doc}
+                        onOpen={() => {
+                          if (doc.type === 'INVOICE')   setInvoiceDoc(doc);
+                          if (doc.type === 'CONTRACT')  setContractDoc(doc);
+                        }}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
           )
       }
+
+      {/* Modals */}
+      <InvoiceModal      doc={invoiceDoc}  onClose={() => setInvoiceDoc(null)}  />
+      <ContractSignModal doc={contractDoc} onClose={() => setContractDoc(null)} />
     </div>
   );
 }
 
-function DocRow({ doc }: { doc: ResidentDocument }) {
+function DocRow({ doc, onOpen }: { doc: ResidentDocument; onOpen: () => void }) {
   const ts = TYPE_STYLE[doc.type] ?? { bg: 'var(--bg3)', color: 'var(--text2)' };
+  const needsSign = doc.type === 'CONTRACT' && doc.status === 'Pending';
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }} className="last:border-0">
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px',
+        borderBottom: '1px solid var(--border)',
+        cursor: 'pointer', transition: 'background .15s',
+      }}
+      className="last:border-0"
+      onClick={onOpen}
+      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--hover)'}
+      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+    >
       <div style={{ width: 36, height: 36, borderRadius: 8, background: ts.bg, color: ts.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {TYPE_ICON[doc.type]}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{doc.type.charAt(0) + doc.type.slice(1).toLowerCase()}</p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+            {doc.type === 'INVOICE' ? 'Rent Invoice' : doc.type === 'CONTRACT' ? 'Lease Agreement' : 'Official Letter'}
+          </p>
           <span style={{ color: 'var(--text4)', fontSize: 12 }}>—</span>
           <p style={{ fontSize: 13, color: 'var(--text2)' }}>{doc.period}</p>
         </div>
         {doc.amount && doc.amount !== '—' && (
           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{doc.amount}</p>
         )}
+        {doc.signedAt && doc.signedByName && (
+          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--cyan)', marginTop: 2 }}>
+            ✓ Signed by {doc.signedByName}
+          </p>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span className={`badge ${STATUS_BADGE[doc.status] ?? 'badge-gray'}`}>{doc.status}</span>
-        {doc.fileUrl && (
-          <a href={doc.fileUrl} download
-            style={{ padding: 6, borderRadius: 6, background: 'var(--hover)', border: '1px solid var(--border)', color: 'var(--text2)', display: 'flex', transition: 'all .18s' }}>
+        {needsSign ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--rose)', fontWeight: 500 }}>
+            <PenLine size={12} /> Sign
+          </span>
+        ) : doc.type === 'INVOICE' ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text3)' }}>
             <Download size={13} />
-          </a>
+          </span>
+        ) : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text3)' }}>
+            <Eye size={13} />
+          </span>
         )}
       </div>
     </div>

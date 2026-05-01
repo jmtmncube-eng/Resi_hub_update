@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { ROLE_HOME } from '../../constants/routes';
+import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
 import IsometricScene from '../../components/IsometricScene';
 
@@ -74,27 +74,24 @@ export default function Login() {
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Radial ambient glow behind the scene */}
+        {/* Radial ambient glow */}
         <div style={{
-          position: 'absolute',
-          top: '35%', left: '50%',
+          position: 'absolute', top: '35%', left: '50%',
           transform: 'translate(-50%,-50%)',
           width: 500, height: 500,
           background: 'radial-gradient(circle, rgba(0,204,204,.07) 0%, transparent 65%)',
           pointerEvents: 'none',
         }}/>
         <div style={{
-          position: 'absolute',
-          top: '65%', left: '30%',
+          position: 'absolute', top: '65%', left: '30%',
           width: 300, height: 300,
           background: 'radial-gradient(circle, rgba(232,25,122,.05) 0%, transparent 65%)',
           pointerEvents: 'none',
         }}/>
-        {/* Scene */}
         <IsometricScene />
       </div>
 
-      {/* ── Right panel: Login form ───────────────────────── */}
+      {/* ── Right panel: Login form (rose-tinted) ─────────── */}
       <div style={{
         flexShrink: 0,
         width: '100%',
@@ -103,14 +100,37 @@ export default function Login() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px 20px',
+        background: 'linear-gradient(160deg, #0f0810 0%, #1c0d18 50%, #120f14 100%)',
+        position: 'relative',
+        overflow: 'hidden',
       }}>
+        {/* Decorative rose glow orbs */}
+        <div style={{
+          position: 'absolute', top: '18%', right: '10%',
+          width: 300, height: 300,
+          background: 'radial-gradient(circle, rgba(232,25,122,.12) 0%, transparent 65%)',
+          pointerEvents: 'none',
+        }}/>
+        <div style={{
+          position: 'absolute', bottom: '12%', left: '5%',
+          width: 200, height: 200,
+          background: 'radial-gradient(circle, rgba(232,25,122,.07) 0%, transparent 65%)',
+          pointerEvents: 'none',
+        }}/>
+        {/* Subtle dot grid */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'radial-gradient(rgba(232,25,122,.06) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+          pointerEvents: 'none',
+        }}/>
 
-        <div style={{ width: '100%', maxWidth: 420 }} className="appear">
+        <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="appear">
 
           {/* Mobile-only brand header */}
           <div className="rh-mobile-brand" style={{ textAlign: 'center', marginBottom: 28 }}>
             <h1 style={{
-              fontSize: 30, fontWeight: 800, color: 'var(--cyan)',
+              fontSize: 30, fontWeight: 800, color: 'var(--rose)',
               letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif",
               marginBottom: 4,
             }}>
@@ -125,7 +145,7 @@ export default function Login() {
           </div>
 
           {/* Login card */}
-          <div className="modal-card" style={{ marginBottom: 12 }}>
+          <div className="modal-card" style={{ marginBottom: 12, borderColor: 'rgba(232,25,122,.15)' }}>
 
             {/* Card header */}
             <div style={{ marginBottom: 24 }}>
@@ -137,7 +157,10 @@ export default function Login() {
                 Sign in to your account
               </h2>
               <p style={{ fontSize: 13, color: 'var(--text3)' }}>
-                Enter your credentials to continue
+                No account?{' '}
+                <Link to={ROUTES.REGISTER} style={{ color: 'var(--rose)', textDecoration: 'none', fontWeight: 500 }}>
+                  Create one free →
+                </Link>
               </p>
             </div>
 
@@ -221,7 +244,7 @@ export default function Login() {
           </div>
 
           {/* Demo accounts */}
-          <div className="card-sm">
+          <div className="card-sm" style={{ borderColor: 'rgba(232,25,122,.1)' }}>
             <p className="micro-label" style={{ marginBottom: 12 }}>Quick demo — click to fill</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {DEMO_ACCOUNTS.map(({ label, email, password }) => (
@@ -237,8 +260,8 @@ export default function Login() {
                     cursor: 'pointer', transition: 'all .18s', textAlign: 'left',
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0,204,204,.3)';
-                    (e.currentTarget as HTMLButtonElement).style.background  = 'rgba(0,204,204,.06)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(232,25,122,.3)';
+                    (e.currentTarget as HTMLButtonElement).style.background  = 'rgba(232,25,122,.06)';
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
@@ -249,7 +272,7 @@ export default function Login() {
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 1 }}>{label}</p>
                     <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{email}</p>
                   </div>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)' }}>Fill →</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--rose)' }}>Fill →</span>
                 </button>
               ))}
             </div>

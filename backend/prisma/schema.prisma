@@ -305,14 +305,16 @@ model News {
 }
 
 model Document {
-  id        String       @id @default(cuid())
-  userId    String
-  type      DocumentType
-  period    String
-  amount    String?
-  status    String
-  fileUrl   String?
-  createdAt DateTime     @default(now())
+  id           String       @id @default(cuid())
+  userId       String
+  type         DocumentType
+  period       String
+  amount       String?
+  status       String
+  fileUrl      String?
+  signedAt     DateTime?
+  signedByName String?
+  createdAt    DateTime     @default(now())
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getApplicationStatus, ApplicationStatus as TApplicationStatus } from '../../services/application.service';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import OnboardingWizard from '../../components/OnboardingWizard';
 
 const STEPS = [
   { key: 'submitted', label: 'Application Submitted',  desc: 'Your application is in the system.' },
@@ -48,6 +49,7 @@ export default function ApplicationStatus() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      <OnboardingWizard />
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">My Application</h1>
