@@ -346,5 +346,23 @@
 
 ---
 
-**Document Version**: 1.9
+---
+
+### Session 8 — Full Audit & Bug Fixes
+
+**Root-cause bugs found and fixed:**
+
+1. **File picker never opened (payment proof broken)** — Both `Documents.tsx` and `InvoiceModal.tsx` created a transient `<input>` element via `document.createElement` and called `.click()` on it without appending it to the DOM. Browsers block programmatic clicks on detached inputs, so the file picker silently did nothing. Fixed by using a hidden `<input ref>` element that lives in the DOM.
+
+2. **Documents.tsx UX overhaul** — "Upload Proof" button no longer immediately opens a file dialog. It now expands an inline panel. Inside the panel a dashed "Select Image" drop-zone opens the picker. After file selection, a preview + "Submit Proof" button appear. "Change" / "Cancel" work correctly.
+
+3. **Task vouchers unguarded at backend** — `wallet.service.ts` `redeemVoucher` had no check for `requiresProof`. Students could call `POST /wallet/redeem/:id` directly to claim task vouchers without submitting proof. Fixed with a 400 guard.
+
+4. **One-click voucher redemption** — The Voucher Shop "Redeem" button spent credits in a single click with no confirmation. Now shows `ConfirmModal` with the credit cost and current balance before committing.
+
+**TypeScript**: 0 errors (frontend + backend)
+
+---
+
+**Document Version**: 2.0
 **Last Updated**: 2026-05-01
