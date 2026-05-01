@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
@@ -17,12 +17,6 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-const DEMO_ACCOUNTS = [
-  { label: 'Admin',           email: 'admin@resihub.co', password: 'admin123' },
-  { label: 'Active Student',  email: 'sarah@campus.edu', password: 'pass123'  },
-  { label: 'Pending Student', email: 'aisha@campus.edu', password: 'pass123'  },
-];
-
 export default function Login() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
@@ -35,7 +29,7 @@ export default function Login() {
   }
 
   const {
-    register, handleSubmit, setValue,
+    register, handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
@@ -53,11 +47,6 @@ export default function Login() {
         axiosErr.response?.data?.error || 'Something went wrong. Please try again.'
       );
     }
-  }
-
-  function fillDemo(email: string, password: string) {
-    setValue('email',    email);
-    setValue('password', password);
   }
 
   return (
@@ -262,39 +251,52 @@ export default function Login() {
             </form>
           </div>
 
-          {/* Demo accounts */}
-          <div className="card-sm" style={{ borderColor: 'rgba(232,25,122,.1)' }}>
-            <p className="micro-label" style={{ marginBottom: 12 }}>Quick demo — click to fill</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {DEMO_ACCOUNTS.map(({ label, email, password }) => (
-                <button
-                  key={email}
-                  onClick={() => fillDemo(email, password)}
-                  style={{
-                    width: '100%', display: 'flex',
-                    alignItems: 'center', justifyContent: 'space-between',
-                    padding: '9px 12px', borderRadius: 8,
-                    background: 'var(--hover)',
-                    border: '1px solid var(--border)',
-                    cursor: 'pointer', transition: 'all .18s', textAlign: 'left',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(232,25,122,.3)';
-                    (e.currentTarget as HTMLButtonElement).style.background  = 'rgba(232,25,122,.06)';
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
-                    (e.currentTarget as HTMLButtonElement).style.background  = 'var(--hover)';
-                  }}
-                >
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 1 }}>{label}</p>
-                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{email}</p>
-                  </div>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--rose)' }}>Fill →</span>
-                </button>
-              ))}
+          {/* POPI Act notice — replaces the dev demo-credentials card */}
+          <div className="card-sm" style={{
+            borderColor: 'rgba(0,204,204,.18)',
+            background: 'linear-gradient(135deg, rgba(0,204,204,.04), rgba(232,25,122,.02))',
+            padding: '14px 16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                background: 'rgba(0,204,204,.14)',
+                border: '1px solid rgba(0,204,204,.32)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <ShieldCheck size={16} style={{ color: 'var(--cyan)' }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, letterSpacing: '-.005em' }}>
+                  Privacy notice (POPI Act)
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.55 }}>
+                  By signing in you acknowledge that the personal information you
+                  share with ResiHub — name, contact details, room allocation,
+                  payment proofs and visitor records — will be processed lawfully
+                  in line with the Protection of Personal Information Act,
+                  Act 4 of 2013. Your data is used only to run residence services
+                  and is never sold. You may request access, correction, or
+                  deletion at any time via your residence administrator.
+                </p>
+              </div>
             </div>
+          </div>
+
+          {/* Athera signature */}
+          <div style={{
+            marginTop: 18, textAlign: 'center',
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
+          }}>
+            Built by{' '}
+            <span style={{
+              color: 'var(--cyan)', fontWeight: 700, letterSpacing: '0',
+              fontFamily: "'Space Grotesk', sans-serif", fontSize: 11,
+            }}>
+              Athera
+            </span>
+            {' '}· © {new Date().getFullYear()}
           </div>
 
         </div>

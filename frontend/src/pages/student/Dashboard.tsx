@@ -5,7 +5,6 @@ import { getDashboard } from '../../services/dashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { ResiMark } from '../../components/Brand';
 import { format } from 'date-fns';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -38,7 +37,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 appear">
 
-      {/* Welcome banner — avatar on the left, ResiHub mark on the right */}
+      {/* Welcome banner — avatar + greeting (brand mark lives in the sidebar) */}
       <div style={{
         background: 'var(--bg2)', border: '1px solid var(--border)',
         borderRadius: 12, padding: '20px 24px',
@@ -58,15 +57,6 @@ export default function Dashboard() {
           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 500, color: 'var(--text3)' }}>
             {allocation ? `Room ${allocation.room.number} · Block ${allocation.room.block}` : 'No active room'}
           </p>
-        </div>
-        <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <ResiMark size={36} />
-          <span style={{
-            fontSize: 16, fontWeight: 700, color: 'var(--cyan)',
-            letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif",
-          }}>
-            ResiHub
-          </span>
         </div>
       </div>
 

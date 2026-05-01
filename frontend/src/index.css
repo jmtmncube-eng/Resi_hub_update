@@ -253,6 +253,29 @@ html.light {
   }
   select.input-base option { background: var(--sel-bg); color: var(--text); }
 
+  /* Native date / time picker icon — invert in dark mode so the
+     little calendar/clock glyph isn't invisible against dark inputs. */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator {
+    filter:  invert(1) brightness(.95);
+    opacity: .8;
+    cursor:  pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+  /* In light mode the input is light, so the icon should NOT be inverted */
+  html.light input[type="date"]::-webkit-calendar-picker-indicator,
+  html.light input[type="time"]::-webkit-calendar-picker-indicator,
+  html.light input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  html.light input[type="month"]::-webkit-calendar-picker-indicator {
+    filter:  none;
+    opacity: .75;
+  }
+
   .input-login {
     @apply w-full rounded-lg outline-none transition-all;
     background:  var(--input-bg);

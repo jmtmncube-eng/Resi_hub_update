@@ -4,13 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Bell, FileText, ClipboardList, AlertCircle,
-  Wrench, Megaphone,
+  Wrench, Megaphone, UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROUTES }  from '../constants/routes';
 import { getNews } from '../services/news.service';
 import { getMyDocuments } from '../services/document.service';
 import { getChores } from '../services/chore.service';
+import { getAccounts } from '../services/admin.service';
+import { getTickets } from '../services/maintenance.service';
 import { Chore } from '../types/domain.types';
 import { formatPeriod } from '../utils/period';
 
@@ -37,8 +39,11 @@ export function LiveNotifier() {
   const seenInvoiceRef  = useRef<Set<string> | null>(null);
   const seenChoreRef    = useRef<Set<string> | null>(null);
   const choreStateRef   = useRef<Map<string, string>>(new Map());
+  const seenPendingRef  = useRef<Set<string> | null>(null);
+  const seenTicketRef   = useRef<Set<string> | null>(null);
 
   const isStudent = user?.role === 'ACTIVE_STUDENT';
+  const isAdmin   = user?.role === 'ADMIN';
 
   // Pause polling when tab is hidden — a quiet tab shouldn't burn requests
   const enabled = !!user;
@@ -189,6 +194,74 @@ export function LiveNotifier() {
     seenChoreRef.current = ids;
     choreStateRef.current = stateMap;
   }, [chores, user, nav, qc]);
+
+  // ── Admin: new pending student registrations ───────────────────
+  const { data: accounts } = useQuery({
+    queryKey: ['live-accounts'],
+    queryFn:  () => getAccounts(),
+    enabled:  enabled && isAdmin,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: true,
+  });
+
+  useEffect(() => {
+    if (!accounts) return;
+    const pending = accounts.filter(a => a.role === 'PENDING_STUDENT');
+    const ids = new Set(pending.map(a => a.id));
+    if (seenPendingRef.current === null) {
+      seenPendingRef.current = ids;
+      return;
+    }
+    const fresh = pending.filter(a => !seenPendingRef.current!.has(a.id));
+    seenPendingRef.current = ids;
+
+    for (const a of fresh) {
+      toast(
+        <ToastBody
+          icon={<UserPlus size={15} style={{ color: 'var(--rose)' }} />}
+          title={`New applicant: ${a.name}`}
+          subtitle={`${a.email}${a.university ? ' · ' + a.university : ''} — tap to review`}
+          tag="Approval needed"
+          action={() => { nav(ROUTES.ADMIN_ACCOUNTS); qc.invalidateQueries({ queryKey: ['admin-accounts'] }); }}
+        />,
+        { duration: 8000 },
+      );
+    }
+  }, [accounts, nav, qc]);
+
+  // ── Admin: new maintenance tickets ─────────────────────────────
+  const { data: tickets } = useQuery({
+    queryKey: ['live-tickets'],
+    queryFn:  () => getTickets(),
+    enabled:  enabled && isAdmin,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: true,
+  });
+
+  useEffect(() => {
+    if (!tickets) return;
+    const ids = new Set(tickets.map(t => t.id));
+    if (seenTicketRef.current === null) {
+      seenTicketRef.current = ids;
+      return;
+    }
+    const fresh = tickets.filter(t => !seenTicketRef.current!.has(t.id));
+    seenTicketRef.current = ids;
+
+    for (const t of fresh) {
+      const isUrgent = t.priority === 'EMERGENCY' || t.priority === 'HIGH';
+      toast(
+        <ToastBody
+          icon={<Wrench size={15} style={{ color: isUrgent ? 'var(--rose)' : 'var(--cyan)' }} />}
+          title={`${t.priority === 'EMERGENCY' ? 'EMERGENCY — ' : ''}${t.category}: ${t.location}`}
+          subtitle={`${t.student?.name ?? 'A resident'} — tap to triage`}
+          tag={isUrgent ? 'Urgent ticket' : 'New ticket'}
+          action={() => { nav(ROUTES.ADMIN_MAINTENANCE); qc.invalidateQueries({ queryKey: ['admin-tickets'] }); }}
+        />,
+        { duration: isUrgent ? 10000 : 7000 },
+      );
+    }
+  }, [tickets, nav, qc]);
 
   return null;
 }

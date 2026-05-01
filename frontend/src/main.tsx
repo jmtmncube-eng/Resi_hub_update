@@ -7,7 +7,11 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      // Was 5min — too long; lists felt stale after admin actions even
+      // when the user had clearly acted. 30s + refetchOnWindowFocus is
+      // a much fresher feel without hammering the API.
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
       retry: 1,
     },
   },

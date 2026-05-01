@@ -150,6 +150,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <LogOut size={12} />
           Sign out
         </button>
+
+        {/* Athera signature — small, never the visual focus */}
+        <p style={{
+          marginTop: 10, textAlign: 'center',
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 9, color: 'var(--text4)', letterSpacing: '.05em',
+        }}>
+          Built by{' '}
+          <span style={{ color: 'var(--text3)', fontWeight: 700, letterSpacing: '0' }}>Athera</span>
+        </p>
       </div>
     </aside>
   );

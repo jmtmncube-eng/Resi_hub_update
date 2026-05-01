@@ -1,6 +1,15 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
-import { ensureContractForUser } from './document.service';
+import { ensureContractForUser, initiateRentInvoice } from './document.service';
+
+/** Build the YYYY-MM period string for "next month from today". Used so a
+ *  freshly-activated student lands with their upcoming-month invoice
+ *  ready to pay rather than this-month back-dated. */
+function nextMonthPeriod(): string {
+  const now  = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+}
 import {
   CreateAllocationInput,
   UpdateAllocationInput,
@@ -276,9 +285,12 @@ export async function createAllocation(data: CreateAllocationInput) {
   });
 
   await recomputeRoomStatus(data.roomId);
-  // Auto-provision a contract document so the student has one to sign on day-1
+  // Auto-provision contract + first invoice so the student lands fully set up
   if (allocation.status === 'ACTIVE') {
-    await ensureContractForUser(data.userId).catch(() => { /* non-fatal */ });
+    await Promise.all([
+      ensureContractForUser(data.userId).catch(() => { /* non-fatal */ }),
+      initiateRentInvoice(data.userId, nextMonthPeriod()).catch(() => { /* non-fatal */ }),
+    ]);
   }
   return allocation;
 }
@@ -317,9 +329,13 @@ export async function updateAllocation(id: string, data: UpdateAllocationInput) 
   // Recompute the room's status from its (possibly multiple) tenants
   await recomputeRoomStatus(allocation.roomId);
 
-  // RESERVED → ACTIVE: same lease-contract guarantee as a fresh allocation
+  // RESERVED → ACTIVE: same contract + first-invoice guarantee as a fresh
+  // allocation so admins don't have to remember to bill the student.
   if (data.status === 'ACTIVE') {
-    await ensureContractForUser(allocation.userId).catch(() => { /* non-fatal */ });
+    await Promise.all([
+      ensureContractForUser(allocation.userId).catch(() => { /* non-fatal */ }),
+      initiateRentInvoice(allocation.userId, nextMonthPeriod()).catch(() => { /* non-fatal */ }),
+    ]);
   }
 
   return updated;
@@ -409,18 +425,39 @@ export async function setAccountActive(id: string, isActive: boolean, adminId: s
   });
 }
 
-/** One-click approve: PENDING_STUDENT → ACTIVE_STUDENT. */
+/** One-click approve: PENDING_STUDENT → ACTIVE_STUDENT. If they already
+ *  have a RESERVED allocation we promote it to ACTIVE and auto-provision
+ *  their lease contract + first rent invoice so they land fully set up. */
 export async function approveAccount(id: string) {
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { allocation: true },
+  });
   if (!user) throw new AppError('User not found', 404);
   if (user.role === 'ACTIVE_STUDENT') throw new AppError('Already an active student', 400);
   if (user.role === 'ADMIN')          throw new AppError('Cannot change admin role this way', 400);
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id },
     data:  { role: 'ACTIVE_STUDENT' as never },
     select: { id: true, name: true, role: true },
   });
+
+  // If they reserved a room during onboarding, activate that allocation
+  // and provision the contract + upcoming-month invoice.
+  if (user.allocation && user.allocation.status === 'RESERVED') {
+    await prisma.allocation.update({
+      where: { id: user.allocation.id },
+      data:  { status: 'ACTIVE', moveIn: user.allocation.moveIn ?? new Date() },
+    });
+    await recomputeRoomStatus(user.allocation.roomId);
+    await Promise.all([
+      ensureContractForUser(id).catch(() => { /* non-fatal */ }),
+      initiateRentInvoice(id, nextMonthPeriod()).catch(() => { /* non-fatal */ }),
+    ]);
+  }
+
+  return updated;
 }
 
 // ── Revenue Report ────────────────────────────────────────────

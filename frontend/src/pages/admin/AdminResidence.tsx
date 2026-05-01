@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, SquareStack, LayoutGrid, Activity, Camera } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Building2, SquareStack, LayoutGrid, Activity, Camera, Pencil } from 'lucide-react';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { getSettings } from '../../services/admin.service';
 
 import AdminAllocations   from './AdminAllocations';
 import AdminSettings      from './AdminSettings';
@@ -33,6 +35,7 @@ export default function AdminResidence() {
   usePageTitle('Residence · Admin');
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as Tab) || 'health';
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
 
   const setTab = (next: Tab) => {
     const p = new URLSearchParams(params);
@@ -41,27 +44,48 @@ export default function AdminResidence() {
   };
 
   const active = useMemo(() => TABS.find(t => t.value === tab) ?? TABS[0], [tab]);
+  const residenceName = settings?.name?.trim() || 'Your residence';
 
   return (
     <div className="space-y-5 appear">
-      {/* Header */}
-      <div>
-        <h1 className="page-title">Residence</h1>
-        <p className="page-sub">{active.sub}</p>
+      {/* Header — residence name front-and-centre, with a quick-edit hop */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <p className="micro-label" style={{ marginBottom: 6, color: 'var(--cyan)' }}>RESIDENCE</p>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {residenceName}
+            <button
+              onClick={() => setTab('info')}
+              className="press-soft"
+              title="Edit residence name & details"
+              aria-label="Edit residence info"
+              style={{
+                width: 30, height: 30, borderRadius: 8,
+                border: '1px solid var(--border2)',
+                background: 'var(--bg3)',
+                color: 'var(--text2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <Pencil size={13} />
+            </button>
+          </h1>
+          <p className="page-sub">{active.sub}</p>
+        </div>
       </div>
 
-      {/* Tab strip — segmented control */}
+      {/* Tab strip — underlined for high visibility, scrolls horizontally
+          on narrow screens so the active tab is never hidden. */}
       <div
         role="tablist"
         aria-label="Residence sections"
         style={{
-          display: 'inline-flex',
-          padding: 4,
-          borderRadius: 12,
-          background: 'var(--bg3)',
-          border: '1px solid var(--border)',
-          gap: 2,
-          flexWrap: 'wrap',
+          display: 'flex',
+          gap: 4,
+          borderBottom: '1px solid var(--border2)',
+          overflowX: 'auto',
+          flexWrap: 'nowrap',
           maxWidth: '100%',
         }}
       >
@@ -77,31 +101,33 @@ export default function AdminResidence() {
               onClick={() => setTab(t.value)}
               className="press-soft"
               style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 14px',
-                borderRadius: 8,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '12px 18px',
+                marginBottom: -1,                          // overlap parent border
+                background: 'transparent',
                 border: 'none',
-                background: isActive ? 'var(--bg2)' : 'transparent',
-                boxShadow: isActive ? '0 1px 0 var(--shadow), inset 0 0 0 1px var(--border2)' : 'none',
+                borderBottom: `3px solid ${isActive ? 'var(--cyan)' : 'transparent'}`,
                 color: isActive ? 'var(--text)' : 'var(--text2)',
-                fontSize: 13,
-                fontWeight: isActive ? 600 : 500,
+                fontSize: 14,
+                fontWeight: isActive ? 700 : 500,
                 fontFamily: "'Space Grotesk', sans-serif",
                 cursor: 'pointer',
-                position: 'relative',
+                whiteSpace: 'nowrap',
+                transition: 'border-color .18s, color .18s',
+                flexShrink: 0,
               }}
             >
-              <Icon size={14} style={{ color: isActive ? 'var(--cyan)' : 'currentColor' }} />
+              <Icon size={15} style={{ color: isActive ? 'var(--cyan)' : 'currentColor' }} />
               {t.label}
               {isComingSoon && (
                 <span style={{
-                  fontSize: 8, fontWeight: 700,
-                  padding: '1px 5px', borderRadius: 4,
+                  fontSize: 9, fontWeight: 700,
+                  padding: '2px 6px', borderRadius: 4,
                   background: 'rgba(232,25,122,.14)',
                   color: 'var(--rose)',
                   fontFamily: "'IBM Plex Mono', monospace",
                   textTransform: 'uppercase', letterSpacing: '.05em',
-                  marginLeft: 2,
+                  marginLeft: 4,
                 }}>SOON</span>
               )}
             </button>
