@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  getAllocations, createAllocation, updateAllocation,
+  getAllocations, createAllocation, updateAllocation, removeAllocation,
   getAccounts, getOccupancy,
   AdminAllocation,
 } from '../../services/admin.service';
@@ -44,7 +44,9 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
     queryFn: () => getOccupancy(),
   });
 
-  const vacantRooms = (occupancyData?.rooms ?? []).filter(r => r.status === 'VACANT');
+  // Rooms that have at least one open slot. With multi-tenant rooms,
+  // status alone isn't enough — we filter on `vacantSlots > 0` instead.
+  const vacantRooms = (occupancyData?.rooms ?? []).filter(r => (r.vacantSlots ?? (r.status === 'VACANT' ? 1 : 0)) > 0);
 
   const createMut = useMutation({
     mutationFn: () => createAllocation({
@@ -74,6 +76,20 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
       toast.success('Allocation updated!');
     },
     onError: () => toast.error('Failed to update allocation.'),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (id: string) => removeAllocation(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-allocations'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      toast.success('Allocation removed');
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to remove allocation');
+    },
   });
 
   if (isError) return (
@@ -190,16 +206,41 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
                           {a.moveIn ? new Date(a.moveIn).toLocaleDateString() : '—'}
                         </td>
                         <td>
-                          <button
-                            onClick={() => {
-                              setEditId(a.id);
-                              setEditForm({ rent: String(a.rent), status: a.status });
-                            }}
-                            className="btn-ghost"
-                            style={{ padding: '5px 12px', fontSize: 12 }}
-                          >
-                            Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => {
+                                setEditId(a.id);
+                                setEditForm({ rent: String(a.rent), status: a.status });
+                              }}
+                              className="btn-ghost press-soft"
+                              style={{ padding: '5px 12px', fontSize: 12 }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove ${a.user.name} from ${a.room.block}-${a.room.number}? This frees up the slot.`)) {
+                                  removeMut.mutate(a.id);
+                                }
+                              }}
+                              disabled={removeMut.isPending && removeMut.variables === a.id}
+                              className="press-soft"
+                              title="Remove allocation — frees the slot"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px', borderRadius: 7,
+                                fontSize: 12,
+                                background: 'rgba(232,25,122,.08)',
+                                color: 'var(--rose)',
+                                border: '1px solid rgba(232,25,122,.25)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {removeMut.isPending && removeMut.variables === a.id
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <>Remove</>}
+                            </button>
+                          </div>
                         </td>
                       </>
                     )}

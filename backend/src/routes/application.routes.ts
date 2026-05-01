@@ -7,7 +7,8 @@ const router = Router();
 // Both pending and active students can view these
 router.use(authenticate);
 
-router.get('/status', ctrl.getStatus);
-router.get('/rooms',  ctrl.getRooms);
+router.get('/status',       ctrl.getStatus);
+router.get('/rooms',        ctrl.getRooms);
+router.post('/select-room', ctrl.selectRoom);
 
 export default router;

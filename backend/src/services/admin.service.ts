@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { ensureContractForUser } from './document.service';
 import {
   CreateAllocationInput,
   UpdateAllocationInput,
@@ -61,16 +62,80 @@ export async function getAdminStats() {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Room status helpers — rooms can now hold multiple tenants
+// ─────────────────────────────────────────────────────────────────
+
+const TYPE_CAPACITY: Record<string, number> = {
+  SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4, STUDIO: 1,
+};
+
+/** Recompute a room's status from its current allocations.
+ *  - All slots filled with ACTIVE  → OCCUPIED
+ *  - Any allocation present (ACTIVE or RESERVED) but slots remain → RESERVED
+ *  - No active or reserved allocations → VACANT */
+async function recomputeRoomStatus(roomId: string): Promise<void> {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      allocations: { where: { status: { in: ['ACTIVE', 'RESERVED'] } } },
+    },
+  });
+  if (!room) return;
+
+  const total    = room.allocations.length;
+  const active   = room.allocations.filter(a => a.status === 'ACTIVE').length;
+  const capacity = room.capacity || TYPE_CAPACITY[room.type] || 1;
+
+  let next: 'VACANT' | 'RESERVED' | 'OCCUPIED' = 'VACANT';
+  if (total === 0)                              next = 'VACANT';
+  else if (active >= capacity)                  next = 'OCCUPIED';
+  else                                          next = 'RESERVED';
+
+  if (next !== room.status) {
+    await prisma.room.update({ where: { id: roomId }, data: { status: next } });
+  }
+}
+
 // ── Occupancy ─────────────────────────────────────────────────
 export async function getOccupancy(block?: string) {
-  return prisma.room.findMany({
+  const rooms = await prisma.room.findMany({
     where: block ? { block } : undefined,
     include: {
-      allocation: {
+      allocations: {
+        where:   { status: { in: ['ACTIVE', 'RESERVED'] } },
         include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+        orderBy: { createdAt: 'asc' },
       },
     },
     orderBy: [{ block: 'asc' }, { number: 'asc' }],
+  });
+
+  // Shape each room for the frontend grid: include capacity, occupied slots,
+  // a tenants array, and a back-compat single `allocation` field for the
+  // original "first tenant" UI that still references it.
+  return rooms.map(r => {
+    const tenants = r.allocations.map(a => ({
+      allocationId: a.id,
+      status:       a.status,
+      rent:         Number(a.rent),
+      moveIn:       a.moveIn,
+      user:         a.user,
+    }));
+    const occupied  = tenants.filter(t => t.status === 'ACTIVE').length;
+    const reserved  = tenants.filter(t => t.status === 'RESERVED').length;
+    const capacity  = r.capacity || TYPE_CAPACITY[r.type] || 1;
+    return {
+      id: r.id, number: r.number, block: r.block, type: r.type,
+      price: r.price, status: r.status,
+      capacity, occupied, reserved,
+      vacantSlots: capacity - tenants.length,
+      tenants,
+      // Back-compat: first tenant only (existing UIs that read .allocation)
+      allocation: tenants[0]
+        ? { id: tenants[0].allocationId, status: tenants[0].status, rent: tenants[0].rent, user: tenants[0].user }
+        : null,
+    };
   });
 }
 
@@ -82,46 +147,82 @@ export async function getBlocks() {
 // ── Room Setup ─────────────────────────────────────────────────
 const BLOCK_LETTERS = ['A','B','C','D','E','F','G','H','J','K'];
 
-export async function setupRooms({
-  count, type, blocks, pricePerRoom,
-}: {
-  count: number;
-  type: 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
-  blocks: number;
+type RoomTypeStr = 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
+
+interface SetupRoomsLegacy {
+  count:        number;
+  type:         RoomTypeStr;
+  blocks:       number;
   pricePerRoom: number;
-}) {
-  // Only remove VACANT rooms — never delete rooms with active allocations
-  await prisma.room.deleteMany({ where: { status: 'VACANT' } });
+}
 
-  const perBlock = Math.ceil(count / blocks);
-  const toCreate: Array<{
-    number: string; block: string; type: typeof type; price: number; status: 'VACANT';
-  }> = [];
-  let created = 0;
+interface SetupRoomsMixed {
+  blocks: number;
+  /** Mixed-type generation. Each entry creates `count` rooms of that type. */
+  mix:    Array<{ type: RoomTypeStr; count: number; price: number }>;
+}
 
-  for (let b = 0; b < blocks && created < count; b++) {
-    const letter = BLOCK_LETTERS[b] ?? String.fromCharCode(65 + b);
-    for (let r = 1; r <= perBlock && created < count; r++) {
-      toCreate.push({
-        number: `${letter}${100 + r}`,
-        block:  letter,
-        type,
-        price:  pricePerRoom,
-        status: 'VACANT',
-      });
-      created++;
+/**
+ * Generate rooms. Two modes:
+ * - **Legacy**: one type per call (used by simple "X rooms of type Y" wizard)
+ * - **Mixed**: `mix` array → e.g. 5 SINGLEs + 4 DOUBLEs + 2 QUADs in one go.
+ *   Rooms are interleaved across blocks so each block ends up with a balanced
+ *   mix instead of all the singles in Block A and all the doubles in Block B.
+ */
+export async function setupRooms(args: SetupRoomsLegacy | SetupRoomsMixed) {
+  // Only remove rooms with NO allocations of any kind. Rooms that still
+  // hold (or once held) tenants stay — we never want to nuke history.
+  await prisma.room.deleteMany({
+    where: {
+      status:      'VACANT',
+      allocations: { none: {} },
+    },
+  });
+
+  // Normalise both shapes into a flat list of (type, price) entries
+  const flat: Array<{ type: RoomTypeStr; price: number }> = [];
+  if ('mix' in args) {
+    for (const slice of args.mix) {
+      for (let i = 0; i < slice.count; i++) flat.push({ type: slice.type, price: slice.price });
+    }
+  } else {
+    for (let i = 0; i < args.count; i++) flat.push({ type: args.type, price: args.pricePerRoom });
+  }
+
+  const blocks = Math.max(1, args.blocks);
+
+  // Seed each block's counter from the highest existing room number in that
+  // block so we never collide with rooms that survived the cleanup above.
+  const surviving = await prisma.room.findMany({ select: { block: true, number: true } });
+  const counters: Record<string, number> = {};
+  for (const room of surviving) {
+    const tail = parseInt(room.number.replace(/^[A-Z]+/, ''), 10);
+    if (Number.isFinite(tail)) {
+      counters[room.block] = Math.max(counters[room.block] ?? 100, tail);
     }
   }
 
+  const toCreate: Array<{
+    number: string; block: string; type: RoomTypeStr; price: number;
+    capacity: number; status: 'VACANT';
+  }> = [];
+
+  for (let i = 0; i < flat.length; i++) {
+    const letter = BLOCK_LETTERS[i % blocks] ?? String.fromCharCode(65 + (i % blocks));
+    counters[letter] = (counters[letter] ?? 100) + 1;
+    const { type, price } = flat[i];
+    toCreate.push({
+      number:   `${letter}${counters[letter]}`,
+      block:    letter,
+      type,
+      price,
+      capacity: TYPE_CAPACITY[type] ?? 1,
+      status:   'VACANT',
+    });
+  }
+
   await prisma.room.createMany({ data: toCreate });
-  return prisma.room.findMany({
-    include: {
-      allocation: {
-        include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
-      },
-    },
-    orderBy: [{ block: 'asc' }, { number: 'asc' }],
-  });
+  return getOccupancy();
 }
 
 // ── Allocations ───────────────────────────────────────────────
@@ -145,9 +246,20 @@ export async function getAllAllocations(search?: string) {
 }
 
 export async function createAllocation(data: CreateAllocationInput) {
-  // Ensure room is not already actively allocated
-  const existing = await prisma.allocation.findUnique({ where: { roomId: data.roomId } });
-  if (existing) throw new AppError('Room already has an allocation', 409);
+  // The user can only have one current allocation
+  const userExisting = await prisma.allocation.findUnique({ where: { userId: data.userId } });
+  if (userExisting) throw new AppError('This student already has a room allocation', 409);
+
+  // Capacity check — count existing ACTIVE/RESERVED allocations against capacity
+  const room = await prisma.room.findUnique({
+    where: { id: data.roomId },
+    include: { allocations: { where: { status: { in: ['ACTIVE', 'RESERVED'] } } } },
+  });
+  if (!room) throw new AppError('Room not found', 404);
+  const capacity = room.capacity || TYPE_CAPACITY[room.type] || 1;
+  if (room.allocations.length >= capacity) {
+    throw new AppError(`Room is full (${room.allocations.length}/${capacity})`, 409);
+  }
 
   const allocation = await prisma.allocation.create({
     data: {
@@ -163,14 +275,27 @@ export async function createAllocation(data: CreateAllocationInput) {
     },
   });
 
-  // Mark room occupied
+  await recomputeRoomStatus(data.roomId);
+  // Auto-provision a contract document so the student has one to sign on day-1
   if (allocation.status === 'ACTIVE') {
-    await prisma.room.update({ where: { id: data.roomId }, data: { status: 'OCCUPIED' } });
-  } else {
-    await prisma.room.update({ where: { id: data.roomId }, data: { status: 'RESERVED' } });
+    await ensureContractForUser(data.userId).catch(() => { /* non-fatal */ });
   }
-
   return allocation;
+}
+
+/**
+ * Admin removes a student from a room. We end the allocation rather than
+ * delete it so historical records are preserved (for audits, ended-leases
+ * reporting, etc.). The user.allocation FK is unique, so to let them be
+ * re-allocated later we hard-delete; ENDED allocations would block that.
+ */
+export async function removeAllocation(id: string) {
+  const alloc = await prisma.allocation.findUnique({ where: { id } });
+  if (!alloc) throw new AppError('Allocation not found', 404);
+
+  await prisma.allocation.delete({ where: { id } });
+  await recomputeRoomStatus(alloc.roomId);
+  return { id, roomId: alloc.roomId };
 }
 
 export async function updateAllocation(id: string, data: UpdateAllocationInput) {
@@ -189,13 +314,12 @@ export async function updateAllocation(id: string, data: UpdateAllocationInput) 
     },
   });
 
-  // Sync room status
-  if (data.status === 'ENDED') {
-    await prisma.room.update({ where: { id: allocation.roomId }, data: { status: 'VACANT' } });
-  } else if (data.status === 'ACTIVE') {
-    await prisma.room.update({ where: { id: allocation.roomId }, data: { status: 'OCCUPIED' } });
-  } else if (data.status === 'RESERVED') {
-    await prisma.room.update({ where: { id: allocation.roomId }, data: { status: 'RESERVED' } });
+  // Recompute the room's status from its (possibly multiple) tenants
+  await recomputeRoomStatus(allocation.roomId);
+
+  // RESERVED → ACTIVE: same lease-contract guarantee as a fresh allocation
+  if (data.status === 'ACTIVE') {
+    await ensureContractForUser(allocation.userId).catch(() => { /* non-fatal */ });
   }
 
   return updated;

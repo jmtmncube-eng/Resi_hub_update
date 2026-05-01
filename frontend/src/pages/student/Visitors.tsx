@@ -121,24 +121,65 @@ export default function Visitors() {
         </div>
       )}
 
-      {/* QR Modal */}
+      {/* QR Modal — centered card with breathing room around the QR */}
       {qrPass && (
         <div className="modal-overlay" onClick={() => setQrPass(null)}>
-          <div className="modal-card" style={{ maxWidth: 320 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Visitor QR Code</h3>
-              <button onClick={() => setQrPass(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer' }}>
+          <div className="modal-card appear" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Visitor pass</h3>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+                  Show this at the gate
+                </p>
+              </div>
+              <button
+                onClick={() => setQrPass(null)}
+                aria-label="Close"
+                className="press-soft"
+                style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 6, borderRadius: 8 }}
+              >
                 <X size={16} />
               </button>
             </div>
-            <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <QRCodeSVG value={qrPass.qrCode} size={180} />
+
+            {/* QR code — big, white, centered with padding */}
+            <div style={{
+              background: '#fff', borderRadius: 14, padding: 24,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 18,
+              boxShadow: '0 0 0 1px var(--border), 0 1px 0 var(--shadow)',
+            }}>
+              <QRCodeSVG value={qrPass.qrCode} size={220} level="M" />
             </div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>{qrPass.visitorName}</p>
-            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', textAlign: 'center', marginTop: 4 }}>{qrPass.qrCode}</p>
-            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', textAlign: 'center', marginTop: 4 }}>
-              {format(new Date(qrPass.date), 'dd MMM yyyy')} · {qrPass.timeFrom}–{qrPass.timeTo}
-            </p>
+
+            {/* Visitor info — centered & generously spaced */}
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+              <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.01em' }}>
+                {qrPass.visitorName}
+              </p>
+              <span style={{
+                display: 'inline-block',
+                padding: '3px 12px', borderRadius: 999,
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                background: 'var(--bg3)', color: 'var(--text3)',
+                border: '1px solid var(--border)',
+                letterSpacing: '.05em', textTransform: 'uppercase',
+              }}>
+                {qrPass.qrCode}
+              </span>
+              <p style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)',
+                marginTop: 6,
+              }}>
+                {format(new Date(qrPass.date), 'EEE, dd MMM yyyy')}
+              </p>
+              <p style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)',
+              }}>
+                {qrPass.timeFrom} – {qrPass.timeTo}
+              </p>
+            </div>
           </div>
         </div>
       )}

@@ -28,6 +28,7 @@ router.post('/setup-rooms',   ctrl.setupRooms);
 router.get('/allocations',                                   ctrl.getAllocations);
 router.post('/allocations',   validate(createAllocationSchema), ctrl.createAllocation);
 router.patch('/allocations/:id', validate(updateAllocationSchema), ctrl.updateAllocation);
+router.delete('/allocations/:id',                            ctrl.removeAllocation);
 
 // ── Accounts ──────────────────────────────────────────────────
 router.get('/accounts',                                      ctrl.getAccounts);

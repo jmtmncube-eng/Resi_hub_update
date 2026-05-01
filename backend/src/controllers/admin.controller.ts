@@ -25,14 +25,52 @@ export async function getOccupancy(req: Request, res: Response, next: NextFuncti
 // ── Room Setup ─────────────────────────────────────────────────
 export async function setupRooms(req: Request, res: Response, next: NextFunction) {
   try {
-    const { count, type, blocks, pricePerRoom } = req.body as {
-      count: number; type: string; blocks: number; pricePerRoom: number;
+    const body = req.body as {
+      // Mixed mode
+      blocks?: number;
+      mix?: Array<{ type: string; count: number; price: number }>;
+      // Legacy mode
+      count?: number; type?: string; pricePerRoom?: number;
     };
+    const VALID_TYPES = ['SINGLE','DOUBLE','TRIPLE','QUAD','STUDIO'] as const;
+    type RoomTypeStr = typeof VALID_TYPES[number];
+
+    // Mixed mode
+    if (Array.isArray(body.mix) && body.mix.length > 0) {
+      const total = body.mix.reduce((s, m) => s + (m.count ?? 0), 0);
+      if (total < 1 || total > 500) {
+        res.status(400).json({ success: false, error: 'Total room count must be 1–500' });
+        return;
+      }
+      for (const slice of body.mix) {
+        if (!VALID_TYPES.includes(slice.type as RoomTypeStr)) {
+          res.status(400).json({ success: false, error: `Invalid room type: ${slice.type}` });
+          return;
+        }
+        if (!slice.count || slice.count < 1) {
+          res.status(400).json({ success: false, error: `Slice count must be ≥ 1` });
+          return;
+        }
+        if (!slice.price || slice.price < 0) {
+          res.status(400).json({ success: false, error: `Each room type needs a price` });
+          return;
+        }
+      }
+      const data = await adminService.setupRooms({
+        blocks: Math.max(1, Math.floor(body.blocks ?? 1)),
+        mix:    body.mix.map(m => ({ type: m.type as RoomTypeStr, count: Math.floor(m.count), price: m.price })),
+      });
+      res.json({ success: true, data });
+      return;
+    }
+
+    // Legacy single-type mode
+    const { count, type, blocks, pricePerRoom } = body;
     if (!count || count < 1 || count > 500) {
       res.status(400).json({ success: false, error: 'count must be 1–500' });
       return;
     }
-    if (!['SINGLE','DOUBLE','TRIPLE','QUAD','STUDIO'].includes(type)) {
+    if (!type || !VALID_TYPES.includes(type as RoomTypeStr)) {
       res.status(400).json({ success: false, error: 'Invalid room type' });
       return;
     }
@@ -65,6 +103,13 @@ export async function createAllocation(req: Request, res: Response, next: NextFu
 export async function updateAllocation(req: Request, res: Response, next: NextFunction) {
   try {
     const data = await adminService.updateAllocation(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+export async function removeAllocation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.removeAllocation(req.params.id);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }

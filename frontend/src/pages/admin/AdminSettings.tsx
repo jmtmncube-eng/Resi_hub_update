@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Save, Loader2, Settings2, LayoutGrid,
-  DoorOpen, RefreshCw, ChevronUp,
+  DoorOpen, RefreshCw, ChevronUp, Plus, Minus, UserPlus, UserMinus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getSettings, updateSettings, getOccupancy,
-  setupRooms, ResidenceSettings,
+  setupRooms, setupRoomsMixed, ResidenceSettings,
+  AdminRoom, getAccounts, createAllocation, removeAllocation,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 
@@ -85,6 +86,12 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   const [pricePerRoom, setPricePerRoom] = useState(3500);
   const [selectedBlock, setSelectedBlock] = useState('');
   const [showSetupForm, setShowSetupForm] = useState(false);
+  const [setupMode, setSetupMode] = useState<'simple' | 'mixed'>('simple');
+  const [mix, setMix] = useState<Array<{ type: SharingType; count: number; price: number }>>([
+    { type: 'SINGLE', count: 5,  price: 4500 },
+    { type: 'DOUBLE', count: 10, price: 3500 },
+    { type: 'QUAD',   count: 2,  price: 2500 },
+  ]);
 
   const { data: occupancy, isLoading: occLoading } = useQuery({
     queryKey: ['admin-occupancy', selectedBlock],
@@ -102,11 +109,61 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   const perBlock   = Math.ceil(roomCount / numBlocks);
   const previewMsg = `${numBlocks} block${numBlocks > 1 ? 's' : ''} × ${perBlock} rooms = ${roomCount} ${sharingType.toLowerCase()} rooms`;
 
+  const mixTotal = mix.reduce((s, m) => s + (m.count || 0), 0);
+
+  // ── Add-tenant flow state ───────────────────────────────────
+  const [addTenantRoom, setAddTenantRoom] = useState<AdminRoom | null>(null);
+
+  const { data: accountsList = [] } = useQuery({
+    queryKey: ['admin-accounts-unallocated'],
+    queryFn:  () => getAccounts(),
+    enabled:  tab === 'rooms',
+  });
+
+  const addTenantMut = useMutation({
+    mutationFn: (vars: { userId: string; roomId: string; rent: number; status: 'ACTIVE' | 'RESERVED' }) =>
+      createAllocation(vars),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-allocations'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      setAddTenantRoom(null);
+      toast.success('Tenant added to room');
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to add tenant');
+    },
+  });
+
+  const removeTenantMut = useMutation({
+    mutationFn: (allocationId: string) => removeAllocation(allocationId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-allocations'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      toast.success('Tenant removed');
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to remove tenant');
+    },
+  });
+
   const doSetup = useMutation({
-    mutationFn: () => setupRooms({ count: roomCount, type: sharingType, blocks: numBlocks, pricePerRoom }),
+    mutationFn: () => {
+      if (setupMode === 'mixed') {
+        return setupRoomsMixed({
+          blocks: numBlocks,
+          mix:    mix.filter(m => m.count > 0),
+        });
+      }
+      return setupRooms({ count: roomCount, type: sharingType, blocks: numBlocks, pricePerRoom });
+    },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
-      toast.success(`${data.length} rooms generated!`);
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      toast.success(`${data.length} rooms generated`);
       setShowSetupForm(false);
     },
     onError: () => toast.error('Failed to generate rooms.'),
@@ -272,48 +329,146 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                {/* Total rooms */}
-                <div>
-                  <label className="field-label">How many rooms does your residence have?</label>
-                  <input
-                    type="number" min={1} max={500} className="input-base"
-                    style={{ maxWidth: 140 }}
-                    value={roomCount}
-                    onChange={e => setRoomCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
-                  />
+                {/* Mode toggle */}
+                <div style={{ display: 'inline-flex', gap: 4, padding: 4, background: 'var(--bg3)', borderRadius: 10, border: '1px solid var(--border)', alignSelf: 'flex-start' }}>
+                  {([
+                    { v: 'simple', label: 'Single type' },
+                    { v: 'mixed',  label: 'Mixed types' },
+                  ] as const).map(({ v, label }) => (
+                    <button
+                      key={v}
+                      onClick={() => setSetupMode(v)}
+                      style={{
+                        padding: '7px 16px', borderRadius: 7, fontSize: 12, border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: setupMode === v ? 600 : 400,
+                        background: setupMode === v ? 'var(--bg2)' : 'transparent',
+                        color: setupMode === v ? 'var(--text)' : 'var(--text3)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Sharing type */}
-                <div>
-                  <label className="field-label">Room sharing type</label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-                    {SHARING_OPTIONS.map(opt => {
-                      const active = sharingType === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => setSharingType(opt.value)}
-                          style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            padding: '10px 18px', borderRadius: 10, cursor: 'pointer',
-                            border: `1px solid ${active ? opt.color : 'var(--border)'}`,
-                            background: active ? `${opt.color}14` : 'var(--hover)',
-                            transition: 'all .18s', minWidth: 80,
-                            fontFamily: "'Space Grotesk', sans-serif",
-                          }}
-                        >
-                          <span style={{ fontSize: 13, fontWeight: 700, color: active ? opt.color : 'var(--text2)' }}>
-                            {opt.label}
-                          </span>
-                          <span style={{ fontSize: 10, color: 'var(--text4)', marginTop: 1 }}>{opt.sub}</span>
-                        </button>
-                      );
-                    })}
+                {setupMode === 'simple' ? (
+                  <>
+                    {/* Total rooms */}
+                    <div>
+                      <label className="field-label">How many rooms does your residence have?</label>
+                      <input
+                        type="number" min={1} max={500} className="input-base"
+                        style={{ maxWidth: 140 }}
+                        value={roomCount}
+                        onChange={e => setRoomCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
+                      />
+                    </div>
+
+                    {/* Sharing type */}
+                    <div>
+                      <label className="field-label">Room sharing type</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                        {SHARING_OPTIONS.map(opt => {
+                          const active = sharingType === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => setSharingType(opt.value)}
+                              style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                padding: '10px 18px', borderRadius: 10, cursor: 'pointer',
+                                border: `1px solid ${active ? opt.color : 'var(--border)'}`,
+                                background: active ? `${opt.color}14` : 'var(--hover)',
+                                transition: 'all .18s', minWidth: 80,
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              <span style={{ fontSize: 13, fontWeight: 700, color: active ? opt.color : 'var(--text2)' }}>
+                                {opt.label}
+                              </span>
+                              <span style={{ fontSize: 10, color: 'var(--text4)', marginTop: 1 }}>{opt.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Mixed mode — list of {type, count, price} rows */
+                  <div>
+                    <label className="field-label">Room mix</label>
+                    <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+                      Add a row per room type — counts and prices apply per slice.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {mix.map((slice, i) => (
+                        <div key={i} style={{
+                          display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr auto',
+                          gap: 8, alignItems: 'center',
+                          padding: '8px 10px', borderRadius: 10,
+                          background: 'var(--bg3)', border: '1px solid var(--border)',
+                        }}>
+                          <select
+                            value={slice.type}
+                            onChange={e => {
+                              const v = e.target.value as SharingType;
+                              setMix(m => m.map((s, idx) => idx === i ? { ...s, type: v } : s));
+                            }}
+                            className="input-base"
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                          >
+                            {SHARING_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label} ({opt.sub})</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number" min={0} className="input-base"
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            placeholder="count"
+                            value={slice.count}
+                            onChange={e => {
+                              const v = Math.max(0, parseInt(e.target.value) || 0);
+                              setMix(m => m.map((s, idx) => idx === i ? { ...s, count: v } : s));
+                            }}
+                          />
+                          <input
+                            type="number" min={0} className="input-base"
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            placeholder="rent (R)"
+                            value={slice.price}
+                            onChange={e => {
+                              const v = Math.max(0, parseInt(e.target.value) || 0);
+                              setMix(m => m.map((s, idx) => idx === i ? { ...s, price: v } : s));
+                            }}
+                          />
+                          <button
+                            onClick={() => setMix(m => m.filter((_, idx) => idx !== i))}
+                            disabled={mix.length === 1}
+                            className="btn-ghost press-soft"
+                            title="Remove row"
+                            style={{ padding: 6, borderRadius: 8 }}
+                          >
+                            <Minus size={13} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setMix(m => [...m, { type: 'SINGLE', count: 1, price: 4000 }])}
+                        className="btn-ghost press-soft"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, alignSelf: 'flex-start' }}
+                      >
+                        <Plus size={12} /> Add room type
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+                      Total: <b style={{ color: 'var(--cyan)' }}>{mixTotal}</b> rooms across {numBlocks} block{numBlocks > 1 ? 's' : ''}
+                    </p>
                   </div>
-                </div>
+                )}
 
                 {/* Blocks / wings */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: setupMode === 'mixed' ? '1fr' : '1fr 1fr', gap: 16 }}>
                   <div>
                     <label className="field-label">How many blocks / wings?</label>
                     <input
@@ -325,27 +480,31 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                       Blocks A → {String.fromCharCode(64 + numBlocks)}
                     </p>
                   </div>
-                  <div>
-                    <label className="field-label">Price per room (R)</label>
-                    <input
-                      type="number" min={0} className="input-base"
-                      value={pricePerRoom}
-                      onChange={e => setPricePerRoom(Math.max(0, parseInt(e.target.value) || 0))}
-                    />
-                  </div>
+                  {setupMode === 'simple' && (
+                    <div>
+                      <label className="field-label">Price per room (R)</label>
+                      <input
+                        type="number" min={0} className="input-base"
+                        value={pricePerRoom}
+                        onChange={e => setPricePerRoom(Math.max(0, parseInt(e.target.value) || 0))}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Preview */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  background: 'var(--bg3)', border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '10px 14px',
-                }}>
-                  <DoorOpen size={14} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)' }}>
-                    {previewMsg}
-                  </span>
-                </div>
+                {setupMode === 'simple' && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'var(--bg3)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '10px 14px',
+                  }}>
+                    <DoorOpen size={14} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)' }}>
+                      {previewMsg}
+                    </span>
+                  </div>
+                )}
 
                 {/* Warning if rooms exist */}
                 {hasRooms && (
@@ -364,13 +523,19 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     onClick={() => doSetup.mutate()}
-                    disabled={doSetup.isPending || roomCount < 1}
+                    disabled={
+                      doSetup.isPending ||
+                      (setupMode === 'simple' && roomCount < 1) ||
+                      (setupMode === 'mixed'  && mixTotal < 1)
+                    }
                     className="btn-primary"
                     style={{ padding: '10px 24px', fontSize: 13 }}
                   >
                     {doSetup.isPending
                       ? <><Loader2 size={13} className="animate-spin" /> Generating…</>
-                      : <><LayoutGrid size={14} /> Generate Rooms</>
+                      : <><LayoutGrid size={14} />
+                          Generate {setupMode === 'mixed' ? `${mixTotal} rooms (mixed)` : 'Rooms'}
+                        </>
                     }
                   </button>
                 </div>
@@ -456,51 +621,133 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                     ))}
                   </div>
 
-                  {/* Room grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {/* Room grid — multi-tenant cards with click-driven actions */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     {rooms.map(room => {
-                      const isOccupied = room.status === 'OCCUPIED';
-                      const resident   = room.allocation?.user;
+                      const tenants  = room.tenants ?? [];
+                      const capacity = room.capacity ?? 1;
+                      const occupied = room.occupied ?? 0;
+                      const isFull   = tenants.length >= capacity;
                       const tc = TYPE_COLOR[room.type] ?? { color: 'var(--text3)', bg: 'var(--bg3)' };
+                      const fillRatio = capacity > 0 ? tenants.length / capacity : 0;
+                      const accentBorder = tenants.length === 0
+                        ? 'var(--border)'
+                        : isFull
+                          ? 'rgba(0,204,204,.4)'
+                          : 'rgba(251,146,60,.35)';
                       return (
                         <div
                           key={room.id}
+                          className="hover-lift"
                           style={{
                             borderRadius: 12, padding: 12, border: '1px solid',
-                            borderColor: isOccupied ? 'rgba(0,204,204,.3)' : 'var(--border)',
-                            background:  isOccupied ? 'rgba(0,204,204,.06)' : 'var(--bg3)',
-                            transition: 'all .18s',
+                            borderColor: accentBorder,
+                            background:  tenants.length > 0 ? 'rgba(0,204,204,.04)' : 'var(--bg3)',
+                            display: 'flex', flexDirection: 'column', gap: 8,
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                          {/* Header row: number + type */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                               {room.number}
                             </span>
                             <span style={{
                               fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
-                              padding: '1px 5px', borderRadius: 4,
+                              padding: '2px 6px', borderRadius: 4,
                               background: tc.bg, color: tc.color,
                               border: `1px solid ${tc.color}33`,
                             }}>
-                              {room.type === 'SINGLE' ? 'S'
-                                : room.type === 'DOUBLE' ? 'D'
-                                : room.type === 'TRIPLE' ? '3x'
-                                : room.type === 'QUAD'   ? '4x'
-                                : room.type.charAt(0)}
+                              {room.type}
                             </span>
                           </div>
-                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
-                            Blk {room.block}
+                          {/* Block + capacity */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+                              Blk {room.block}
+                            </span>
+                            <span style={{
+                              fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                              color: isFull ? 'var(--cyan)' : '#fb923c',
+                              fontWeight: 600,
+                            }}>
+                              {tenants.length}/{capacity}
+                            </span>
+                          </div>
+                          {/* Capacity bar */}
+                          <div style={{
+                            height: 4, borderRadius: 999, background: 'var(--border)', overflow: 'hidden',
+                          }}>
+                            <div style={{
+                              width: `${Math.min(100, fillRatio * 100)}%`, height: '100%',
+                              background: isFull ? 'var(--cyan)' : 'linear-gradient(90deg, #fb923c, #f87171)',
+                              transition: 'width .25s cubic-bezier(.4,0,.2,1)',
+                            }} />
+                          </div>
+                          {/* Tenants list */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {tenants.map(t => (
+                              <div key={t.allocationId} style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                                padding: '5px 8px', borderRadius: 7,
+                                background: t.status === 'RESERVED' ? 'rgba(251,146,60,.08)' : 'rgba(0,204,204,.07)',
+                                border: `1px solid ${t.status === 'RESERVED' ? 'rgba(251,146,60,.2)' : 'rgba(0,204,204,.18)'}`,
+                              }}>
+                                <span style={{
+                                  fontSize: 11, color: 'var(--text)', fontWeight: 500,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  flex: 1, minWidth: 0,
+                                }} title={t.user.email}>
+                                  {t.user.name}
+                                  {t.status === 'RESERVED' && (
+                                    <span style={{ fontSize: 9, color: '#fb923c', marginLeft: 5, fontFamily: "'IBM Plex Mono', monospace" }}>res</span>
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Remove ${t.user.name} from ${room.number}?`)) {
+                                      removeTenantMut.mutate(t.allocationId);
+                                    }
+                                  }}
+                                  className="press-soft"
+                                  title="Remove tenant"
+                                  style={{
+                                    padding: 3, borderRadius: 5, border: 'none', cursor: 'pointer',
+                                    background: 'transparent', color: 'var(--rose)',
+                                    display: 'flex',
+                                  }}
+                                >
+                                  <UserMinus size={11} />
+                                </button>
+                              </div>
+                            ))}
+                            {/* Empty slot indicators */}
+                            {Array.from({ length: capacity - tenants.length }).map((_, idx) => (
+                              <button
+                                key={`empty-${idx}`}
+                                onClick={() => setAddTenantRoom(room as AdminRoom)}
+                                className="press-soft"
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                                  padding: '5px 8px', borderRadius: 7,
+                                  background: 'transparent',
+                                  border: '1px dashed var(--border2)',
+                                  color: 'var(--text3)', fontSize: 11,
+                                  fontFamily: "'IBM Plex Mono', monospace",
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <UserPlus size={10} /> Add tenant
+                              </button>
+                            ))}
+                          </div>
+                          {/* Footer — rent */}
+                          <p style={{
+                            fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text4)',
+                            paddingTop: 4, borderTop: '1px solid var(--border)',
+                          }}>
+                            R{Number(room.price).toLocaleString()} / month
+                            {occupied !== tenants.length && ` · ${occupied} active`}
                           </p>
-                          {resident ? (
-                            <p style={{ fontSize: 11, color: 'var(--cyan)', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {resident.name}
-                            </p>
-                          ) : (
-                            <p style={{ fontSize: 11, color: 'var(--text4)', marginTop: 5 }}>
-                              {room.status === 'RESERVED' ? 'Reserved' : 'Vacant'}
-                            </p>
-                          )}
                         </div>
                       );
                     })}
@@ -529,6 +776,105 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
           )}
         </>
       )}
+
+      {/* Add-tenant modal */}
+      {addTenantRoom && (
+        <AddTenantModal
+          room={addTenantRoom}
+          accounts={accountsList}
+          onClose={() => setAddTenantRoom(null)}
+          onSubmit={(userId, status) => addTenantMut.mutate({
+            userId,
+            roomId: addTenantRoom.id,
+            rent:   Number(addTenantRoom.price),
+            status,
+          })}
+          loading={addTenantMut.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AddTenantModal — pick a student (any role except admin) to assign
+// ─────────────────────────────────────────────────────────────────
+
+interface AccountListItem {
+  id: string; name: string; email: string; role: string;
+  allocation: { room: { number: string; block: string } } | null;
+}
+
+function AddTenantModal({
+  room, accounts, onClose, onSubmit, loading,
+}: {
+  room: AdminRoom;
+  accounts: AccountListItem[];
+  onClose: () => void;
+  onSubmit: (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
+  loading: boolean;
+}) {
+  // Only show students who don't already have a room
+  const eligible = accounts.filter(a => a.role !== 'ADMIN' && !a.allocation);
+  const [userId, setUserId] = useState('');
+  const [status, setStatus] = useState<'ACTIVE' | 'RESERVED'>('ACTIVE');
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+          Add tenant to {room.number}
+        </p>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 18 }}>
+          Block {room.block} · {room.type} · R{Number(room.price).toLocaleString()}/month · {(room.capacity ?? 1) - (room.tenants?.length ?? 0)} slot{(room.capacity ?? 1) - (room.tenants?.length ?? 0) !== 1 ? 's' : ''} open
+        </p>
+
+        <label className="field-label">Student</label>
+        <select value={userId} onChange={e => setUserId(e.target.value)} className="input-base" style={{ marginBottom: 14 }}>
+          <option value="">— pick a student —</option>
+          {eligible.length === 0 ? (
+            <option disabled>No unallocated students available</option>
+          ) : eligible.map(s => (
+            <option key={s.id} value={s.id}>{s.name} · {s.email}</option>
+          ))}
+        </select>
+
+        <label className="field-label">Allocation status</label>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+          {(['ACTIVE', 'RESERVED'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatus(s)}
+              className="press-soft"
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8,
+                border: `1px solid ${status === s ? 'var(--cyan)' : 'var(--border)'}`,
+                background: status === s ? 'rgba(0,204,204,.08)' : 'var(--bg3)',
+                color: status === s ? 'var(--text)' : 'var(--text2)',
+                fontSize: 12, fontWeight: status === s ? 600 : 500, cursor: 'pointer',
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {s === 'ACTIVE' ? 'Move-in immediately' : 'Reserve only'}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => onSubmit(userId, status)}
+            disabled={!userId || loading}
+            className="btn-primary press-soft"
+            style={{ flex: 1, padding: '10px 0', fontSize: 13 }}
+          >
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+            {loading ? 'Adding…' : 'Add tenant'}
+          </button>
+          <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

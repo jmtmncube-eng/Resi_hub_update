@@ -522,6 +522,14 @@ html.light {
     align-items:     center;
     justify-content: center;
     padding:         16px;
+    /* Allow scrolling when modal is taller than viewport — keeps card centered
+       on tall screens, scrollable on short ones (no more "stuck at top"). */
+    overflow-y:      auto;
+  }
+  .modal-card {
+    margin:          auto;             /* belt-and-braces vertical centering */
+    max-height:      calc(100vh - 32px);
+    overflow-y:      auto;
   }
   .modal-card {
     background:    var(--bg2);

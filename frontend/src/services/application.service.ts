@@ -32,9 +32,12 @@ export interface AvailableRoom {
   id:     string;
   number: string;
   block:  string;
-  type:   'SINGLE' | 'DOUBLE' | 'STUDIO';
+  type:   'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
   price:  string;
-  status: 'VACANT';
+  status: 'VACANT' | 'RESERVED';
+  capacity:    number;
+  occupied:    number;
+  vacantSlots: number;
 }
 
 export async function getApplicationStatus(): Promise<ApplicationStatus> {
@@ -44,5 +47,11 @@ export async function getApplicationStatus(): Promise<ApplicationStatus> {
 
 export async function getAvailableRooms(): Promise<AvailableRoom[]> {
   const res = await api.get<ApiResponse<AvailableRoom[]>>('/application/rooms');
+  return res.data.data;
+}
+
+/** Pending student self-reserves a room. Server creates a RESERVED allocation. */
+export async function selectRoom(roomId: string): Promise<ApplicationAllocation> {
+  const res = await api.post<ApiResponse<ApplicationAllocation>>('/application/select-room', { roomId });
   return res.data.data;
 }

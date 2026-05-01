@@ -30,12 +30,66 @@ export default function Housemates() {
     onError:   () => toast.error('Failed to unclaim chore.'),
   });
 
+  // Rejected chores still claimed by this student — surface them at the top
+  const rejectedChores = chores.filter(
+    c => c.claimedById === user?.id && c.proofStatus === 'REJECTED',
+  );
+
   return (
     <div className="space-y-5 appear">
       <div>
         <h1 className="page-title">Housemates & Chores</h1>
         <p className="page-sub">Your block community and shared chores</p>
       </div>
+
+      {/* ── Rejected-proof flag — student needs to resubmit ─────── */}
+      {rejectedChores.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            padding: '14px 18px',
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, rgba(239,68,68,.12) 0%, rgba(239,68,68,.04) 100%)',
+            border: '1px solid rgba(239,68,68,.32)',
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+          }}
+        >
+          <div style={{
+            width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+            background: 'rgba(239,68,68,.18)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <AlertTriangle size={17} style={{ color: '#f87171' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#f87171' }}>
+              {rejectedChores.length} chore{rejectedChores.length > 1 ? 's' : ''} need{rejectedChores.length === 1 ? 's' : ''} a new proof
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>
+              Admin rejected your proof. Open the Chore Board to see the note and resubmit a clearer photo, or unclaim the chore if you can't redo it.
+            </p>
+            {tab !== 'chores' && (
+              <button
+                onClick={() => setTab('chores')}
+                className="press-soft"
+                style={{
+                  marginTop: 10,
+                  padding: '7px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(239,68,68,.4)',
+                  background: 'rgba(239,68,68,.10)',
+                  color: '#f87171',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                See chores →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tab switcher */}
       <div style={{ display: 'inline-flex', background: 'var(--bg3)', borderRadius: 10, padding: 4, gap: 2 }}>

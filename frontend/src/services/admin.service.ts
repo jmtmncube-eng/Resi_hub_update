@@ -32,6 +32,11 @@ export const updateAllocation = async (id: string, body: {
   return res.data.data;
 };
 
+export const removeAllocation = async (id: string) => {
+  const res = await api.delete(`/admin/allocations/${id}`);
+  return res.data.data;
+};
+
 // ── Accounts ──────────────────────────────────────────────────
 export const getAccounts = async (search?: string) => {
   const res = await api.get('/admin/accounts', { params: search ? { search } : {} });
@@ -135,6 +140,15 @@ export const setupRooms = async (body: {
   return res.data.data as AdminRoom[];
 };
 
+/** Mixed-type generation — pass an array of slices: e.g. 5 SINGLE + 4 DOUBLE + 2 QUAD. */
+export const setupRoomsMixed = async (body: {
+  blocks: number;
+  mix:    Array<{ type: string; count: number; price: number }>;
+}) => {
+  const res = await api.post('/admin/setup-rooms', body);
+  return res.data.data as AdminRoom[];
+};
+
 // ── Settings ──────────────────────────────────────────────────
 export const getSettings = async () => {
   const res = await api.get('/settings');
@@ -167,6 +181,18 @@ export interface AdminRoom {
   id: string; number: string; block: string; type: string;
   status: 'VACANT' | 'RESERVED' | 'OCCUPIED';
   price: number;
+  capacity: number;
+  occupied: number;
+  reserved: number;
+  vacantSlots: number;
+  tenants: Array<{
+    allocationId: string;
+    status: 'ACTIVE' | 'RESERVED' | 'ENDED';
+    rent: number;
+    moveIn: string | null;
+    user: { id: string; name: string; email: string; avatarUrl: string | null };
+  }>;
+  /** Back-compat: first tenant of the room (legacy). */
   allocation: {
     id: string; status: string; rent: number;
     user: { id: string; name: string; email: string; avatarUrl: string | null };

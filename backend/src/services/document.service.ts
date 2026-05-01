@@ -69,6 +69,42 @@ export async function getAllInvoices() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Contract auto-provisioning
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Ensure an ACTIVE_STUDENT has a (Pending) lease contract document.
+ * Idempotent — if one already exists we just return it. Called whenever
+ * an allocation goes ACTIVE so every resident has a contract to sign,
+ * view, and download.
+ */
+export async function ensureContractForUser(userId: string) {
+  const existing = await prisma.document.findFirst({
+    where: { userId, type: 'CONTRACT' },
+  });
+  if (existing) return existing;
+
+  // Stamp the period with the move-in month for clarity in the UI
+  const user = await prisma.user.findUnique({
+    where:   { id: userId },
+    include: { allocation: true },
+  });
+  if (!user) throw new AppError('User not found', 404);
+
+  const moveIn = user.allocation?.moveIn ?? new Date();
+  const period = moveIn.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+
+  return prisma.document.create({
+    data: {
+      userId,
+      type:   'CONTRACT',
+      period,
+      status: 'Pending',
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Invoice creation
 // ─────────────────────────────────────────────────────────────────
 

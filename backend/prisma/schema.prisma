@@ -119,15 +119,16 @@ model User {
 }
 
 model Room {
-  id     String     @id @default(cuid())
-  number String     @unique
-  block  String
-  type   RoomType
-  price  Decimal    @db.Decimal(10, 2)
-  status RoomStatus @default(VACANT)
+  id       String     @id @default(cuid())
+  number   String     @unique
+  block    String
+  type     RoomType
+  capacity Int        @default(1)              // Number of tenants the room can hold
+  price    Decimal    @db.Decimal(10, 2)
+  status   RoomStatus @default(VACANT)
 
-  // Relations
-  allocation Allocation?
+  // Relations — a single Room can now have many Allocations (one per tenant)
+  allocations Allocation[]
 
   @@index([block])
   @@index([status])
@@ -135,8 +136,8 @@ model Room {
 
 model Allocation {
   id        String           @id @default(cuid())
-  userId    String           @unique
-  roomId    String           @unique
+  userId    String           @unique             // Each user has at most one current allocation
+  roomId    String                                // No longer unique — many allocations may share a room
   status    AllocationStatus @default(RESERVED)
   moveIn    DateTime?
   rent      Decimal          @db.Decimal(10, 2)
@@ -148,6 +149,7 @@ model Allocation {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   room Room @relation(fields: [roomId], references: [id])
 
+  @@index([roomId])
   @@index([status])
 }
 
