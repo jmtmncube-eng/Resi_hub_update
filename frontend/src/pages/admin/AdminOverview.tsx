@@ -11,6 +11,7 @@ import {
 } from '../../services/chore.service';
 import { getNews } from '../../services/news.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { ResiMark } from '../../components/Brand';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -109,9 +110,12 @@ export default function AdminOverview() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 className="page-title">Admin Overview</h1>
-          <p className="page-sub">Real-time residence statistics</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <ResiMark size={44} />
+          <div>
+            <h1 className="page-title">Admin Overview</h1>
+            <p className="page-sub">Real-time residence statistics</p>
+          </div>
         </div>
         {(pendingClaims.length + pendingChores.length) > 0 && (
           <span className="badge badge-fill-rose" style={{ fontSize: 11, padding: '6px 12px' }}>

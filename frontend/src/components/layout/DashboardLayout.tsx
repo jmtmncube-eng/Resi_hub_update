@@ -11,6 +11,7 @@ import { useTheme }    from '../../contexts/ThemeContext';
 import { ROUTES }      from '../../constants/routes';
 import { WelcomeTour } from '../WelcomeTour';
 import { UserMenu }    from '../UserMenu';
+import { Brand }       from '../Brand';
 
 const studentNav = [
   { to: ROUTES.DASHBOARD,   label: 'Dashboard',   icon: LayoutDashboard },
@@ -65,20 +66,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Logo + role badge */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--cyan)', letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif" }}>
-            ResiHub
-          </span>
-          {/* 1px vertical divider */}
-          <span style={{ width: 1, height: 18, background: 'var(--border2)', display: 'inline-block' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <Brand size="md" />
           <span style={{
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: 10,
+            fontWeight: 600,
             letterSpacing: '.06em',
             textTransform: 'uppercase',
             color: isAdmin ? 'var(--rose)' : 'var(--cyan)',
           }}>
-            {roleLabel}
+            · {roleLabel}
           </span>
         </div>
         {/* Role pill badge */}
@@ -176,8 +174,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Mobile top bar — sticky header with user menu */}
-        <div className="md:hidden" style={{
+        {/* Single top bar — works for desktop and mobile.
+            Hamburger + brand show on mobile only; user menu always on the right. */}
+        <div style={{
           height: 56,
           background: 'var(--bg2)',
           borderBottom: '1px solid var(--border)',
@@ -185,42 +184,31 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 12,
           position: 'sticky',
           top: 0,
           zIndex: 100,
           boxShadow: '0 1px 14px var(--shadow)',
         }}>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            className="press-soft"
-            style={{
-              background: 'var(--bg3)', border: '1px solid var(--border)',
-              borderRadius: 8, color: 'var(--text2)',
-              padding: 8, display: 'flex',
-            }}
-          >
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--cyan)', letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif" }}>
-            ResiHub
-          </span>
-          <UserMenu />
-        </div>
-
-        {/* Desktop top bar — user menu lives here so the avatar/dropdown is always reachable */}
-        <div className="hidden md:flex" style={{
-          height: 56,
-          background: 'var(--bg2)',
-          borderBottom: '1px solid var(--border)',
-          padding: '0 28px',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 12,
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}>
+          {/* Left: hamburger + brand (mobile only) */}
+          <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+              className="press-soft"
+              style={{
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+                borderRadius: 8, color: 'var(--text2)',
+                padding: 8, display: 'flex',
+              }}
+            >
+              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+            <Brand size="sm" />
+          </div>
+          {/* Spacer that pushes UserMenu to the right on desktop (no brand re-shown there;
+              the sidebar already carries the ResiHub brand) */}
+          <div className="hidden md:block" style={{ flex: 1 }} />
           <UserMenu />
         </div>
 

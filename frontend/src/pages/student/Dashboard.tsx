@@ -5,6 +5,7 @@ import { getDashboard } from '../../services/dashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { ResiMark } from '../../components/Brand';
 import { format } from 'date-fns';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -37,18 +38,35 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 appear">
 
-      {/* Welcome banner */}
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div className="avatar avatar-cyan" style={{ width: 48, height: 48, fontSize: 16, fontWeight: 700 }}>
-          {user?.name?.slice(0,2).toUpperCase()}
+      {/* Welcome banner — avatar on the left, ResiHub mark on the right */}
+      <div style={{
+        background: 'var(--bg2)', border: '1px solid var(--border)',
+        borderRadius: 12, padding: '20px 24px',
+        display: 'flex', alignItems: 'center', gap: 16,
+      }}>
+        <div className="avatar avatar-cyan" style={{
+          width: 48, height: 48, fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: 'hidden',
+        }}>
+          {user?.avatarUrl
+            ? <img src={user.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : user?.name?.slice(0,2).toUpperCase()}
         </div>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--text)', marginBottom: 2 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', color: 'var(--text)', marginBottom: 2 }}>
             Good {getGreeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)' }}>
-            {allocation ? `Room ${allocation.room.number} · ${allocation.room.block}` : 'No active room'}
+          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 500, color: 'var(--text3)' }}>
+            {allocation ? `Room ${allocation.room.number} · Block ${allocation.room.block}` : 'No active room'}
           </p>
+        </div>
+        <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <ResiMark size={36} />
+          <span style={{
+            fontSize: 16, fontWeight: 700, color: 'var(--cyan)',
+            letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif",
+          }}>
+            ResiHub
+          </span>
         </div>
       </div>
 
