@@ -333,10 +333,18 @@
 
 **TypeScript**: `tsc --noEmit` → 0 errors (both batches)
 
-**Pending**
-- ⏳ Student Wallet page task-voucher UI — show task vouchers, upload task completion proof (backend endpoint exists at `POST /wallet/task-proof/:voucherId`)
+**Session 8 addendum — Wallet task-voucher UI**
+- ✅ `wallet.service.ts` — `submitTaskProof(voucherId, proofUrl)` helper added
+- ✅ `Wallet.tsx` — Tasks tab added alongside Voucher Shop, History, Leaderboard
+  - `TaskCard` component: task requirement block, inline FileReader proof upload, preview + submit/change/cancel
+  - `ClaimBadge` component: PENDING (purple), APPROVED (cyan), REJECTED (rose) pill
+  - PENDING state → purple "Awaiting review" notice; no re-upload allowed
+  - APPROVED state → reveals PIN (mono, large) and/or voucher image
+  - REJECTED state → "Re-upload Proof" CTA allows resubmission
+  - Voucher Shop tab filtered to credit-only vouchers (`requiresProof=false`)
+- TypeScript: 0 errors
 
 ---
 
-**Document Version**: 1.8
+**Document Version**: 1.9
 **Last Updated**: 2026-05-01
