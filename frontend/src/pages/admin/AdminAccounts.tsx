@@ -490,17 +490,18 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
   });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Edit account</p>
-            <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>{account.email}</p>
-          </div>
-          <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }} aria-label="Close">
-            <X size={14} />
-          </button>
+    // Use the body-portalled <Modal> wrapper so the card always anchors to
+    // the viewport — never drifts with the underlying scrollable column.
+    <Modal open={true} onClose={onClose} maxWidth={560}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Edit account</p>
+          <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>{account.email}</p>
         </div>
+        <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }} aria-label="Close">
+          <X size={14} />
+        </button>
+      </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           <ModalField label="Name" error={nameError}>
@@ -599,8 +600,7 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
