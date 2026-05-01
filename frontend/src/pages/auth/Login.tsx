@@ -92,7 +92,7 @@ export default function Login() {
         <IsometricScene />
       </div>
 
-      {/* ── Right panel: Login form (rose-tinted) ─────────── */}
+      {/* ── Right panel: Login form (blends from cyan-dark → rose) ───── */}
       <div style={{
         flexShrink: 0,
         width: '100%',
@@ -101,27 +101,42 @@ export default function Login() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px 20px',
-        background: 'linear-gradient(160deg, #0f0810 0%, #1c0d18 50%, #120f14 100%)',
+        background: 'linear-gradient(160deg, #08101a 0%, #0d0a1a 35%, #150a18 70%, #100912 100%)',
         position: 'relative',
         overflow: 'hidden',
+        borderLeft: '1px solid rgba(0,204,204,.05)',
       }}>
+        {/* Seam blend — soft cyan→rose vertical fade along the left edge */}
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0, left: 0, width: 180,
+          background: 'linear-gradient(90deg, rgba(0,204,204,.07) 0%, rgba(0,204,204,.02) 40%, transparent 100%)',
+          pointerEvents: 'none',
+        }}/>
+        {/* Aurora sweep — diagonal wash bridging both colors */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse 80% 60% at 0% 30%, rgba(0,204,204,.10) 0%, transparent 55%), radial-gradient(ellipse 70% 70% at 100% 70%, rgba(232,25,122,.14) 0%, transparent 55%)',
+          pointerEvents: 'none',
+        }}/>
         {/* Decorative rose glow orbs */}
         <div style={{
           position: 'absolute', top: '18%', right: '10%',
-          width: 300, height: 300,
-          background: 'radial-gradient(circle, rgba(232,25,122,.12) 0%, transparent 65%)',
+          width: 320, height: 320,
+          background: 'radial-gradient(circle, rgba(232,25,122,.13) 0%, transparent 65%)',
           pointerEvents: 'none',
+          animation: 'blob1 14s ease-in-out infinite',
         }}/>
         <div style={{
           position: 'absolute', bottom: '12%', left: '5%',
-          width: 200, height: 200,
-          background: 'radial-gradient(circle, rgba(232,25,122,.07) 0%, transparent 65%)',
+          width: 240, height: 240,
+          background: 'radial-gradient(circle, rgba(0,204,204,.08) 0%, transparent 65%)',
           pointerEvents: 'none',
+          animation: 'blob2 18s ease-in-out infinite',
         }}/>
         {/* Subtle dot grid */}
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'radial-gradient(rgba(232,25,122,.06) 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px)',
           backgroundSize: '28px 28px',
           pointerEvents: 'none',
         }}/>
@@ -148,7 +163,8 @@ export default function Login() {
           </div>
 
           {/* Login card */}
-          <div className="modal-card" style={{ marginBottom: 12, borderColor: 'rgba(232,25,122,.15)' }}>
+          <div className="glass-card" style={{ marginBottom: 12, padding: '28px 32px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, var(--cyan), var(--rose))' }}/>
 
             {/* Card header */}
             <div style={{ marginBottom: 24 }}>

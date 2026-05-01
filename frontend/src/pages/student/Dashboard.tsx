@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Wrench, QrCode, Newspaper, ClipboardList, AlertCircle } from 'lucide-react';
+import { Wrench, QrCode, Newspaper, ClipboardList, AlertCircle, Bell, Pin } from 'lucide-react';
 import { getDashboard } from '../../services/dashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
@@ -51,6 +51,52 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Notifications banner (pinned only) */}
+      {pinnedNews.length > 0 && (
+        <Link to={ROUTES.UPDATES} style={{ display: 'block', textDecoration: 'none' }}>
+          <div className="glass-card" style={{
+            padding: '14px 18px',
+            display: 'flex', alignItems: 'center', gap: 14,
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
+              background: 'linear-gradient(180deg, var(--cyan), var(--rose))',
+            }}/>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(0,204,204,.10)', border: '1px solid rgba(0,204,204,.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--cyan)', position: 'relative',
+            }}>
+              <Bell size={16} />
+              <span style={{
+                position: 'absolute', top: -4, right: -4,
+                background: 'var(--rose)', color: '#fff',
+                fontSize: 9, fontWeight: 700,
+                width: 16, height: 16, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}>{pinnedNews.length}</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <Pin size={10} style={{ color: 'var(--rose)' }} />
+                <span className="micro-label" style={{ margin: 0, color: 'var(--rose)' }}>
+                  {pinnedNews.length === 1 ? 'Pinned notice' : `${pinnedNews.length} pinned notices`}
+                </span>
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {pinnedNews[0].title}
+              </p>
+            </div>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', flexShrink: 0 }}>
+              View all →
+            </span>
+          </div>
+        </Link>
+      )}
 
       {/* KPI stat row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
