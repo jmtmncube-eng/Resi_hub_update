@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, SquareStack, LayoutGrid, Activity, Camera, Pencil } from 'lucide-react';
+import { Building2, SquareStack, LayoutGrid, Activity, Camera, Pencil, Wrench } from 'lucide-react';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { getSettings } from '../../services/admin.service';
 
@@ -9,6 +9,7 @@ import AdminAllocations   from './AdminAllocations';
 import AdminSettings      from './AdminSettings';
 import ResidenceHealth    from './ResidenceHealth';
 import ResidenceTelemetry from './ResidenceTelemetry';
+import ResidenceOps       from './ResidenceOps';
 
 /**
  * Residence hub — single console for everything property-related:
@@ -21,12 +22,13 @@ import ResidenceTelemetry from './ResidenceTelemetry';
  * Tabs are URL-driven so admins can deep-link / back-button.
  */
 
-type Tab = 'health' | 'rooms' | 'allocations' | 'info' | 'telemetry';
+type Tab = 'health' | 'rooms' | 'allocations' | 'ops' | 'info' | 'telemetry';
 
 const TABS: { value: Tab; label: string; icon: typeof Building2; sub: string }[] = [
   { value: 'health',      label: 'Health',      icon: Activity,    sub: 'Business-health metrics at a glance' },
   { value: 'rooms',       label: 'Rooms',       icon: LayoutGrid,  sub: 'Setup, occupancy grid, add or remove tenants' },
   { value: 'allocations', label: 'Allocations', icon: SquareStack, sub: 'Every tenancy in one table' },
+  { value: 'ops',         label: 'Operations',  icon: Wrench,      sub: 'Pool, gas, grass, electricity & solar tracking' },
   { value: 'info',        label: 'Info',        icon: Building2,   sub: 'Residence name, address & contact details' },
   { value: 'telemetry',   label: 'Telemetry',   icon: Camera,      sub: 'Camera & sensor feeds (coming soon)' },
 ];
@@ -140,6 +142,7 @@ export default function AdminResidence() {
         {tab === 'health'      && <ResidenceHealth />}
         {tab === 'rooms'       && <AdminSettings initialTab="rooms" hideHeader />}
         {tab === 'allocations' && <AdminAllocations hideHeader />}
+        {tab === 'ops'         && <ResidenceOps />}
         {tab === 'info'        && <AdminSettings initialTab="info"  hideHeader />}
         {tab === 'telemetry'   && <ResidenceTelemetry />}
       </div>

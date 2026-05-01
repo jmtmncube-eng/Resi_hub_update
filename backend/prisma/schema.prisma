@@ -49,6 +49,18 @@ enum Priority {
   EMERGENCY
 }
 
+/// Type of operational service / expense logged by admin.
+/// Each type drives its own widget on the Operations tab.
+enum OpsServiceType {
+  POOL_CLEAN
+  POOL_CHEMICAL
+  GAS_REFILL
+  GRASS_CUT
+  ELECTRICITY_PURCHASE
+  SOLAR_TELEMETRY
+  OTHER
+}
+
 enum TicketStatus {
   OPEN
   IN_PROGRESS
@@ -416,4 +428,39 @@ model AuditLog {
   @@index([userId])
   @@index([entity])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OPERATIONS — facility upkeep tracking (pool, gas, grass, etc.)
+// ═══════════════════════════════════════════════════════════════
+
+/// Each entry is one event: pool cleaned today, gas cylinder refilled,
+/// R500 of electricity purchased, lawn cut by a contractor, etc.
+/// `meta` holds type-specific blobs (litres, kWh, panel readings).
+model OpsService {
+  id          String         @id @default(cuid())
+  type        OpsServiceType
+  date        DateTime
+  amount      Decimal?       @db.Decimal(10, 2)  // R cost; null for telemetry-only
+  vendor      String?                            // e.g. "John's Pool Service"
+  note        String?
+  proofUrl    String?                            // base64 / receipt URL
+  meta        Json?                              // {"litres":9,"kWh":24,...}
+  createdById String                             // admin user id (audit)
+  createdAt   DateTime       @default(now())
+
+  @@index([type, date])
+  @@index([date])
+}
+
+/// Current stock level for consumables we want to know are running out
+/// (chlorine, pH, gas in cylinder, prepaid electricity units).
+model OpsStock {
+  id        String   @id @default(cuid())
+  key       String   @unique             // POOL_CHLORINE, POOL_PH, GAS_KG, ELECTRICITY_UNITS
+  label     String                       // "Chlorine"
+  quantity  Decimal  @db.Decimal(10, 2) @default(0)
+  unit      String                       // "L", "kg", "kWh", "units"
+  threshold Decimal? @db.Decimal(10, 2)  // warn when below
+  updatedAt DateTime @updatedAt
 }

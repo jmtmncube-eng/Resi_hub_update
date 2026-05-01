@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  TrendingUp, Users, DoorOpen, AlertTriangle, CheckCircle2,
+  TrendingUp, Users, AlertTriangle,
   Wallet as WalletIcon, BarChart3, Megaphone, Wrench, Sparkles,
+  Sun, Droplets,
 } from 'lucide-react';
 import {
   getAdminStats, getRevenueReport, getOccupancy, getAccounts,
 } from '../../services/admin.service';
+import { getOpsInsights } from '../../services/ops.service';
 
 /**
  * Business-health summary for the residence. Pulls everything an admin
@@ -18,6 +20,7 @@ export default function ResidenceHealth() {
   const { data: revenue }  = useQuery({ queryKey: ['admin-revenue'],   queryFn: getRevenueReport });
   const { data: occ }      = useQuery({ queryKey: ['admin-occupancy'], queryFn: () => getOccupancy() });
   const { data: accounts } = useQuery({ queryKey: ['admin-accounts'],  queryFn: () => getAccounts() });
+  const { data: ops }      = useQuery({ queryKey: ['ops-insights'],    queryFn: getOpsInsights });
 
   const rooms       = occ?.rooms ?? [];
   const totalSlots  = rooms.reduce((s, r) => s + (r.capacity ?? 1), 0);
@@ -28,7 +31,6 @@ export default function ResidenceHealth() {
   for (const r of rooms) roomTypeMix[r.type] = (roomTypeMix[r.type] ?? 0) + 1;
 
   const pendingApplicants = (accounts ?? []).filter(a => a.role === 'PENDING_STUDENT').length;
-  const inactiveStudents  = (accounts ?? []).filter(a => a.isActive === false).length;
   const topEarners = (accounts ?? [])
     .filter(a => a.role === 'ACTIVE_STUDENT' && (a.wallet?.credits ?? 0) > 0)
     .sort((a, b) => (b.wallet?.credits ?? 0) - (a.wallet?.credits ?? 0))
@@ -37,6 +39,10 @@ export default function ResidenceHealth() {
   const projected   = revenue?.projectedMonthly ?? 0;
   const monthlyData = revenue?.monthlyBreakdown?.slice(-6) ?? [];
   const latePayers  = revenue?.latePayers ?? [];
+  const opsCost     = ops?.monthlyOpsCost ?? 0;
+  const netMonthly  = projected - opsCost;
+  const lowStock    = ops?.stock.filter(s => s.low) ?? [];
+  const opsRemind   = ops?.reminders.length ?? 0;
 
   return (
     <div className="space-y-5">
@@ -44,16 +50,18 @@ export default function ResidenceHealth() {
         Live snapshot of residence health — financial, operational, community.
       </p>
 
-      {/* Top KPI grid */}
+      {/* Top KPI grid — operational + financial side-by-side */}
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-        <Kpi label="Projected monthly" value={`R${projected.toLocaleString()}`} accent="cyan"  icon={<TrendingUp size={16} />} />
+        <Kpi label="Projected monthly"  value={`R${projected.toLocaleString()}`} accent="cyan"  icon={<TrendingUp size={16} />} />
+        <Kpi label="Ops cost (30d)"     value={`R${opsCost.toLocaleString()}`}   accent={opsCost > 0 ? 'rose' : 'text'} icon={<Wrench size={16} />} hint={opsRemind > 0 ? `${opsRemind} action items` : 'tracked monthly'} />
+        <Kpi label="Net monthly"        value={`R${netMonthly.toLocaleString()}`} accent={netMonthly >= 0 ? 'cyan' : 'rose'} icon={<TrendingUp size={16} />} hint="projected − ops" />
         <Kpi label="Slot occupancy"     value={`${slotOccupancy}%`}              accent="cyan"  icon={<BarChart3  size={16} />} hint={`${filledSlots}/${totalSlots} filled`} />
         <Kpi label="Active students"    value={String(stats?.students.total ?? '—')}     accent="cyan" icon={<Users size={16} />} />
         <Kpi label="Pending applicants" value={String(pendingApplicants)}        accent="rose"  icon={<Sparkles  size={16} />} hint={pendingApplicants > 0 ? 'awaiting approval' : 'queue empty'} />
         <Kpi label="Open tickets"       value={String(stats?.maintenance.open ?? '—')}   accent="rose" icon={<Wrench size={16} />} hint={`${stats?.maintenance.urgent ?? 0} urgent`} />
-        <Kpi label="Vacant slots"       value={String(totalSlots - filledSlots)} accent="text"  icon={<DoorOpen   size={16} />} hint="ready to allocate" />
         <Kpi label="Late payers"        value={String(latePayers.length)}        accent={latePayers.length ? 'rose' : 'text'} icon={<AlertTriangle size={16} />} />
-        <Kpi label="Deactivated"        value={String(inactiveStudents)}         accent="text"  icon={<CheckCircle2 size={16} />} hint="suspended accounts" />
+        <Kpi label="Solar (30d)"        value={`${(ops?.solarKwhLast30 ?? 0).toFixed(0)} kWh`} accent="text" icon={<Sun size={16} />} hint="from logged readings" />
+        <Kpi label="Low-stock items"    value={String(lowStock.length)}         accent={lowStock.length ? 'rose' : 'text'} icon={<Droplets size={16} />} hint={lowStock.length ? lowStock.map(s => s.label).join(', ') : 'all topped up'} />
       </div>
 
       {/* Two-up: revenue trend + room mix */}
@@ -119,6 +127,38 @@ export default function ResidenceHealth() {
           )}
         </div>
       </div>
+
+      {/* Ops spend breakdown (last 90 days) */}
+      {ops && ops.spend90.some(s => s.total > 0) && (
+        <div className="card-sm" style={{ padding: '18px 20px' }}>
+          <p className="micro-label" style={{ marginBottom: 14 }}>Ops spend — last 90 days</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {ops.spend90
+              .filter(s => s.total > 0)
+              .sort((a, b) => b.total - a.total)
+              .map(s => {
+                const max = Math.max(...ops.spend90.map(x => x.total));
+                const pct = max > 0 ? (s.total / max) * 100 : 0;
+                return (
+                  <div key={s.type}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--text)', fontWeight: 600 }}>{prettyOpsType(s.type)}</span>
+                      <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--text3)' }}>
+                        {s.count} × · R{s.total.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${pct}%`, height: '100%',
+                        background: 'linear-gradient(90deg, var(--cyan), var(--rose))',
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Top earners + late payers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
@@ -216,6 +256,18 @@ function Kpi({
       )}
     </div>
   );
+}
+
+function prettyOpsType(t: string): string {
+  return ({
+    POOL_CLEAN: 'Pool cleaning',
+    POOL_CHEMICAL: 'Pool chemicals',
+    GAS_REFILL: 'Gas refills',
+    GRASS_CUT: 'Grass / grounds',
+    ELECTRICITY_PURCHASE: 'Electricity',
+    SOLAR_TELEMETRY: 'Solar readings',
+    OTHER: 'Other',
+  } as Record<string, string>)[t] ?? t;
 }
 
 function EmptyHint({ label }: { label: string }) {

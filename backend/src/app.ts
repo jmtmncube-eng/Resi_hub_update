@@ -19,6 +19,7 @@ import housemateRoutes  from './routes/housemate.routes';
 import adminRoutes       from './routes/admin.routes';
 import applicationRoutes from './routes/application.routes';
 import settingsRoutes    from './routes/settings.routes';
+import opsRoutes         from './routes/ops.routes';
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use('/api/housemates',  housemateRoutes);
 app.use('/api/admin',       adminRoutes);
 app.use('/api/application', applicationRoutes);
 app.use('/api/settings',    settingsRoutes);
+app.use('/api/admin/ops',   opsRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use('*', (req, res) => {
