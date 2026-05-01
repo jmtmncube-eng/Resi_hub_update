@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
@@ -251,41 +251,31 @@ export default function Login() {
             </form>
           </div>
 
-          {/* POPI Act notice — replaces the dev demo-credentials card */}
-          <div className="card-sm" style={{
-            borderColor: 'rgba(0,204,204,.18)',
-            background: 'linear-gradient(135deg, rgba(0,204,204,.04), rgba(232,25,122,.02))',
-            padding: '14px 16px',
+          {/* Legal links — short acknowledgement + clickable policy & terms */}
+          <p style={{
+            marginTop: 16, textAlign: 'center', fontSize: 11, lineHeight: 1.6,
+            color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace",
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                background: 'rgba(0,204,204,.14)',
-                border: '1px solid rgba(0,204,204,.32)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <ShieldCheck size={16} style={{ color: 'var(--cyan)' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, letterSpacing: '-.005em' }}>
-                  Privacy notice (POPI Act)
-                </p>
-                <p style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.55 }}>
-                  By signing in you acknowledge that the personal information you
-                  share with ResiHub — name, contact details, room allocation,
-                  payment proofs and visitor records — will be processed lawfully
-                  in line with the Protection of Personal Information Act,
-                  Act 4 of 2013. Your data is used only to run residence services
-                  and is never sold. You may request access, correction, or
-                  deletion at any time via your residence administrator.
-                </p>
-              </div>
-            </div>
-          </div>
+            By signing in you agree to our{' '}
+            <Link to={ROUTES.TERMS} style={{
+              color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
+              borderBottom: '1px solid rgba(0,204,204,.4)',
+            }}>
+              Terms of Use
+            </Link>
+            {' '}and{' '}
+            <Link to={ROUTES.PRIVACY} style={{
+              color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
+              borderBottom: '1px solid rgba(0,204,204,.4)',
+            }}>
+              Privacy Policy
+            </Link>
+            {' '}(POPIA-compliant).
+          </p>
 
           {/* Athera signature */}
           <div style={{
-            marginTop: 18, textAlign: 'center',
+            marginTop: 14, textAlign: 'center',
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
           }}>

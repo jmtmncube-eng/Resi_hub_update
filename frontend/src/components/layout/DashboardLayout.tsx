@@ -151,15 +151,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           Sign out
         </button>
 
-        {/* Athera signature — small, never the visual focus */}
-        <p style={{
+        {/* Legal links + Athera signature — small, never the visual focus */}
+        <div style={{
           marginTop: 10, textAlign: 'center',
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: 9, color: 'var(--text4)', letterSpacing: '.05em',
         }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 4 }}>
+            <NavLink to={ROUTES.PRIVACY} style={{ color: 'var(--text3)', textDecoration: 'none' }}>
+              Privacy
+            </NavLink>
+            <span style={{ color: 'var(--text4)' }}>·</span>
+            <NavLink to={ROUTES.TERMS} style={{ color: 'var(--text3)', textDecoration: 'none' }}>
+              Terms
+            </NavLink>
+          </div>
           Built by{' '}
           <span style={{ color: 'var(--text3)', fontWeight: 700, letterSpacing: '0' }}>Athera</span>
-        </p>
+        </div>
       </div>
     </aside>
   );

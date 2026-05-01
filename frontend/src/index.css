@@ -811,3 +811,47 @@ html.light body  { background-color: #f7f4ec; color: #14110d; }
 
 /* Toast in light mode */
 html.light .toast-success { background: #fbf8f1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   LEGAL PROSE — privacy / terms reading surfaces
+   ═══════════════════════════════════════════════════════════════ */
+.legal-prose {
+  font-size:    15px;
+  line-height:  1.72;
+  color:        var(--text2);
+}
+.legal-prose h2 {
+  font-size:      18px;
+  font-weight:    700;
+  letter-spacing: -.01em;
+  color:          var(--text);
+  margin-top:     32px;
+  margin-bottom:  10px;
+}
+.legal-prose p,
+.legal-prose ul,
+.legal-prose ol {
+  margin-bottom: 14px;
+}
+.legal-prose ul,
+.legal-prose ol {
+  padding-left: 22px;
+}
+.legal-prose li {
+  margin-bottom: 6px;
+}
+.legal-prose strong {
+  color:       var(--text);
+  font-weight: 600;
+}
+.legal-prose em { color: var(--text); }
+.legal-prose a {
+  color:           var(--cyan);
+  text-decoration: none;
+  border-bottom:   1px solid rgba(0,204,204,.4);
+  transition:      border-color .18s, color .18s;
+}
+.legal-prose a:hover {
+  color:         #00aaaa;
+  border-color:  var(--cyan);
+}

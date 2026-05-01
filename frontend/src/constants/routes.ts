@@ -3,6 +3,10 @@ export const ROUTES = {
   LOGIN:    '/login',
   REGISTER: '/register',
 
+  // Public legal pages
+  PRIVACY:  '/privacy',
+  TERMS:    '/terms',
+
   // Active student
   DASHBOARD:   '/dashboard',
   MAINTENANCE: '/maintenance',

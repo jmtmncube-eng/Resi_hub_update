@@ -14,6 +14,10 @@ import Login    from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import NotFound from './pages/NotFound';
 
+// ── Public legal pages ────────────────────────────────────────
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import TermsOfUse    from './pages/legal/TermsOfUse';
+
 // ── Active Student ─────────────────────────────────────────────
 import Dashboard   from './pages/student/Dashboard';
 import Maintenance from './pages/student/Maintenance';
@@ -66,6 +70,8 @@ function App() {
           {/* ── Public ─────────────────────────────────────── */}
           <Route path={ROUTES.LOGIN}    element={<Login />} />
           <Route path={ROUTES.REGISTER} element={<Register />} />
+          <Route path={ROUTES.PRIVACY}  element={<PrivacyPolicy />} />
+          <Route path={ROUTES.TERMS}    element={<TermsOfUse />} />
 
           {/* ── Active Student ─────────────────────────────── */}
           <Route path={ROUTES.DASHBOARD}   element={<Page roles={ACTIVE}><Dashboard /></Page>} />
