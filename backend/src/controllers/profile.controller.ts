@@ -20,7 +20,9 @@ export async function uploadAvatar(req: AuthRequest, res: Response, next: NextFu
       res.status(400).json({ success: false, error: 'No file uploaded' });
       return;
     }
-    const avatarUrl = `/uploads/${req.file.filename}`;
+    // Store absolute URL so the SPA (different origin in dev) can render it directly.
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const avatarUrl = `${origin}/uploads/${req.file.filename}`;
     res.json({ success: true, data: await svc.updateAvatar(req.user!.userId, avatarUrl) });
   } catch (err) { next(err); }
 }

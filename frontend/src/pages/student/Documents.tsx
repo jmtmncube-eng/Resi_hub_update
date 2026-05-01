@@ -45,7 +45,7 @@ function ProofBadge({ status }: { status?: string }) {
 }
 
 export default function Documents() {
-  usePageTitle('Documents');
+  usePageTitle('Documents & Invoices');
   const qc = useQueryClient();
 
   // ── Modal state ──────────────────────────────────────────────
@@ -129,7 +129,7 @@ export default function Documents() {
       />
 
       <div>
-        <h1 className="page-title">Documents</h1>
+        <h1 className="page-title">Documents & Invoices</h1>
         <p className="page-sub">Your invoices, contracts, and official letters</p>
       </div>
 

@@ -17,7 +17,7 @@ const studentNav = [
   { to: ROUTES.VISITORS,    label: 'Visitors',     icon: QrCode          },
   { to: ROUTES.HOUSEMATES,  label: 'Housemates',   icon: Users           },
   { to: ROUTES.WALLET,      label: 'Wallet',       icon: Wallet          },
-  { to: ROUTES.DOCUMENTS,   label: 'Documents',    icon: FileText        },
+  { to: ROUTES.DOCUMENTS,   label: 'Documents & Invoices', icon: FileText  },
   { to: ROUTES.PROFILE,     label: 'Profile',      icon: User            },
 ];
 
@@ -123,8 +123,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         {/* User info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 4 }}>
           <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`}
-               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-            {user?.name?.slice(0, 2).toUpperCase() || 'RH'}
+               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
+            {user?.avatarUrl
+              ? <img src={user.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : (user?.name?.slice(0, 2).toUpperCase() || 'RH')}
           </div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

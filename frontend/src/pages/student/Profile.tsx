@@ -1,12 +1,25 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 import { Camera, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateProfile, uploadAvatar } from '../../services/profile.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
+
+const ACCEPTED_AVATAR = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+function extractApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as { error?: string } | undefined;
+    if (data?.error) return data.error;
+    if (err.message) return err.message;
+  }
+  return fallback;
+}
 
 const formSchema = z.object({
   name:       z.string().min(2).optional().or(z.literal('')),
@@ -19,8 +32,9 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function Profile() {
   usePageTitle('Profile');
-  const { user }    = useAuth();
-  const fileRef     = useRef<HTMLInputElement>(null);
+  const { user, updateUser } = useAuth();
+  const fileRef              = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -36,19 +50,49 @@ export default function Profile() {
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: updateProfile,
-    onSuccess: () => toast.success('Profile saved!'),
-    onError:   () => toast.error('Failed to save profile.'),
+    onSuccess: (updated) => {
+      updateUser(updated);
+      toast.success('Profile saved');
+    },
+    onError: (err) => toast.error(extractApiError(err, 'Failed to save profile')),
   });
 
   const { mutate: uploadAv, isPending: uploading } = useMutation({
     mutationFn: (file: File) => uploadAvatar(file),
-    onSuccess:  () => toast.success('Avatar updated!'),
-    onError:    () => toast.error('Failed to upload avatar.'),
+    onSuccess:  (updated) => {
+      // Push the new avatarUrl into the auth context so the sidebar + profile tile
+      // both refresh immediately without a hard reload.
+      updateUser({ avatarUrl: updated.avatarUrl });
+      setPreview(null);
+      toast.success('Profile picture updated');
+    },
+    onError: (err) => {
+      setPreview(null);
+      toast.error(extractApiError(err, 'Failed to upload profile picture'));
+    },
   });
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) uploadAv(file);
+    // Always reset the input so re-selecting the same file fires onChange again
+    e.target.value = '';
+    if (!file) return;
+
+    if (!ACCEPTED_AVATAR.includes(file.type)) {
+      toast.error('Please choose a PNG, JPG, WEBP or GIF image');
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 5MB.`);
+      return;
+    }
+
+    // Local optimistic preview while the upload is in flight
+    const reader = new FileReader();
+    reader.onload = () => setPreview(typeof reader.result === 'string' ? reader.result : null);
+    reader.readAsDataURL(file);
+
+    uploadAv(file);
   }
 
   const roleLabel = isAdmin ? 'Admin' : user?.role === 'ACTIVE_STUDENT' ? 'Resident' : 'Applicant';
@@ -64,18 +108,34 @@ export default function Profile() {
       <div className="card" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ position: 'relative' }}>
-            <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`} style={{ width: 72, height: 72, fontSize: 22, fontWeight: 700 }}>
-              {user?.avatarUrl
-                ? <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`} style={{ width: 72, height: 72, fontSize: 22, fontWeight: 700, overflow: 'hidden', position: 'relative' }}>
+              {preview || user?.avatarUrl
+                ? <img src={preview ?? user!.avatarUrl!} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : user?.name?.slice(0,2).toUpperCase()
               }
+              {uploading && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'rgba(0,0,0,.45)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Loader2 size={20} className="animate-spin" style={{ color: '#fff' }} />
+                </div>
+              )}
             </div>
-            <button onClick={() => fileRef.current?.click()} style={{
-              position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%',
-              background: 'var(--cyan)', color: '#0f0f12', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {uploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              aria-label="Change profile picture"
+              style={{
+                position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%',
+                background: 'var(--cyan)', color: '#0f0f12', border: '2px solid var(--bg2)', cursor: uploading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: uploading ? 0.6 : 1,
+              }}
+            >
+              <Camera size={11} />
             </button>
           </div>
           <div>
@@ -84,7 +144,16 @@ export default function Profile() {
             <span className={`badge ${isAdmin ? 'badge-rose' : 'badge-cyan'}`}>{roleLabel}</span>
           </div>
         </div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ACCEPTED_AVATAR.join(',')}
+          style={{ display: 'none' }}
+          onChange={onFileChange}
+        />
+        <p style={{ marginTop: 12, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+          PNG / JPG / WEBP / GIF · max 5MB
+        </p>
       </div>
 
       {/* Edit form */}
