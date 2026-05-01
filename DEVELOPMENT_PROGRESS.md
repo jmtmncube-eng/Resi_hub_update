@@ -287,5 +287,56 @@
 
 ---
 
-**Document Version**: 1.7
+---
+
+### Session 8 — 2026-05-01
+
+**Goal**: Login sparks animation, liquid glass dashboard, admin residence settings, revenue reports, payment proof flow, voucher PIN/image, task proof system, prominent student payment UI
+
+**Visual / UX**
+- ✅ `SparkParticles.tsx` (new) — canvas-based rising spark particles with radial glow halos; `requestAnimationFrame` loop, `ResizeObserver`
+- ✅ Sparks slowed to match isometric building float pace (~0.09–0.15 px/frame): `vy: -(0.42+0.11)`, `vx: 0.28`, `decay: 0.0012–0.0027`, `rate: 0.14`
+- ✅ `Login.tsx` — `<SparkParticles color="#E8197A" rate={0.14} />` added to rose right panel
+- ✅ `index.css` — blob animation keyframes (`blob1/2/3`) + `.card` backdrop-filter glass effect (`blur(14px) saturate(160%)`)
+- ✅ `DashboardLayout.tsx` — fixed ambient blob background divs (cyan/rose/purple) animating behind all dashboard content; `zIndex` layering; Payments + Settings added to adminNav
+
+**Backend — New Models & Migrations**
+- ✅ `ResidenceSettings` model (single-row, `id = "settings"`) — name, tagline, address, phone, email, description
+- ✅ `Voucher` expanded — `requiresProof Bool`, `taskTitle String?`, `pin String?`, `imageUrl String?`
+- ✅ `VoucherClaim` model — `@@unique([voucherId, userId])`, proofUrl, proofStatus, claimedAt
+- ✅ `Document` expanded — `proofUrl String?`, `proofStatus String?`, `clearedAt DateTime?`, `clearedBy String?`, `@@index([proofStatus])`
+- ✅ Prisma migration applied
+
+**Backend — New Services & Routes**
+- ✅ `settings.service.ts` + `settings.controller.ts` + `settings.routes.ts` — GET (any auth), PUT (ADMIN only); upsert pattern
+- ✅ `document.service.ts` — `submitPaymentProof`, `clearPayment`, `rejectPaymentProof`, `getAllInvoices`
+- ✅ `document.routes.ts` — `POST /:id/proof`, `GET /admin/invoices`, `POST /:id/clear`, `POST /:id/reject-proof`
+- ✅ `admin.service.ts` — `getRevenueReport` (monthly breakdown, projectedMonthly, latePayers >30 days), `getVoucherClaims`, `approveVoucherClaim`, `rejectVoucherClaim`
+- ✅ `admin.routes.ts` — `/revenue`, `/claims`, `/claims/:id/approve`, `/claims/:id/reject`
+- ✅ `wallet.service.ts` — `getVouchers(userId)` hides pin/imageUrl until claim APPROVED; `submitTaskProof` (upserts rejected claims)
+- ✅ `wallet.routes.ts` — `POST /task-proof/:voucherId`
+- ✅ `app.ts` — `settingsRoutes` registered at `/api/settings`
+
+**Frontend — New Pages**
+- ✅ `AdminSettings.tsx` — residence settings form with live preview card; fields: name, tagline, address, phone, email, description
+- ✅ `AdminPayments.tsx` — KPI strip (projected monthly, awaiting review, overdue, active students); Revenue tab (monthly table), Invoices tab (proof review modal, clear/reject), Late Payers tab; ConfirmModal for destructive clear
+
+**Frontend — Modified Pages / Components**
+- ✅ `AdminRewards.tsx` — Task Claims tab (PENDING/APPROVED/REJECTED filter, proof image modal); voucher create form with task toggle, taskTitle, PIN, image upload (FileReader base64)
+- ✅ `InvoiceModal.tsx` — proof upload section (SUBMITTED/CLEARED/REJECTED status states, image picker, preview, submit mutation)
+- ✅ `Documents.tsx` — `ProofBadge` component; rose payment banner; inline proof-upload panel expands below invoice row; prominent "Upload Proof" / "Re-upload Proof" CTA on each unpaid invoice; progress states (Under Review, Cleared)
+- ✅ `frontend/src/constants/routes.ts` — `ADMIN_PAYMENTS`, `ADMIN_SETTINGS`
+- ✅ `frontend/src/services/admin.service.ts` — `getVoucherClaims`, `approveVoucherClaim`, `rejectVoucherClaim`, `getRevenueReport`, `getAllInvoices`, `clearPayment`, `rejectPaymentProof`, `getSettings`, `updateSettings`; new types: `AdminVoucherClaim`, `AdminInvoice`, `RevenueReport`, `ResidenceSettings`
+- ✅ `frontend/src/services/document.service.ts` — `submitPaymentProof`
+- ✅ `frontend/src/types/domain.types.ts` — `Voucher` expanded; `VoucherClaim` interface; `ResidentDocument` proof fields
+- ✅ `App.tsx` — `AdminPayments` and `AdminSettings` imported and routed
+
+**TypeScript**: `tsc --noEmit` → 0 errors (both batches)
+
+**Pending**
+- ⏳ Student Wallet page task-voucher UI — show task vouchers, upload task completion proof (backend endpoint exists at `POST /wallet/task-proof/:voucherId`)
+
+---
+
+**Document Version**: 1.8
 **Last Updated**: 2026-05-01
