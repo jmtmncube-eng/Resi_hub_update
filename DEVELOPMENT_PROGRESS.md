@@ -1,9 +1,9 @@
 # Development Progress Report
 ## ResiHub — Student Accommodation Management Platform
 
-**Last Updated**: 2026-03-25
-**Status**: ✅ Phase 4 Complete — Admin Panel
-**Overall Completion**: **65%**
+**Last Updated**: 2026-05-01
+**Status**: ✅ Sessions 5–9 Complete — Full Feature Polish & E2E Verified
+**Overall Completion**: **92%**
 
 ---
 
@@ -15,8 +15,9 @@
 | 2 | Authentication & RBAC | ✅ Complete | 100% |
 | 3 | Student Core Features | ✅ Complete | 100% |
 | 4 | Admin Panel | ✅ Complete | 100% |
-| 5 | Pending Student Portal | ⏳ Pending | 0% |
-| 6 | Polish, Testing & Deployment | ⏳ Pending | 0% |
+| 5 | Pending Student Portal + Wallet Tasks | ✅ Complete | 100% |
+| 6 | Security, Polish & E2E Verification | ✅ Complete | 90% |
+| 7 | Deployment | ⏳ Pending | 0% |
 
 ---
 
@@ -122,6 +123,62 @@
 - ✅ Added `createNews`, `togglePin`, `deleteNews` to news.service.ts
 
 **Smoke Test**: All 6 admin API endpoints returned `"success":true`
+
+---
+
+### Sessions 5–9 — 2026-04-01 → 2026-05-01
+
+**Goal**: Pending Student Portal, Wallet Tasks, Security Hardening, Merged Residence Page, E2E Verification
+
+#### Pending Student Portal (Phase 5)
+- ✅ `ApplicationStatus.tsx` — progress stepper (Submitted → Reserved → Confirmed → Active)
+- ✅ `BrowseRooms.tsx` — room grid with type/price/block filter for PENDING_STUDENT
+- ✅ `OnboardingWizard` — 4-step modal (localStorage gate: `rh_onboarding_seen`), mounts in ApplicationStatus
+- ✅ `application.routes.ts` + `application.service.ts` + `application.controller.ts` — `/application/status` and `/application/rooms`
+
+#### Wallet Tasks Tab
+- ✅ Added Tasks tab to `Wallet.tsx` — task vouchers with proof upload, claim status (PENDING/APPROVED/REJECTED), PIN reveal on APPROVED
+- ✅ `submitTaskProof` frontend service + `POST /wallet/task-proof/:voucherId` backend route
+- ✅ Backend `getVouchers` hides `pin`/`imageUrl` unless claim is APPROVED (privacy guard)
+- ✅ `ConfirmModal` added before credit voucher redemption (prevent accidental one-click claims)
+- ✅ Shop tab filtered to credit-only; Tasks tab filtered to `requiresProof` vouchers
+
+#### Security Fixes
+- ✅ **Task voucher loophole**: `redeemVoucher` now throws 400 if `voucher.requiresProof` — cannot bypass via direct API
+- ✅ **File picker fix**: Both `Documents.tsx` and `InvoiceModal.tsx` replaced detached `document.createElement('input')` with DOM-attached `useRef<HTMLInputElement>` hidden input (browser security requirement)
+- ✅ **Zero-credits guard**: confirmed working in E2E test
+
+#### Admin Residence Page (merged Occupancy + Settings)
+- ✅ `AdminSettings.tsx` — unified "Residence" page with "Info" and "Rooms & Occupancy" tabs
+- ✅ Room setup wizard: count → sharing type (SINGLE/DOUBLE/TRIPLE/QUAD) → blocks → price per room → generates rooms
+- ✅ `setupRooms` backend service: deletes VACANT rooms, creates new layout, never touches OCCUPIED rooms
+- ✅ TRIPLE + QUAD added to `RoomType` enum with Prisma migration `20260501052241_add_triple_quad_room_types`
+- ✅ Removed `AdminOccupancy.tsx` (orphaned); `/admin/occupancy` URL redirects to `/admin/settings`
+- ✅ Sidebar updated: "Occupancy" → "Residence" with Building2 icon
+
+#### Seed & Data Reset (Session 9)
+- ✅ Added `voucherClaim.deleteMany()` and `residenceSettings.deleteMany()` to seed cleanup
+- ✅ Rewrote seed with minimal clean data for E2E testing:
+  - 3 users: `admin@resihub.co` / `admin123`, `sarah@campus.edu` / `pass123` (Active, Room A101, 45 🪙), `aisha@campus.edu` / `pass123` (Pending — triggers onboarding)
+  - 6 rooms: 1 OCCUPIED (Sarah) + 5 VACANT (for BrowseRooms)
+  - 1 allocation (Sarah → A101)
+  - 2 documents: INVOICE Unpaid + CONTRACT Unsigned (both testable)
+  - 3 vouchers: 2 credit-based + 1 task-based
+  - 3 chores (1 claimed by Sarah)
+  - 1 pinned Welcome notification
+  - Sarah wallet: 45 credits + 2 earn transactions
+
+#### E2E Smoke Test Results (all flows verified)
+- ✅ Auth: login/me/register for ACTIVE_STUDENT, PENDING_STUDENT, ADMIN
+- ✅ Student: documents, wallet, vouchers, chores, news, maintenance, visitor passes
+- ✅ Pending: application/status, application/rooms (5 rooms shown), onboarding wizard
+- ✅ Admin: accounts (3), occupancy (all rooms), allocations, news creation, voucher claims
+- ✅ Security guards: task voucher direct-redeem BLOCKED, zero-credits BLOCKED
+- ✅ Task proof: submitted → PENDING → visible in admin/claims
+- ✅ Docker Desktop fix: deleted corrupted `dockerInference` socket file
+
+#### Type Fixes
+- ✅ `auth.types.ts` Room type updated: added `'TRIPLE' | 'QUAD'` to RoomType union
 
 ---
 
