@@ -234,5 +234,58 @@
 
 ---
 
-**Document Version**: 1.6
-**Last Updated**: 2026-04-30
+---
+
+### Session 7 — 2026-05-01
+
+**Goal**: Premium sign-up flow, onboarding system, invoice viewer + download, contract signing
+
+**Login Page Enhancement**
+- ✅ Right panel: rose-tinted gradient (`#0f0810 → #1c0d18 → #120f14`) matching building left panel
+- ✅ Decorative radial rose glow orbs + dot-grid overlay for premium feel
+- ✅ Login card border tinted rose; demo account hover rose; "Create one free →" link to /register
+
+**Register Page (new)**
+- ✅ `frontend/src/pages/auth/Register.tsx` — full premium split-layout (IsometricScene left, rose form right)
+- ✅ Zod schema: name, email, password, confirmPassword (refine match), university, programme, year, phone
+- ✅ Rose-themed submit btn; `toast.success('Account created! Welcome to ResiHub 🎉')` on success
+- ✅ Wired into App.tsx as public route `/register`; AuthContext.register() calls backend POST /api/auth/register
+
+**Onboarding Wizard (new)**
+- ✅ `frontend/src/components/OnboardingWizard.tsx` — 4-step fullscreen overlay for first-time users
+- ✅ localStorage-gated (`rh_onboarding_seen`); shown only once per device
+- ✅ Steps: Welcome (cyan) → How it works with allocation progress tracker (purple) → Complete profile (orange) → Browse rooms (rose)
+- ✅ Per-step accent color: icon bg, progress bar, top glow line
+- ✅ Navigation: Back/Next, final step has "Browse Rooms" link + "Get Started"; Skip link always visible
+- ✅ Rendered in `ApplicationStatus.tsx` for PENDING_STUDENT users
+
+**Invoice Modal (new)**
+- ✅ `frontend/src/components/InvoiceModal.tsx` — formatted invoice viewer (invoice #, billed-to, period, line items, total)
+- ✅ Client-side HTML blob download (no external PDF lib); Escape key + scroll lock
+- ✅ Overdue warning banner; cyan/rose total amount colour based on status
+
+**Contract Sign Modal (new)**
+- ✅ `frontend/src/components/ContractSignModal.tsx` — lease contract viewer + e-signature
+- ✅ Pending state: typed-name signature input; Signed state: signed-by + date in cyan UI
+- ✅ `useMutation` → `POST /documents/:id/sign` → toast success/error; invalidates `['documents']` query
+- ✅ Contract HTML blob download with conditional signature block
+
+**Documents Page (rewritten)**
+- ✅ Clickable rows open InvoiceModal (invoices) or ContractSignModal (contracts)
+- ✅ DocRow shows: "Sign" CTA (rose) for unsigned contracts, download icon for invoices, eye for letters
+- ✅ Shows "✓ Signed by {name}" mono text on signed contract rows
+
+**Backend: Contract Signing API**
+- ✅ Prisma migration `20260430182006_add_contract_signing`: `signedAt DateTime?` + `signedByName String?` on Document
+- ✅ `backend/src/services/document.service.ts` — `signDocument()`: validates ownership, type, prevents double-sign
+- ✅ `backend/src/controllers/document.controller.ts` — `signDocument` controller
+- ✅ `backend/src/routes/document.routes.ts` — `POST /:id/sign`
+- ✅ `frontend/src/services/document.service.ts` — `signContract(id, signedByName)` helper
+- ✅ `frontend/src/types/domain.types.ts` — `signedAt?` + `signedByName?` added to ResidentDocument
+
+**TypeScript**: `tsc --noEmit` → 0 errors
+
+---
+
+**Document Version**: 1.7
+**Last Updated**: 2026-05-01
