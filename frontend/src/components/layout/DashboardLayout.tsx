@@ -12,6 +12,7 @@ import { ROUTES }      from '../../constants/routes';
 import { WelcomeTour } from '../WelcomeTour';
 import { UserMenu }    from '../UserMenu';
 import { Brand }       from '../Brand';
+import { LiveNotifier } from '../LiveNotifier';
 
 const studentNav = [
   { to: ROUTES.DASHBOARD,   label: 'Dashboard',   icon: LayoutDashboard },
@@ -156,6 +157,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
       {/* First-time welcome tour — renders only when user.onboardedAt is null */}
       <WelcomeTour />
+      {/* Background polling notifier — toasts new news/invoices/chores */}
+      <LiveNotifier />
       {/* Desktop sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar />
