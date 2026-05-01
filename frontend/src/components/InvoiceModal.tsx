@@ -1,5 +1,5 @@
 import { X, Download, CheckCircle2, AlertCircle, Upload, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ResidentDocument } from '../types/domain.types';
@@ -17,6 +17,9 @@ export default function InvoiceModal({ doc, onClose }: Props) {
   const qc = useQueryClient();
   const [proofPreview, setProofPreview] = useState<string | null>(null);
 
+  // Hidden file input — must be in DOM for .click() to reliably open the file picker
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const uploadProof = useMutation({
     mutationFn: (proofUrl: string) => submitPaymentProof(doc!.id, proofUrl),
     onSuccess: () => {
@@ -24,21 +27,23 @@ export default function InvoiceModal({ doc, onClose }: Props) {
       toast.success('Proof of payment uploaded! Admin will review shortly.');
       setProofPreview(null);
     },
-    onError: () => toast.error('Failed to upload proof.'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'Failed to upload proof.');
+    },
   });
 
   function pickProof() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (re) => setProofPreview(re.target?.result as string);
-      reader.readAsDataURL(file);
-    };
-    input.click();
+    fileInputRef.current?.click();
+  }
+
+  function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (re) => setProofPreview(re.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
   }
 
   useEffect(() => {
@@ -136,6 +141,14 @@ export default function InvoiceModal({ doc, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
+      {/* Hidden file input — in DOM so .click() reliably opens the OS file picker */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={onFileSelected}
+      />
       <div
         className="modal-card appear"
         onClick={e => e.stopPropagation()}

@@ -88,8 +88,14 @@ export async function redeemVoucher(userId: string, voucherId: string) {
 
   if (!wallet)  throw new AppError('Wallet not found', 404);
   if (!voucher) throw new AppError('Voucher not found', 404);
-  if (!voucher.isActive)        throw new AppError('Voucher is no longer available', 400);
-  if (voucher.stock < 1)        throw new AppError('This voucher is out of stock', 400);
+  if (!voucher.isActive)  throw new AppError('Voucher is no longer available', 400);
+  if (voucher.stock < 1)  throw new AppError('This voucher is out of stock', 400);
+  if (voucher.requiresProof) {
+    throw new AppError(
+      'This voucher requires task completion — go to the Tasks tab, complete the task, and upload proof.',
+      400,
+    );
+  }
   if (wallet.credits < voucher.cost) {
     throw new AppError(`Not enough credits — you need ${voucher.cost} 🪙 but have ${wallet.credits}`, 400);
   }

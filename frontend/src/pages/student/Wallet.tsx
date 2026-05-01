@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { format } from 'date-fns';
 import type { Voucher } from '../../types/domain.types';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const TX_ICON: Record<string, string>   = { EARN: '⬆', REDEEM: '🎟', ADJUST: '⚙' };
 const TX_COLOR: Record<string, string>  = { EARN: '#4ade80', REDEEM: 'var(--rose)', ADJUST: 'var(--cyan)' };
@@ -234,6 +235,9 @@ export default function Wallet() {
   const fileInputRef                      = useRef<HTMLInputElement>(null);
   const pickingFor                        = useRef<string | null>(null);
 
+  // Confirm-before-redeem state
+  const [confirmVoucher, setConfirmVoucher] = useState<Voucher | null>(null);
+
   const { data: wallet, isLoading: wLoading } = useQuery({ queryKey: ['wallet'],      queryFn: getWallet });
   const { data: vouchers = [] }               = useQuery({ queryKey: ['vouchers'],    queryFn: getVouchers });
   const { data: leaderboard = [] }            = useQuery({ queryKey: ['leaderboard'], queryFn: getLeaderboard });
@@ -242,14 +246,20 @@ export default function Wallet() {
   const shopVouchers = vouchers.filter(v => !v.requiresProof && v.isActive);
   const taskVouchers = vouchers.filter(v =>  v.requiresProof && v.isActive);
 
-  const { mutate: redeem, isPending: redeeming, variables: redeemId } = useMutation({
+  const { mutate: redeem, isPending: redeeming } = useMutation({
     mutationFn: redeemVoucher,
-    onSuccess: () => {
+    onSuccess: (_, voucherId) => {
       qc.invalidateQueries({ queryKey: ['wallet'] });
       qc.invalidateQueries({ queryKey: ['vouchers'] });
-      toast.success('Voucher redeemed! Check your email.');
+      const v = shopVouchers.find(x => x.id === voucherId);
+      toast.success(`${v?.icon ?? '🎟'} ${v?.name ?? 'Voucher'} redeemed! Check your inbox.`);
+      setConfirmVoucher(null);
     },
-    onError: () => toast.error('Failed to redeem voucher.'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'Failed to redeem voucher.');
+      setConfirmVoucher(null);
+    },
   });
 
   const { mutate: doSubmitProof, isPending: submittingProof, variables: submittingFor } = useMutation({
@@ -371,8 +381,8 @@ export default function Wallet() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {shopVouchers.map(v => {
-                const canAfford   = (wallet?.credits ?? 0) >= v.cost;
-                const isRedeeming = redeeming && redeemId === v.id;
+                const canAfford    = (wallet?.credits ?? 0) >= v.cost;
+                const isConfirming = confirmVoucher?.id === v.id;
                 return (
                   <div key={v.id} className="card-sm" style={{ opacity: canAfford ? 1 : .65, transition: 'opacity .2s' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -384,12 +394,11 @@ export default function Wallet() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, fontWeight: 700, color: 'var(--cyan)' }}>{v.cost} 🪙</span>
                       <button
-                        onClick={() => redeem(v.id)}
-                        disabled={!canAfford || isRedeeming || v.stock < 1}
+                        onClick={() => canAfford && v.stock > 0 && setConfirmVoucher(v)}
+                        disabled={!canAfford || isConfirming || v.stock < 1}
                         className="btn-primary"
                         style={{ padding: '7px 14px', fontSize: 12 }}
                       >
-                        {isRedeeming && <Loader2 size={11} className="animate-spin" />}
                         {v.stock < 1 ? 'Out of stock' : !canAfford ? 'Not enough' : 'Redeem'}
                       </button>
                     </div>
@@ -479,6 +488,17 @@ export default function Wallet() {
           ))}
         </div>
       )}
+
+      {/* ── Redeem confirmation modal ────────────────────────────── */}
+      <ConfirmModal
+        open={!!confirmVoucher}
+        title={`Redeem ${confirmVoucher?.name ?? 'Voucher'}?`}
+        message={`This will spend ${confirmVoucher?.cost ?? 0} 🪙 from your balance. You currently have ${wallet?.credits ?? 0} 🪙.`}
+        confirmLabel="Yes, Redeem"
+        loading={redeeming}
+        onConfirm={() => confirmVoucher && redeem(confirmVoucher.id)}
+        onCancel={() => setConfirmVoucher(null)}
+      />
     </div>
   );
 }
