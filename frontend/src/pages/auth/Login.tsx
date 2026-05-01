@@ -126,7 +126,7 @@ export default function Login() {
           pointerEvents: 'none',
         }}/>
         {/* Rising sparks */}
-        <SparkParticles color="#E8197A" rate={0.22} />
+        <SparkParticles color="#E8197A" rate={0.14} />
 
         <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="appear">
 

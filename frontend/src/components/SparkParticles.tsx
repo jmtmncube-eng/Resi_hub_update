@@ -17,7 +17,7 @@ interface Props {
   rate?:  number;
 }
 
-export default function SparkParticles({ color = '#E8197A', rate = 0.28 }: Props) {
+export default function SparkParticles({ color = '#E8197A', rate = 0.14 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -43,11 +43,13 @@ export default function SparkParticles({ color = '#E8197A', rate = 0.28 }: Props
       sparks.push({
         x:     Math.random() * canvas.width,
         y:     canvas.height + 6,
-        vx:    (Math.random() - 0.5) * 1.6,
-        vy:    -(Math.random() * 2.4 + 0.7),
-        size:  Math.random() * 1.8 + 0.5,
-        alpha: Math.random() * 0.75 + 0.25,
-        decay: 0.004 + Math.random() * 0.007,
+        // Slow drift — building floats at ~0.09-0.15 px/frame; sparks match that scale
+        vx:    (Math.random() - 0.5) * 0.28,
+        vy:    -(Math.random() * 0.42 + 0.11),
+        size:  Math.random() * 2.2 + 0.7,
+        alpha: Math.random() * 0.65 + 0.22,
+        // Slow fade — each spark lives ~10–14 s at 60 fps
+        decay: 0.0012 + Math.random() * 0.0015,
       });
     }
 
