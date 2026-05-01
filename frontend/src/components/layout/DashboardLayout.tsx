@@ -13,6 +13,7 @@ import { WelcomeTour } from '../WelcomeTour';
 import { UserMenu }    from '../UserMenu';
 import { Brand }       from '../Brand';
 import { LiveNotifier } from '../LiveNotifier';
+import { IdleLogout }   from '../IdleLogout';
 
 const studentNav = [
   { to: ROUTES.DASHBOARD,   label: 'Dashboard',   icon: LayoutDashboard },
@@ -159,6 +160,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <WelcomeTour />
       {/* Background polling notifier — toasts new news/invoices/chores */}
       <LiveNotifier />
+      {/* Auto sign-out after 90s of inactivity (15s warning at 75s) */}
+      <IdleLogout />
       {/* Desktop sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar />
@@ -223,19 +226,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               position: 'absolute', top: '-15%', left: '10%',
               width: 520, height: 520, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(0,204,204,.055) 0%, transparent 70%)',
-              animation: 'blob1 18s ease-in-out infinite',
+              animation: 'blob1 38s ease-in-out infinite',
             }} />
             <div style={{
               position: 'absolute', bottom: '-10%', right: '8%',
               width: 480, height: 480, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(232,25,122,.045) 0%, transparent 70%)',
-              animation: 'blob2 22s ease-in-out infinite',
+              animation: 'blob2 46s ease-in-out infinite',
             }} />
             <div style={{
               position: 'absolute', top: '40%', left: '55%',
               width: 340, height: 340, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(0,204,204,.03) 0%, transparent 70%)',
-              animation: 'blob3 26s ease-in-out infinite',
+              animation: 'blob3 54s ease-in-out infinite',
             }} />
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
