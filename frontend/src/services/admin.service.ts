@@ -39,9 +39,15 @@ export const getAccounts = async (search?: string) => {
 };
 
 export const updateAccount = async (id: string, body: {
-  name?: string; role?: string; phone?: string;
+  name?: string; email?: string; role?: string; phone?: string;
+  university?: string; program?: string; year?: number | null; bio?: string;
 }) => {
   const res = await api.patch(`/admin/accounts/${id}`, body);
+  return res.data.data;
+};
+
+export const approveAccount = async (id: string) => {
+  const res = await api.post(`/admin/accounts/${id}/approve`);
   return res.data.data;
 };
 
@@ -171,7 +177,9 @@ export interface AdminAllocation {
 
 export interface AdminAccount {
   id: string; name: string; email: string; role: string;
-  phone: string | null; university: string | null; avatarUrl: string | null;
+  phone: string | null; university: string | null;
+  program?: string | null; year?: number | null; bio?: string | null;
+  avatarUrl: string | null;
   createdAt: string;
   wallet: { credits: number } | null;
   allocation: { room: { number: string; block: string } } | null;

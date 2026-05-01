@@ -15,8 +15,13 @@ const STATUS_BADGE: Record<string, string> = {
   ENDED:    'badge-rose',
 };
 
-export default function AdminAllocations() {
-  usePageTitle('Allocations · Admin');
+interface AdminAllocationsProps {
+  /** When embedded under the Residence hub, suppress the local page title. */
+  hideHeader?: boolean;
+}
+
+export default function AdminAllocations({ hideHeader = false }: AdminAllocationsProps = {}) {
+  usePageTitle(hideHeader ? '' : 'Allocations · Admin');
   const qc = useQueryClient();
   const [search, setSearch]       = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -78,12 +83,16 @@ export default function AdminAllocations() {
   return (
     <div className="space-y-6 appear">
 
-      {/* Header */}
+      {/* Header — suppressed when embedded in Residence hub */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div>
-          <h1 className="page-title">Allocations</h1>
-          <p className="page-sub">{allocations.length} total allocations</p>
-        </div>
+        {!hideHeader ? (
+          <div>
+            <h1 className="page-title">Allocations</h1>
+            <p className="page-sub">{allocations.length} total allocations</p>
+          </div>
+        ) : (
+          <p className="page-sub" style={{ margin: 0 }}>{allocations.length} total allocations</p>
+        )}
         <button onClick={() => setShowModal(true)} className="btn-primary" style={{ padding: '9px 18px', fontSize: 13 }}>
           + New Allocation
         </button>

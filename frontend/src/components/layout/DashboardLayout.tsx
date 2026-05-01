@@ -3,12 +3,13 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
-  Building2, SquareStack, Ticket, Megaphone, ClipboardList, Gift, BookUser,
+  Building2, Ticket, Megaphone, ClipboardList, Gift, BookUser,
   Sun, Moon, CreditCard,
 } from 'lucide-react';
-import { useAuth }  from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { ROUTES }   from '../../constants/routes';
+import { useAuth }     from '../../contexts/AuthContext';
+import { useTheme }    from '../../contexts/ThemeContext';
+import { ROUTES }      from '../../constants/routes';
+import { WelcomeTour } from '../WelcomeTour';
 
 const studentNav = [
   { to: ROUTES.DASHBOARD,   label: 'Dashboard',   icon: LayoutDashboard },
@@ -27,15 +28,14 @@ const pendingNav = [
 ];
 
 const adminNav = [
-  { to: ROUTES.ADMIN,             label: 'Overview',    icon: LayoutDashboard },
-  { to: ROUTES.ADMIN_ALLOCATIONS, label: 'Allocations', icon: SquareStack     },
-  { to: ROUTES.ADMIN_PAYMENTS,    label: 'Payments',    icon: CreditCard      },
-  { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets',     icon: Ticket          },
-  { to: ROUTES.ADMIN_NEWS,        label: 'News',        icon: Megaphone       },
-  { to: ROUTES.ADMIN_VISITORS,    label: 'Visitors',    icon: QrCode          },
-  { to: ROUTES.ADMIN_REWARDS,     label: 'Rewards',     icon: Gift            },
-  { to: ROUTES.ADMIN_ACCOUNTS,    label: 'Accounts',    icon: BookUser        },
-  { to: ROUTES.ADMIN_SETTINGS,    label: 'Residence',   icon: Building2       },
+  { to: ROUTES.ADMIN,             label: 'Overview',  icon: LayoutDashboard },
+  { to: ROUTES.ADMIN_RESIDENCE,   label: 'Residence', icon: Building2       },
+  { to: ROUTES.ADMIN_ACCOUNTS,    label: 'Accounts',  icon: BookUser        },
+  { to: ROUTES.ADMIN_PAYMENTS,    label: 'Payments',  icon: CreditCard      },
+  { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets',   icon: Ticket          },
+  { to: ROUTES.ADMIN_NEWS,        label: 'News',      icon: Megaphone       },
+  { to: ROUTES.ADMIN_VISITORS,    label: 'Visitors',  icon: QrCode          },
+  { to: ROUTES.ADMIN_REWARDS,     label: 'Rewards',   icon: Gift            },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -155,6 +155,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+      {/* First-time welcome tour — renders only when user.onboardedAt is null */}
+      <WelcomeTour />
       {/* Desktop sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar />

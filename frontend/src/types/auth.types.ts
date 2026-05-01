@@ -11,6 +11,7 @@ export interface User {
   year?:      number;
   phone?:     string;
   bio?:       string;
+  onboardedAt?: string | null;
   createdAt:  string;
   updatedAt:  string;
   allocation?: Allocation | null;

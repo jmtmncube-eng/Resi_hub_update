@@ -31,19 +31,21 @@
 }
 
 html.light {
-  --bg:        #f2f4f7;
-  --bg2:       #ffffff;
-  --bg3:       #e8eaef;
-  --border:    rgba(0,0,0,.08);
-  --border2:   rgba(0,0,0,.15);
-  --text:      #0f0f12;
-  --text2:     rgba(15,15,18,.65);
-  --text3:     rgba(15,15,18,.4);
-  --text4:     rgba(15,15,18,.16);
-  --input-bg:  rgba(0,0,0,.03);
-  --sel-bg:    #f0f0f0;
-  --hover:     rgba(0,0,0,.025);
-  --shadow:    rgba(0,0,0,.1);
+  /* Warm cream palette — softer on the eyes than pure white,
+     with a touch of yellow so surfaces feel "paper" not "screen". */
+  --bg:        #f7f4ec;   /* page — cream */
+  --bg2:       #fbf8f1;   /* cards — lighter cream */
+  --bg3:       #ece6d6;   /* recessed/inputs — toasted cream */
+  --border:    rgba(60,45,15,.09);
+  --border2:   rgba(60,45,15,.16);
+  --text:      #1a1714;
+  --text2:     rgba(26,23,20,.66);
+  --text3:     rgba(26,23,20,.42);
+  --text4:     rgba(26,23,20,.18);
+  --input-bg:  rgba(60,45,15,.04);
+  --sel-bg:    #f0ebde;
+  --hover:     rgba(60,45,15,.035);
+  --shadow:    rgba(60,45,15,.10);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -747,11 +749,11 @@ html.light .input-login:focus {
   border-color: #00CCCC;
   background:   rgba(0,204,204,.05);
 }
-html.light select.input-base option { background: #fff; color: #0f0f12; }
+html.light select.input-base option { background: #fbf8f1; color: #1a1714; }
 
-/* Sidebar */
-html.light aside { background-color: #ffffff !important; }
-html.light body  { background-color: #f2f4f7; color: #0f0f12; }
+/* Sidebar — cream paper with subtle warm tint */
+html.light aside { background-color: #fbf8f1 !important; }
+html.light body  { background-color: #f7f4ec; color: #1a1714; }
 
 /* Toast in light mode */
-html.light .toast-success { background: #ffffff; }
+html.light .toast-success { background: #fbf8f1; }

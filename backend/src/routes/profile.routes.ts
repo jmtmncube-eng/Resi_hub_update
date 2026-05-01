@@ -34,8 +34,9 @@ const upload = multer({
 const router = Router();
 router.use(authenticate);
 
-router.get('/',           ctrl.getProfile);
-router.patch('/',         validate(updateProfileSchema), ctrl.updateProfile);
+router.get('/',                ctrl.getProfile);
+router.patch('/',              validate(updateProfileSchema), ctrl.updateProfile);
+router.post('/onboarding',     ctrl.completeOnboarding);
 router.post(
   '/avatar',
   (req, res, next) => {

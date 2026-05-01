@@ -21,6 +21,11 @@ export async function updateProfile(data: UpdateProfileInput): Promise<User> {
   return res.data.data;
 }
 
+export async function completeOnboarding(): Promise<{ onboardedAt: string }> {
+  const res = await api.post<ApiResponse<{ onboardedAt: string }>>('/profile/onboarding');
+  return res.data.data;
+}
+
 export async function uploadAvatar(file: File): Promise<User> {
   const form = new FormData();
   form.append('avatar', file);

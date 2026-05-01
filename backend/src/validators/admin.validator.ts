@@ -14,9 +14,14 @@ export const updateAllocationSchema = z.object({
 });
 
 export const updateAccountSchema = z.object({
-  name:  z.string().min(2).optional(),
-  role:  z.enum(['ACTIVE_STUDENT', 'PENDING_STUDENT', 'ADMIN']).optional(),
-  phone: z.string().optional(),
+  name:       z.string().min(2).optional(),
+  email:      z.string().email().optional(),
+  role:       z.enum(['ACTIVE_STUDENT', 'PENDING_STUDENT', 'ADMIN']).optional(),
+  phone:      z.string().optional().or(z.literal('')),
+  university: z.string().optional().or(z.literal('')),
+  program:    z.string().optional().or(z.literal('')),
+  year:       z.number().int().min(1).max(10).optional().nullable(),
+  bio:        z.string().max(500).optional().or(z.literal('')),
 });
 
 export const createVoucherSchema = z.object({

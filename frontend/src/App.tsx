@@ -29,14 +29,13 @@ import BrowseRooms       from './pages/student/BrowseRooms';
 
 // ── Admin ───────────────────────────────────────────────────────
 import AdminOverview    from './pages/admin/AdminOverview';
-import AdminAllocations from './pages/admin/AdminAllocations';
+import AdminResidence   from './pages/admin/AdminResidence';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminNews        from './pages/admin/AdminNews';
 import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
 import AdminAccounts    from './pages/admin/AdminAccounts';
 import AdminPayments    from './pages/admin/AdminPayments';
-import AdminSettings    from './pages/admin/AdminSettings';
 
 /** Wraps a page component with DashboardLayout + ErrorBoundary */
 function Page({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
@@ -84,15 +83,17 @@ function App() {
 
           {/* ── Admin ──────────────────────────────────────── */}
           <Route path={ROUTES.ADMIN}             element={<Page roles={ADMIN}><AdminOverview /></Page>} />
-          <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Navigate to={ROUTES.ADMIN_SETTINGS} replace />} />
-          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Page roles={ADMIN}><AdminAllocations /></Page>} />
+          <Route path={ROUTES.ADMIN_RESIDENCE}   element={<Page roles={ADMIN}><AdminResidence /></Page>} />
+          {/* Legacy admin URLs → redirect into the consolidated Residence hub */}
+          <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
+          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=allocations`} replace />} />
+          <Route path={ROUTES.ADMIN_SETTINGS}    element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=info`} replace />} />
           <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={ADMIN}><AdminMaintenance /></Page>} />
           <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />
           <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
           <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
           <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
           <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={ADMIN}><AdminPayments /></Page>} />
-          <Route path={ROUTES.ADMIN_SETTINGS}    element={<Page roles={ADMIN}><AdminSettings /></Page>} />
 
           {/* ── Default ────────────────────────────────────── */}
           <Route path="/"  element={<Navigate to={ROUTES.LOGIN} replace />} />

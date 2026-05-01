@@ -85,6 +85,13 @@ export async function updateAccount(req: Request, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
+export async function approveAccount(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.approveAccount(req.params.id);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 // ── Rewards ───────────────────────────────────────────────────
 export async function getVouchers(req: Request, res: Response, next: NextFunction) {
   try {

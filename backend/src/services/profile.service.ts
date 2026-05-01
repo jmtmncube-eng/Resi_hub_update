@@ -46,3 +46,17 @@ export async function updateAvatar(userId: string, avatarUrl: string) {
   const { passwordHash: _pw, ...safe } = updated;
   return safe;
 }
+
+/** Mark the user's first-time welcome tour as completed. Idempotent. */
+export async function completeOnboarding(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError('User not found', 404);
+  if (user.onboardedAt) return { onboardedAt: user.onboardedAt };
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data:  { onboardedAt: new Date() },
+    select: { onboardedAt: true },
+  });
+  return updated;
+}

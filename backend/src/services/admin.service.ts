@@ -219,6 +219,9 @@ export async function getAllAccounts(search?: string) {
       role:       true,
       phone:      true,
       university: true,
+      program:    true,
+      year:       true,
+      bio:        true,
       avatarUrl:  true,
       createdAt:  true,
       wallet:     { select: { credits: true } },
@@ -234,14 +237,43 @@ export async function updateAccount(id: string, data: UpdateAccountInput) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
 
+  // Email uniqueness guard if it's changing
+  if (data.email && data.email !== user.email) {
+    const clash = await prisma.user.findUnique({ where: { email: data.email } });
+    if (clash) throw new AppError('That email is already in use', 409);
+  }
+
   return prisma.user.update({
     where: { id },
     data: {
-      ...(data.name  && { name:  data.name }),
-      ...(data.role  && { role:  data.role as never }),
-      ...(data.phone && { phone: data.phone }),
+      ...(data.name  !== undefined && { name:  data.name }),
+      ...(data.email !== undefined && { email: data.email }),
+      ...(data.role  !== undefined && { role:  data.role as never }),
+      ...(data.phone !== undefined && { phone: data.phone || null }),
+      ...(data.university !== undefined && { university: data.university || null }),
+      ...(data.program    !== undefined && { program:    data.program    || null }),
+      ...(data.year       !== undefined && { year:       data.year ?? null }),
+      ...(data.bio        !== undefined && { bio:        data.bio || null }),
     },
-    select: { id: true, name: true, email: true, role: true, phone: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, role: true, phone: true,
+      university: true, program: true, year: true, bio: true,
+      avatarUrl: true, createdAt: true,
+    },
+  });
+}
+
+/** One-click approve: PENDING_STUDENT → ACTIVE_STUDENT. */
+export async function approveAccount(id: string) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError('User not found', 404);
+  if (user.role === 'ACTIVE_STUDENT') throw new AppError('Already an active student', 400);
+  if (user.role === 'ADMIN')          throw new AppError('Cannot change admin role this way', 400);
+
+  return prisma.user.update({
+    where: { id },
+    data:  { role: 'ACTIVE_STUDENT' as never },
+    select: { id: true, name: true, role: true },
   });
 }
 

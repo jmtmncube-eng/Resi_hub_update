@@ -28,6 +28,8 @@ export const ROUTES = {
   ADMIN_ACCOUNTS:     '/admin/accounts',
   ADMIN_PAYMENTS:     '/admin/payments',
   ADMIN_SETTINGS:     '/admin/settings',
+  /** Consolidated Residence hub — tabs: allocations / rooms / info */
+  ADMIN_RESIDENCE:    '/admin/residence',
 } as const;
 
 /** Where to redirect after login, keyed by role */

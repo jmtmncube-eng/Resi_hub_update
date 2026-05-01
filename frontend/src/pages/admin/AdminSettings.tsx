@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Save, Loader2, Settings2, LayoutGrid,
-  Users, DoorOpen, RefreshCw, ChevronDown, ChevronUp,
+  DoorOpen, RefreshCw, ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -33,10 +33,18 @@ const BLANK: Partial<ResidenceSettings> = {
   name: '', tagline: '', address: '', phone: '', email: '', description: '',
 };
 
-export default function AdminSettings() {
-  usePageTitle('Residence · Admin');
+interface AdminSettingsProps {
+  /** When embedded inside the consolidated Residence page, hide the local
+   *  page header + inner tab switcher; the parent renders them. */
+  hideHeader?: boolean;
+  /** Force a starting tab (used when the parent owns the routing). */
+  initialTab?: 'info' | 'rooms';
+}
+
+export default function AdminSettings({ hideHeader = false, initialTab = 'info' }: AdminSettingsProps = {}) {
+  usePageTitle(hideHeader ? '' : 'Residence · Admin');
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'info' | 'rooms'>('info');
+  const [tab, setTab] = useState<'info' | 'rooms'>(initialTab);
 
   // ── Info form state ─────────────────────────────────────────
   const [form, setForm] = useState<Partial<ResidenceSettings>>(BLANK);
@@ -108,36 +116,40 @@ export default function AdminSettings() {
   return (
     <div className="space-y-6 appear">
 
-      {/* Page header */}
-      <div>
-        <h1 className="page-title">Residence</h1>
-        <p className="page-sub">Manage residence info and configure your room layout</p>
-      </div>
+      {/* Page header — suppressed when embedded in the Residence hub */}
+      {!hideHeader && (
+        <div>
+          <h1 className="page-title">Residence</h1>
+          <p className="page-sub">Manage residence info and configure your room layout</p>
+        </div>
+      )}
 
-      {/* Tab switcher */}
-      <div style={{ display: 'inline-flex', background: 'var(--bg3)', borderRadius: 10, padding: 4, gap: 2 }}>
-        {([
-          { key: 'info',  label: 'Info',              icon: Settings2   },
-          { key: 'rooms', label: 'Rooms & Occupancy', icon: LayoutGrid  },
-        ] as const).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', borderRadius: 7, fontSize: 13,
-              fontWeight: tab === key ? 600 : 400,
-              background: tab === key ? 'var(--bg2)' : 'transparent',
-              color:      tab === key ? 'var(--text)' : 'var(--text3)',
-              border: 'none', cursor: 'pointer', transition: 'all .18s',
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Local tab switcher — also suppressed when the parent owns tabs */}
+      {!hideHeader && (
+        <div style={{ display: 'inline-flex', background: 'var(--bg3)', borderRadius: 10, padding: 4, gap: 2 }}>
+          {([
+            { key: 'info',  label: 'Info',              icon: Settings2   },
+            { key: 'rooms', label: 'Rooms & Occupancy', icon: LayoutGrid  },
+          ] as const).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', borderRadius: 7, fontSize: 13,
+                fontWeight: tab === key ? 600 : 400,
+                background: tab === key ? 'var(--bg2)' : 'transparent',
+                color:      tab === key ? 'var(--text)' : 'var(--text3)',
+                border: 'none', cursor: 'pointer', transition: 'all .18s',
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── INFO TAB ─────────────────────────────────────────────── */}
       {tab === 'info' && (

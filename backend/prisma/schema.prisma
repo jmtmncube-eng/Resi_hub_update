@@ -97,6 +97,7 @@ model User {
   year         Int?
   phone        String?
   bio          String?
+  onboardedAt  DateTime?  // null = first-time user, show welcome tour
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

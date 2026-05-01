@@ -14,6 +14,12 @@ export async function updateProfile(req: AuthRequest, res: Response, next: NextF
   } catch (err) { next(err); }
 }
 
+export async function completeOnboarding(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.completeOnboarding(req.user!.userId) });
+  } catch (err) { next(err); }
+}
+
 export async function uploadAvatar(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     if (!req.file) {
