@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, FlaskConical } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
@@ -17,6 +17,16 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+// Dev-only seeded accounts. Hidden in production builds via VITE_HIDE_DEMO=1
+// (set the env var when building for prod and the picker disappears entirely).
+const DEMO_ACCOUNTS: Array<{ label: string; email: string; password: string; tone: 'cyan' | 'rose' }> = [
+  { label: 'Admin · Jordan',      email: 'admin@resihub.co',     password: 'admin123',    tone: 'rose' },
+  { label: 'Admin · Mbongeni',    email: 'mbongeni@resihub.co',  password: 'mbongeni123', tone: 'rose' },
+  { label: 'Resident · Sarah',    email: 'sarah@campus.edu',     password: 'pass123',     tone: 'cyan' },
+  { label: 'Resident · Thandi',   email: 'thandi@lions.edu',     password: 'lions123',    tone: 'cyan' },
+  { label: 'Applicant · Aisha',   email: 'aisha@campus.edu',     password: 'pass123',     tone: 'cyan' },
+];
+
 export default function Login() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
@@ -29,9 +39,16 @@ export default function Login() {
   }
 
   const {
-    register, handleSubmit,
+    register, handleSubmit, setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+
+  function fillDemo(email: string, password: string) {
+    setValue('email',    email);
+    setValue('password', password);
+  }
+
+  const showDemo = import.meta.env.VITE_HIDE_DEMO !== '1';
 
   async function onSubmit(data: LoginForm) {
     setServerError('');
@@ -250,6 +267,72 @@ export default function Login() {
               </button>
             </form>
           </div>
+
+          {/* Dev-only demo accounts — auto-removed in production builds.
+              Set VITE_HIDE_DEMO=1 at build time to drop them entirely. */}
+          {showDemo && (
+            <div className="card-sm" style={{
+              marginTop: 14, padding: '12px 14px',
+              background: 'linear-gradient(135deg, rgba(232,25,122,.04), rgba(0,204,204,.02))',
+              borderColor: 'rgba(232,25,122,.18)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <FlaskConical size={11} style={{ color: 'var(--rose)' }} />
+                <span className="micro-label" style={{ margin: 0 }}>
+                  Dev quick-fill
+                </span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700,
+                  padding: '1px 6px', borderRadius: 4,
+                  background: 'rgba(232,25,122,.14)', color: 'var(--rose)',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  textTransform: 'uppercase', letterSpacing: '.05em',
+                }}>DEV</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 5 }}>
+                {DEMO_ACCOUNTS.map(({ label, email, password, tone }) => (
+                  <button
+                    key={email}
+                    type="button"
+                    onClick={() => fillDemo(email, password)}
+                    className="press-soft"
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1,
+                      padding: '7px 10px', borderRadius: 7,
+                      background: 'var(--hover)',
+                      border: '1px solid var(--border)',
+                      cursor: 'pointer', transition: 'all .18s', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.borderColor = tone === 'rose' ? 'rgba(232,25,122,.32)' : 'rgba(0,204,204,.32)';
+                      el.style.background  = tone === 'rose' ? 'rgba(232,25,122,.06)' : 'rgba(0,204,204,.05)';
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.borderColor = 'var(--border)';
+                      el.style.background  = 'var(--hover)';
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: 600,
+                      color: tone === 'rose' ? 'var(--rose)' : 'var(--cyan)',
+                    }}>
+                      {label}
+                    </span>
+                    <span style={{
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+                      color: 'var(--text3)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      maxWidth: '100%',
+                    }}>
+                      {email}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Legal links — short acknowledgement + clickable policy & terms */}
           <p style={{
