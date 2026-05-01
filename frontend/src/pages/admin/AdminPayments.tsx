@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { getRevenueReport, getAllInvoices, clearPayment, rejectPaymentProof, AdminInvoice } from '../../services/admin.service';
 import { bulkCreateInvoices, BulkInvoiceResult } from '../../services/document.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { formatPeriod, formatRand } from '../../utils/period';
 import ConfirmModal from '../../components/ConfirmModal';
 
 const PROOF_LABEL: Record<string, string> = {
@@ -133,7 +134,7 @@ export default function AdminPayments() {
               </div>
               {(report?.monthlyBreakdown ?? []).map(row => (
                 <div key={row.period} style={{ display: 'flex', gap: 16, padding: '13px 18px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
-                  <span style={{ flex: 2, fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{row.period}</span>
+                  <span style={{ flex: 2, fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{formatPeriod(row.period)}</span>
                   <span style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)' }}>R{row.expected.toLocaleString()}</span>
                   <span style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--cyan)' }}>R{row.cleared.toLocaleString()}</span>
                   <span style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: '#a78bfa' }}>R{row.submitted.toLocaleString()}</span>
@@ -176,7 +177,7 @@ export default function AdminPayments() {
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>{inv.user.name}</p>
-                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>{inv.period} · {inv.amount ?? '—'}</p>
+                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>{formatPeriod(inv.period)} · {formatRand(inv.amount)}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {inv.proofStatus && (
@@ -243,7 +244,7 @@ export default function AdminPayments() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{lp.user.name}</p>
                     <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                      {lp.user.email} · {lp.period} · {lp.amount ?? '—'}
+                      {lp.user.email} · {formatPeriod(lp.period)} · {formatRand(lp.amount)}
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -266,7 +267,7 @@ export default function AdminPayments() {
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>PAYMENT PROOF</p>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{proofModal.user.name} — {proofModal.period}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{proofModal.user.name} — {formatPeriod(proofModal.period)}</p>
               </div>
               <button onClick={() => setProofModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}>
                 <X size={16} />
@@ -310,7 +311,7 @@ export default function AdminPayments() {
       <ConfirmModal
         open={!!clearTarget}
         title="Clear payment"
-        message={`Mark ${clearTarget?.user.name}'s invoice (${clearTarget?.period}) as Paid? This can be used for sponsor or direct payments too.`}
+        message={`Mark ${clearTarget?.user.name}'s invoice (${formatPeriod(clearTarget?.period)}) as Paid? This can be used for sponsor or direct payments too.`}
         confirmLabel="Clear Payment"
         loading={clearMut.isPending}
         onConfirm={() => clearTarget && clearMut.mutate(clearTarget.id)}
@@ -359,8 +360,8 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
     onSuccess:  (r) => {
       setResult(r);
       onDone();
-      if (r.created === 0) toast.message(`No new invoices — all ${r.totalActive} students already have one for ${r.period}`);
-      else toast.success(`${r.created} invoice${r.created > 1 ? 's' : ''} generated for ${r.period}`);
+      if (r.created === 0) toast.message(`No new invoices — all ${r.totalActive} students already have one for ${formatPeriod(r.period)}`);
+      else toast.success(`${r.created} invoice${r.created > 1 ? 's' : ''} generated for ${formatPeriod(r.period)}`);
     },
     onError: (err: unknown) => {
       const msg = err instanceof AxiosError ? err.response?.data?.error : null;
@@ -443,7 +444,7 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
             </label>
 
             <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginBottom: 16 }}>
-              ℹ Students who already have an invoice for {period} will be skipped — no duplicates.
+              ℹ Students who already have an invoice for {formatPeriod(period)} will be skipped — no duplicates.
             </p>
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -455,7 +456,7 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
               >
                 {generate.isPending
                   ? <><Loader2 size={13} className="animate-spin" /> Generating…</>
-                  : <><Send size={13} /> Generate for {period}</>}
+                  : <><Send size={13} /> Generate for {formatPeriod(period)}</>}
               </button>
               <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
                 Cancel
@@ -476,7 +477,7 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
                 {result.created}
               </p>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>
-                invoice{result.created !== 1 ? 's' : ''} created for {result.period}
+                invoice{result.created !== 1 ? 's' : ''} created for {formatPeriod(result.period)}
               </p>
             </div>
 

@@ -63,12 +63,17 @@ html.light {
     background:  var(--bg);
     color:       var(--text);
     font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size:   14px;
-    line-height: 1.7;
+    /* Bumped from 14 → 15px and base weight from 400 → 450 so copy reads
+       cleaner on both cream (light) and dark backgrounds. Heading sizes
+       inherit from elements below. */
+    font-size:   15px;
+    font-weight: 450;
+    line-height: 1.65;
     min-height:  100vh;
     overflow-x:  hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     transition:  background .22s, color .22s;
   }
 
@@ -105,14 +110,18 @@ html.light {
    ANIMATIONS
    ═══════════════════════════════════════════════════════════════ */
 
+/* IMPORTANT: terminate keyframes with transform:none (not translateY(0))
+   so the element doesn't keep a transform value at rest. A non-none
+   transform creates a containing block for fixed-positioned descendants
+   — exactly what was clipping modals to the main column. */
 @keyframes appear {
   from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  to   { opacity: 1; transform: none;            }
 }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 1; transform: none;             }
 }
 
 @keyframes pulseDot {
@@ -212,7 +221,8 @@ html.light {
   }
   .micro-label {
     font-family:     'IBM Plex Mono', monospace;
-    font-size:       10px;
+    font-size:       11px;
+    font-weight:     500;
     color:           var(--text3);
     letter-spacing:  .09em;
     text-transform:  uppercase;
@@ -228,7 +238,8 @@ html.light {
     padding:     10px 14px;
     color:       var(--text);
     font-family: 'IBM Plex Mono', monospace;
-    font-size:   13px;
+    font-size:   14px;
+    font-weight: 500;
     width:       100%;
   }
   .input-base::placeholder { color: var(--text4); }
@@ -256,8 +267,9 @@ html.light {
 
   .field-label {
     font-family:    'IBM Plex Mono', monospace;
-    font-size:      10px;
-    color:          var(--text3);
+    font-size:      11px;
+    font-weight:    600;
+    color:          var(--text2);
     text-transform: uppercase;
     letter-spacing: .08em;
     display:        block;
@@ -403,10 +415,11 @@ html.light {
   .btn-ghost {
     background:    transparent;
     border:        1px solid var(--border2);
-    color:         var(--text2);
+    color:         var(--text);
     border-radius: 8px;
     padding:       9px 20px;
     font-size:     13px;
+    font-weight:   500;
     font-family:   'Space Grotesk', sans-serif;
     cursor:        pointer;
     transition:    all .18s;
@@ -451,7 +464,8 @@ html.light {
     padding:        3px 10px;
     border-radius:  20px;
     font-family:    'IBM Plex Mono', monospace;
-    font-size:      10px;
+    font-size:      11px;
+    font-weight:    600;
     text-transform: uppercase;
     letter-spacing: .05em;
     border:         1px solid;
@@ -613,16 +627,18 @@ html.light {
   }
   .page-header { margin-bottom: 28px; }
   .page-title {
-    font-size:      24px;
+    font-size:      26px;
     font-weight:    700;
     letter-spacing: -.025em;
     color:          var(--text);
+    line-height:    1.2;
   }
   .page-sub {
     font-family: 'IBM Plex Mono', monospace;
-    font-size:   12px;
+    font-size:   13px;
+    font-weight: 500;
     color:       var(--text3);
-    margin-top:  4px;
+    margin-top:  6px;
   }
 
   /* ── Divider ──────────────────────────────────────────────── */

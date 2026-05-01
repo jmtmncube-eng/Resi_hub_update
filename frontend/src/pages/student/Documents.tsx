@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { getMyDocuments, submitPaymentProof, initiateRentInvoice } from '../../services/document.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatPeriod, formatRand } from '../../utils/period';
 import { ResidentDocument } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import InvoiceModal from '../../components/InvoiceModal';
@@ -236,7 +237,7 @@ export default function Documents() {
                             }}>
                               <div style={{ marginBottom: 12 }}>
                                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
-                                  Proof of Payment — <span style={{ color: 'var(--rose)' }}>{doc.period}</span>
+                                  Proof of Payment — <span style={{ color: 'var(--rose)' }}>{formatPeriod(doc.period)}</span>
                                 </p>
                                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
                                   Upload a screenshot or photo of your bank transfer, EFT receipt, or payment slip.
@@ -347,7 +348,7 @@ export default function Documents() {
             setPayRentOpen(false);
             // Open the inline upload panel for the new invoice straight away
             expandPanel(doc.id);
-            toast.success(`Invoice for ${doc.period} ready — upload your proof of payment`);
+            toast.success(`Invoice for ${formatPeriod(doc.period)} ready — upload your proof of payment`);
           }}
         />
       )}
@@ -572,12 +573,12 @@ function DocRow({
               : 'Official Letter'}
           </p>
           <span style={{ color: 'var(--text4)', fontSize: 12 }}>—</span>
-          <p style={{ fontSize: 13, color: 'var(--text2)' }}>{doc.period}</p>
+          <p style={{ fontSize: 13, color: 'var(--text2)' }}>{formatPeriod(doc.period)}</p>
           <ProofBadge status={doc.proofStatus} />
         </div>
         {doc.amount && doc.amount !== '—' && (
           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-            {doc.amount}
+            {formatRand(doc.amount)}
           </p>
         )}
         {doc.signedAt && doc.signedByName && (

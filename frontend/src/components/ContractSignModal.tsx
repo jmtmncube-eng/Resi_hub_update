@@ -6,6 +6,7 @@ import { ResidentDocument } from '../types/domain.types';
 import { signContract } from '../services/document.service';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
+import { formatPeriod } from '../utils/period';
 
 interface Props {
   doc: ResidentDocument | null;
@@ -95,7 +96,7 @@ export default function ContractSignModal({ doc, onClose }: Props) {
 
   <div class="section">
     <div class="section-title">Lease Terms</div>
-    <p>Period: <strong>${doc.period}</strong></p>
+    <p>Period: <strong>${formatPeriod(doc.period)}</strong></p>
     <p>Monthly Rent: <strong>${doc.amount ?? (user?.allocation ? 'R' + Number(user?.allocation?.rent ?? 0).toLocaleString() : '—')}</strong></p>
     <p>Room Type: <strong>${user?.allocation?.room.type ?? '—'}</strong></p>
     ${user?.allocation?.moveIn ? `<p>Move-in Date: <strong>${format(new Date(user.allocation.moveIn), 'dd MMMM yyyy')}</strong></p>` : ''}
@@ -185,7 +186,7 @@ export default function ContractSignModal({ doc, onClose }: Props) {
         <div style={{ padding: '24px' }}>
           {/* Contract summary */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <InfoBlock label="Period" value={doc.period} />
+            <InfoBlock label="Period" value={formatPeriod(doc.period)} />
             <InfoBlock label="Monthly Rent" value={doc.amount ?? (user?.allocation ? `R${Number(user.allocation.rent).toLocaleString()}` : '—')} />
             {user?.allocation && <>
               <InfoBlock label="Room" value={`Room ${user.allocation.room.number} · Block ${user.allocation.room.block}`} />

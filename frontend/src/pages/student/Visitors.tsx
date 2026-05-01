@@ -10,6 +10,7 @@ import { getMyPasses, createPass, cancelPass } from '../../services/visitor.serv
 import { VisitorPass } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import ConfirmModal from '../../components/ConfirmModal';
+import { Modal } from '../../components/Modal';
 import { format } from 'date-fns';
 
 const formSchema = z.object({
@@ -121,15 +122,16 @@ export default function Visitors() {
         </div>
       )}
 
-      {/* QR Modal — centered card with breathing room around the QR */}
-      {qrPass && (
-        <div className="modal-overlay" onClick={() => setQrPass(null)}>
-          <div className="modal-card appear" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+      {/* QR Modal — body-portalled so it always covers the viewport,
+          regardless of any transform-stacking-context ancestors. */}
+      <Modal open={!!qrPass} onClose={() => setQrPass(null)} maxWidth={380}>
+        {qrPass && (
+          <>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Visitor pass</h3>
-                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Visitor pass</h3>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
                   Show this at the gate
                 </p>
               </div>
@@ -161,28 +163,29 @@ export default function Visitors() {
               <span style={{
                 display: 'inline-block',
                 padding: '3px 12px', borderRadius: 999,
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
-                background: 'var(--bg3)', color: 'var(--text3)',
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, fontWeight: 600,
+                background: 'var(--bg3)', color: 'var(--text2)',
                 border: '1px solid var(--border)',
                 letterSpacing: '.05em', textTransform: 'uppercase',
               }}>
                 {qrPass.qrCode}
               </span>
               <p style={{
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)',
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: 'var(--text2)',
                 marginTop: 6,
               }}>
                 {format(new Date(qrPass.date), 'EEE, dd MMM yyyy')}
               </p>
               <p style={{
-                fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)',
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--cyan)',
+                fontWeight: 600,
               }}>
                 {qrPass.timeFrom} – {qrPass.timeTo}
               </p>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Pass list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

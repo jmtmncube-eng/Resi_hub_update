@@ -6,6 +6,7 @@ import { ResidentDocument } from '../types/domain.types';
 import { useAuth } from '../contexts/AuthContext';
 import { submitPaymentProof } from '../services/document.service';
 import { format } from 'date-fns';
+import { formatPeriod, formatRand } from '../utils/period';
 
 interface Props {
   doc: ResidentDocument | null;
@@ -112,13 +113,13 @@ export default function InvoiceModal({ doc, onClose }: Props) {
     </div>
     <div>
       <div class="label">Invoice Details</div>
-      <div class="value">Period: ${doc!.period}<br/>Issue Date: ${format(new Date(doc!.createdAt), 'dd MMMM yyyy')}<br/>Due: Net 30 days</div>
+      <div class="value">Period: ${formatPeriod(doc!.period)}<br/>Issue Date: ${format(new Date(doc!.createdAt), 'dd MMMM yyyy')}<br/>Due: Net 30 days</div>
     </div>
   </div>
   <table>
     <thead><tr><th>Description</th><th>Period</th><th style="text-align:right">Amount</th></tr></thead>
     <tbody>
-      <tr><td>Monthly Rent — ${user?.allocation ? `Room ${user.allocation.room.number} (${user.allocation.room.type})` : 'Student Accommodation'}</td><td>${doc!.period}</td><td style="text-align:right;font-family:monospace">${doc!.amount ?? user?.allocation ? 'R' + Number(user?.allocation?.rent ?? 0).toLocaleString() : '—'}</td></tr>
+      <tr><td>Monthly Rent — ${user?.allocation ? `Room ${user.allocation.room.number} (${user.allocation.room.type})` : 'Student Accommodation'}</td><td>${formatPeriod(doc!.period)}</td><td style="text-align:right;font-family:monospace">${formatRand(doc!.amount ?? user?.allocation?.rent)}</td></tr>
     </tbody>
     <tfoot>
       <tr class="total-row"><td colspan="2">Total Due</td><td style="text-align:right;font-family:monospace">${doc!.amount ?? (user?.allocation ? 'R' + Number(user?.allocation?.rent ?? 0).toLocaleString() : '—')}</td></tr>
@@ -196,7 +197,7 @@ export default function InvoiceModal({ doc, onClose }: Props) {
             <div>
               <p className="micro-label" style={{ marginBottom: 8 }}>Invoice Details</p>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)' }}>
-                Period: {doc.period}
+                Period: {formatPeriod(doc.period)}
               </p>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>
                 Issued: {format(new Date(doc.createdAt), 'dd MMM yyyy')}
@@ -218,7 +219,7 @@ export default function InvoiceModal({ doc, onClose }: Props) {
                 <p style={{ fontSize: 13, color: 'var(--text)' }}>
                   Monthly Rent {user?.allocation ? `— Room ${user.allocation.room.number} (${user.allocation.room.type})` : '— Student Accommodation'}
                 </p>
-                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{doc.period}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{formatPeriod(doc.period)}</p>
               </div>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
                 {doc.amount ?? (user?.allocation ? `R${Number(user.allocation.rent).toLocaleString()}` : '—')}
