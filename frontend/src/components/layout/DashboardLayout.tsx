@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
   Building2, SquareStack, Ticket, Megaphone, ClipboardList, Gift, BookUser,
-  Sun, Moon, CreditCard, Settings,
+  Sun, Moon, CreditCard,
 } from 'lucide-react';
 import { useAuth }  from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';

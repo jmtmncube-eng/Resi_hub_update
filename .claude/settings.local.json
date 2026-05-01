@@ -15,7 +15,9 @@
       "Bash(sort -t: -k2 -rn)",
       "Bash(docker exec *)",
       "Bash(docker restart *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(del \"C:\\\\Users\\\\mbong\\\\OneDrive\\\\Documents\\\\Projects\\\\Resi-Hub\\\\frontend\\\\src\\\\pages\\\\admin\\\\AdminOccupancy.tsx\")"
     ]
   }
 }
