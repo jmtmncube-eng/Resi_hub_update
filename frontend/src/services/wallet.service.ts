@@ -21,3 +21,8 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   const res = await api.get<ApiResponse<LeaderboardEntry[]>>('/wallet/leaderboard');
   return res.data.data;
 }
+
+export async function submitTaskProof(voucherId: string, proofUrl: string): Promise<{ message: string }> {
+  const res = await api.post<ApiResponse<{ message: string }>>(`/wallet/task-proof/${voucherId}`, { proofUrl });
+  return res.data.data;
+}
