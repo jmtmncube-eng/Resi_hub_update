@@ -2,10 +2,22 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import * as svc from '../services/news.service';
 
-export async function getAll(req: Request, res: Response, next: NextFunction) {
+export async function getAll(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const filter = req.query.type as string | undefined;
-    res.json({ success: true, data: await svc.getAllNews(filter) });
+    res.json({ success: true, data: await svc.getAllNews(filter, req.user?.userId) });
+  } catch (err) { next(err); }
+}
+
+export async function markRead(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.markNewsRead(req.params.id, req.user!.userId) });
+  } catch (err) { next(err); }
+}
+
+export async function markAllRead(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.markAllNewsRead(req.user!.userId) });
   } catch (err) { next(err); }
 }
 

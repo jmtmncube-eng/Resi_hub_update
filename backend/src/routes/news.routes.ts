@@ -8,10 +8,12 @@ import { createNewsSchema } from '../validators/news.validator';
 const router = Router();
 router.use(authenticate);
 
-router.get('/',        ctrl.getAll);
-router.get('/:id',     ctrl.getOne);
-router.post('/',       requireRole('ADMIN'), validate(createNewsSchema), ctrl.create);
-router.patch('/:id/pin', requireRole('ADMIN'), ctrl.pin);
-router.delete('/:id',  requireRole('ADMIN'), ctrl.remove);
+router.get('/',           ctrl.getAll);
+router.post('/read-all',  ctrl.markAllRead);
+router.get('/:id',        ctrl.getOne);
+router.post('/:id/read',  ctrl.markRead);
+router.post('/',          requireRole('ADMIN'), validate(createNewsSchema), ctrl.create);
+router.patch('/:id/pin',  requireRole('ADMIN'), ctrl.pin);
+router.delete('/:id',     requireRole('ADMIN'), ctrl.remove);
 
 export default router;

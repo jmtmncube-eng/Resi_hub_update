@@ -22,12 +22,19 @@ export async function getDashboard(userId: string) {
 
   if (!user) throw new AppError('User not found', 404);
 
-  // Pinned news
-  const pinnedNews = await prisma.news.findMany({
+  // Pinned news (with per-user read flag)
+  const pinnedRaw = await prisma.news.findMany({
     where: { pinned: true },
     orderBy: { createdAt: 'desc' },
     take: 3,
-    include: { author: { select: { name: true } } },
+    include: {
+      author: { select: { name: true } },
+      reads:  { where: { userId }, select: { id: true } },
+    },
+  });
+  const pinnedNews = pinnedRaw.map(item => {
+    const { reads, ...rest } = item as any;
+    return { ...rest, read: !!(reads && reads.length > 0) };
   });
 
   // Active chores for the user's block

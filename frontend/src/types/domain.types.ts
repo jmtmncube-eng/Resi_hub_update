@@ -29,6 +29,7 @@ export interface NewsItem {
   date:      string;
   body:      string;
   createdAt: string;
+  read?:     boolean;
   author?:   { id: string; name: string };
 }
 
@@ -63,6 +64,8 @@ export interface ChoreLog {
   user?: { name: string };
 }
 
+export type ChoreProofStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export interface Chore {
   id:          string;
   icon:        string;
@@ -73,6 +76,13 @@ export interface Chore {
   claimedById?: string;
   doneById?:    string;
   doneAt?:      string;
+  proofUrl?:    string | null;
+  proofStatus?: ChoreProofStatus | null;
+  proofSubmittedAt?: string | null;
+  approvalDeadline?: string | null;
+  approvedAt?:  string | null;
+  approvedById?: string | null;
+  adminNote?:   string | null;
   createdAt:    string;
   logs:         ChoreLog[];
 }

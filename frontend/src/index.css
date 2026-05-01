@@ -71,8 +71,16 @@ html.light {
   button {
     cursor:      pointer;
     font-family: 'Space Grotesk', sans-serif;
-    transition:  all .18s;
+    transition:  background .22s cubic-bezier(.4,0,.2,1),
+                 border-color .22s cubic-bezier(.4,0,.2,1),
+                 color .22s cubic-bezier(.4,0,.2,1),
+                 transform .15s cubic-bezier(.4,0,.2,1),
+                 box-shadow .22s cubic-bezier(.4,0,.2,1),
+                 opacity .22s cubic-bezier(.4,0,.2,1);
   }
+  button:active:not(:disabled) { transform: scale(.97); }
+
+  a { transition: color .18s cubic-bezier(.4,0,.2,1); }
 
   textarea { resize: vertical; }
 
@@ -96,6 +104,21 @@ html.light {
 @keyframes appear {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232,25,122,.55); transform: scale(1); }
+  50%      { box-shadow: 0 0 0 6px rgba(232,25,122,0); transform: scale(1.08); }
+}
+
+@keyframes softPulse {
+  0%, 100% { opacity: .6; }
+  50%      { opacity: 1;  }
 }
 
 @keyframes toastIn {
@@ -130,8 +153,45 @@ html.light {
 
 @layer components {
 
-  /* ── Appear animation ─────────────────────────────────────── */
-  .appear { animation: appear .3s ease forwards; }
+  /* ── Appear animations ────────────────────────────────────── */
+  .appear   { animation: appear .35s cubic-bezier(.4,0,.2,1) forwards; }
+  .fade-up  { animation: fadeUp .45s cubic-bezier(.4,0,.2,1) forwards; opacity: 0; }
+
+  /* Stagger children fade-up (1..6). Apply on a parent: */
+  .stagger > * { animation: fadeUp .45s cubic-bezier(.4,0,.2,1) both; }
+  .stagger > *:nth-child(1) { animation-delay: .04s; }
+  .stagger > *:nth-child(2) { animation-delay: .09s; }
+  .stagger > *:nth-child(3) { animation-delay: .14s; }
+  .stagger > *:nth-child(4) { animation-delay: .19s; }
+  .stagger > *:nth-child(5) { animation-delay: .24s; }
+  .stagger > *:nth-child(6) { animation-delay: .29s; }
+  .stagger > *:nth-child(7) { animation-delay: .34s; }
+  .stagger > *:nth-child(8) { animation-delay: .39s; }
+
+  /* Hover lift — applies to interactive cards/buttons */
+  .hover-lift {
+    transition: transform .22s cubic-bezier(.4,0,.2,1),
+                box-shadow .22s cubic-bezier(.4,0,.2,1),
+                border-color .22s cubic-bezier(.4,0,.2,1),
+                background .22s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px -16px rgba(0,0,0,.55);
+  }
+
+  /* Soft press effect — buttons */
+  .press-soft { transition: transform .15s cubic-bezier(.4,0,.2,1); }
+  .press-soft:active { transform: scale(.97); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .appear, .fade-up, .stagger > *, .hover-lift, .press-soft {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
+    }
+  }
 
   /* ── Typography helpers ───────────────────────────────────── */
   .section-title {

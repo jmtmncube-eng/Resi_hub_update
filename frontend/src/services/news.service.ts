@@ -28,3 +28,12 @@ export async function togglePin(id: string): Promise<NewsItem> {
 export async function deleteNews(id: string): Promise<void> {
   await api.delete(`/news/${id}`);
 }
+
+export async function markNewsRead(id: string): Promise<void> {
+  await api.post(`/news/${id}/read`);
+}
+
+export async function markAllNewsRead(): Promise<{ count: number }> {
+  const res = await api.post<ApiResponse<{ count: number }>>('/news/read-all');
+  return res.data.data;
+}

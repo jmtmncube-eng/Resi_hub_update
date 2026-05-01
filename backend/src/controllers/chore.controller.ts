@@ -25,8 +25,26 @@ export async function unclaimChore(req: AuthRequest, res: Response, next: NextFu
 
 export async function completeChore(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { note } = req.body;
-    res.json({ success: true, data: await svc.completeChore(req.params.id, req.user!.userId, note) });
+    const { note, proofUrl } = req.body;
+    res.json({ success: true, data: await svc.completeChore(req.params.id, req.user!.userId, proofUrl, note) });
+  } catch (err) { next(err); }
+}
+
+export async function getPendingApprovals(_req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.getPendingApprovals() });
+  } catch (err) { next(err); }
+}
+
+export async function approveChoreProof(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.approveChoreProof(req.params.id, req.user!.userId) });
+  } catch (err) { next(err); }
+}
+
+export async function rejectChoreProof(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.rejectChoreProof(req.params.id, req.user!.userId, req.body?.adminNote) });
   } catch (err) { next(err); }
 }
 

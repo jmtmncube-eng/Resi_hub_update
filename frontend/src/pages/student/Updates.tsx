@@ -1,25 +1,66 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Newspaper, Pin } from 'lucide-react';
-import { getNews } from '../../services/news.service';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Newspaper, Pin, CheckCheck } from 'lucide-react';
+import { getNews, markNewsRead, markAllNewsRead } from '../../services/news.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { toast } from 'sonner';
 
 const FILTERS = ['All', 'maintenance', 'wifi', 'grounds', 'notice'];
 
 export default function Updates() {
   usePageTitle('Residence Updates');
   const [filter, setFilter] = useState('All');
+  const qc = useQueryClient();
+  const seenRef = useRef<Set<string>>(new Set());
 
   const { data: news = [], isLoading } = useQuery({
     queryKey: ['news', filter],
     queryFn:  () => getNews(filter === 'All' ? undefined : filter),
   });
 
+  // Mark items as read when they appear (1.2s after render — gives the user a beat to actually see them)
+  useEffect(() => {
+    const unread = news.filter(n => !n.read && !seenRef.current.has(n.id));
+    if (unread.length === 0) return;
+    const timer = setTimeout(() => {
+      unread.forEach(n => {
+        seenRef.current.add(n.id);
+        markNewsRead(n.id).catch(() => {});
+      });
+      qc.invalidateQueries({ queryKey: ['news'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [news, qc]);
+
+  const markAll = useMutation({
+    mutationFn: markAllNewsRead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['news'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success('All notifications marked as read');
+    },
+  });
+
+  const unreadCount = news.filter(n => !n.read).length;
+
   return (
     <div className="space-y-5 appear">
-      <div>
-        <h1 className="page-title">Residence Updates</h1>
-        <p className="page-sub">Notices and announcements from management</p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">Residence Updates</h1>
+          <p className="page-sub">
+            Notices and announcements from management
+            {unreadCount > 0 && (
+              <span style={{ color: 'var(--rose)', marginLeft: 8 }}>· {unreadCount} unread</span>
+            )}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={() => markAll.mutate()} disabled={markAll.isPending} className="btn-ghost" style={{ padding: '7px 14px', fontSize: 12 }}>
+            <CheckCheck size={13} /> Mark all read
+          </button>
+        )}
       </div>
 
       {/* Filter chips */}
@@ -56,11 +97,25 @@ export default function Updates() {
               </div>
             )
             : news.map(item => (
-              <div key={item.id} className="card-sm" style={{
+              <div key={item.id} className="card-sm hover-lift" style={{
                 padding: '18px 20px',
-                borderColor: item.pinned ? 'rgba(0,204,204,.25)' : 'var(--border)',
-                background: item.pinned ? 'linear-gradient(135deg, rgba(0,204,204,.04), var(--bg2))' : 'var(--bg2)',
+                position: 'relative',
+                borderColor: !item.read ? 'rgba(232,25,122,.30)' : item.pinned ? 'rgba(0,204,204,.25)' : 'var(--border)',
+                background: !item.read
+                  ? 'linear-gradient(135deg, rgba(232,25,122,.05), var(--bg2))'
+                  : item.pinned
+                    ? 'linear-gradient(135deg, rgba(0,204,204,.04), var(--bg2))'
+                    : 'var(--bg2)',
+                opacity: item.read ? .92 : 1,
               }}>
+                {!item.read && (
+                  <span aria-label="Unread" style={{
+                    position: 'absolute', top: 14, left: -3,
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: 'var(--rose)',
+                    boxShadow: '0 0 12px rgba(232,25,122,.7)',
+                  }}/>
+                )}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{

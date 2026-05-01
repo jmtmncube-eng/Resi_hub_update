@@ -109,6 +109,7 @@ model User {
   documents          Document[]
   auditLogs          AuditLog[]
   newsAuthored       News[]
+  newsReads          NewsRead[]
   voucherClaims      VoucherClaim[]
 
   @@index([role])
@@ -194,22 +195,31 @@ model VisitorPass {
 }
 
 model Chore {
-  id          String    @id @default(cuid())
-  icon        String
-  name        String
-  description String
-  frequency   String
-  block       String
-  claimedById String?
-  doneById    String?
-  doneAt      DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  icon            String
+  name            String
+  description     String
+  frequency       String
+  block           String
+  claimedById     String?
+  doneById        String?
+  doneAt          DateTime?
+  // Proof + admin approval workflow
+  proofUrl        String?
+  proofStatus     String?   // PENDING | APPROVED | REJECTED
+  proofSubmittedAt DateTime?
+  approvalDeadline DateTime?
+  approvedAt      DateTime?
+  approvedById    String?
+  adminNote       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Relations
   logs ChoreLog[]
 
   @@index([block])
+  @@index([proofStatus])
 }
 
 model ChoreLog {
@@ -328,10 +338,25 @@ model News {
   updatedAt DateTime @updatedAt
 
   // Relations
-  author User @relation(fields: [authorId], references: [id])
+  author User       @relation(fields: [authorId], references: [id])
+  reads  NewsRead[]
 
   @@index([pinned])
   @@index([createdAt])
+}
+
+model NewsRead {
+  id     String   @id @default(cuid())
+  newsId String
+  userId String
+  readAt DateTime @default(now())
+
+  // Relations
+  news News @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, userId])
+  @@index([userId])
 }
 
 model Document {

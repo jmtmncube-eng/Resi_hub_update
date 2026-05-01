@@ -52,8 +52,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Notifications banner (pinned only) */}
-      {pinnedNews.length > 0 && (
+      {/* Notifications banner — unread pinned only */}
+      {(() => {
+        const unreadPinned = pinnedNews.filter((n: any) => !n.read);
+        if (unreadPinned.length === 0) return null;
+        return (
         <Link to={ROUTES.UPDATES} style={{ display: 'block', textDecoration: 'none' }}>
           <div className="glass-card" style={{
             padding: '14px 18px',
@@ -78,17 +81,18 @@ export default function Dashboard() {
                 width: 16, height: 16, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontFamily: "'IBM Plex Mono', monospace",
-              }}>{pinnedNews.length}</span>
+                animation: 'pulseDot 1.6s ease-in-out infinite',
+              }}>{unreadPinned.length}</span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                 <Pin size={10} style={{ color: 'var(--rose)' }} />
                 <span className="micro-label" style={{ margin: 0, color: 'var(--rose)' }}>
-                  {pinnedNews.length === 1 ? 'Pinned notice' : `${pinnedNews.length} pinned notices`}
+                  {unreadPinned.length === 1 ? 'New pinned notice' : `${unreadPinned.length} new pinned notices`}
                 </span>
               </div>
               <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {pinnedNews[0].title}
+                {unreadPinned[0].title}
               </p>
             </div>
             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', flexShrink: 0 }}>
@@ -96,10 +100,11 @@ export default function Dashboard() {
             </span>
           </div>
         </Link>
-      )}
+        );
+      })()}
 
       {/* KPI stat row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
         <StatCard
           label="Monthly Rent"
           value={allocation ? `R${Number(allocation.rent).toLocaleString()}` : '—'}
@@ -127,7 +132,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger">
 
         {/* Maintenance tickets */}
         <Section

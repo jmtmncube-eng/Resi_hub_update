@@ -2,12 +2,43 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { CreateNewsInput } from '../validators/news.validator';
 
-export async function getAllNews(filter?: string) {
-  return prisma.news.findMany({
+export async function getAllNews(filter?: string, userId?: string) {
+  const items = await prisma.news.findMany({
     where: filter && filter !== 'All' ? { type: filter } : undefined,
-    include: { author: { select: { id: true, name: true } } },
+    include: {
+      author: { select: { id: true, name: true } },
+      reads:  userId ? { where: { userId }, select: { id: true, readAt: true } } : false,
+    },
     orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
   });
+  // Flatten read flag for the requesting user
+  return items.map(item => {
+    const reads = (item as any).reads as { id: string; readAt: Date }[] | undefined;
+    const { reads: _omit, ...rest } = item as any;
+    return { ...rest, read: !!(reads && reads.length > 0) };
+  });
+}
+
+export async function markNewsRead(newsId: string, userId: string) {
+  await prisma.news.findUniqueOrThrow({ where: { id: newsId } }).catch(() => {
+    throw new AppError('News item not found', 404);
+  });
+  await prisma.newsRead.upsert({
+    where:  { newsId_userId: { newsId, userId } },
+    update: {},
+    create: { newsId, userId },
+  });
+  return { newsId, read: true };
+}
+
+export async function markAllNewsRead(userId: string) {
+  const all = await prisma.news.findMany({ select: { id: true } });
+  if (all.length === 0) return { count: 0 };
+  await prisma.newsRead.createMany({
+    data: all.map(n => ({ newsId: n.id, userId })),
+    skipDuplicates: true,
+  });
+  return { count: all.length };
 }
 
 export async function getNewsById(id: string) {

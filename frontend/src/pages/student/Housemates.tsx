@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, CheckCircle2, Loader2 } from 'lucide-react';
+import { Users, CheckCircle2, Loader2, Camera, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getHousemates } from '../../services/housemate.service';
-import { getChores, claimChore, unclaimChore, completeChore } from '../../services/chore.service';
+import { getChores, claimChore, unclaimChore } from '../../services/chore.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Chore } from '../../types/domain.types';
+import ChoreProofModal from '../../components/ChoreProofModal';
 
 export default function Housemates() {
   usePageTitle('Housemates');
   const [tab, setTab] = useState<'mates'|'chores'>('mates');
+  const [proofChore, setProofChore] = useState<Chore | null>(null);
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -26,15 +28,6 @@ export default function Housemates() {
     mutationFn: unclaimChore,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['chores'] }); toast.success('Chore unclaimed.'); },
     onError:   () => toast.error('Failed to unclaim chore.'),
-  });
-  const { mutate: complete } = useMutation({
-    mutationFn: (id: string) => completeChore(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['chores'] });
-      qc.invalidateQueries({ queryKey: ['wallet'] });
-      toast.success('Chore completed! +20 🪙');
-    },
-    onError: () => toast.error('Failed to complete chore.'),
   });
 
   return (
@@ -100,6 +93,8 @@ export default function Housemates() {
         </div>
       )}
 
+      <ChoreProofModal chore={proofChore} onClose={() => setProofChore(null)} />
+
       {/* Chore board tab */}
       {tab === 'chores' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -110,7 +105,7 @@ export default function Housemates() {
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
-              Complete +20 🪙
+              Complete +20 🪙 (admin-approved)
             </span>
           </div>
           {cLoading
@@ -119,7 +114,7 @@ export default function Housemates() {
               <ChoreCard key={chore.id} chore={chore} userId={user!.id}
                 onClaim={() => claim(chore.id)}
                 onUnclaim={() => unclaim(chore.id)}
-                onComplete={() => complete(chore.id)}
+                onComplete={() => setProofChore(chore)}
                 loading={claiming}
               />
             ))
@@ -134,49 +129,92 @@ function ChoreCard({ chore, userId, onClaim, onUnclaim, onComplete, loading }: {
   chore: Chore; userId: string;
   onClaim: () => void; onUnclaim: () => void; onComplete: () => void; loading: boolean;
 }) {
-  const isMine  = chore.claimedById === userId;
-  const isDone  = !!chore.doneById;
-  const claimed = !!chore.claimedById;
+  const isMine     = chore.claimedById === userId;
+  const isMineDone = chore.doneById === userId;
+  const proofState = chore.proofStatus ?? null;
+  const isPending  = proofState === 'PENDING' && isMineDone;
+  const isApproved = proofState === 'APPROVED';
+  const isRejected = proofState === 'REJECTED';
+  const claimed    = !!chore.claimedById;
+  const dimmed     = isApproved;
+
+  // Border color reflects state
+  const borderColor =
+    isApproved ? 'rgba(74,222,128,.25)' :
+    isPending  ? 'rgba(232,25,122,.25)' :
+    isRejected ? 'rgba(239,68,68,.30)'  :
+    isMine     ? 'rgba(0,204,204,.20)'  :
+    'var(--border)';
 
   return (
-    <div className="card-sm" style={{
+    <div className="card-sm hover-lift" style={{
       padding: '14px 16px',
-      borderColor: isDone ? 'rgba(74,222,128,.2)' : isMine ? 'rgba(0,204,204,.2)' : 'var(--border)',
-      opacity: isDone ? .7 : 1,
-      transition: 'opacity .2s',
+      borderColor,
+      opacity: dimmed ? .65 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
           <span style={{ fontSize: 20, marginTop: 1 }}>{chore.icon}</span>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{chore.name}</p>
             <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{chore.frequency}</p>
             <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3, lineHeight: 1.5 }}>{chore.description}</p>
+
+            {/* Proof state strip */}
+            {isPending && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--rose)' }}>
+                <Clock size={11} />
+                <span>Awaiting admin review · +20 🪙 unlocks on approval</span>
+              </div>
+            )}
+            {isApproved && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: '#4ade80' }}>
+                <CheckCircle2 size={11} />
+                <span>Approved · +20 🪙 added</span>
+              </div>
+            )}
+            {isRejected && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 8, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: '#f87171' }}>
+                <AlertTriangle size={11} style={{ marginTop: 1 }} />
+                <span>Rejected{chore.adminNote ? ` — ${chore.adminNote}` : ''}. You can resubmit.</span>
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-          {isDone && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: '#4ade80' }}>
-              <CheckCircle2 size={12} /> Done
-            </span>
+          {isApproved && (
+            <span className="badge badge-cyan" style={{ borderColor: '#4ade80', color: '#4ade80' }}>Done</span>
           )}
-          {!isDone && isMine && (
+          {isPending && (
+            <span className="badge badge-rose">Pending</span>
+          )}
+          {!isApproved && !isPending && isMine && (
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={onComplete} style={{ padding: '5px 10px', background: 'rgba(74,222,128,.12)', color: '#4ade80', border: '1px solid rgba(74,222,128,.2)', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" }}>
-                Mark done
+              <button onClick={onComplete} style={{
+                padding: '6px 12px', background: 'rgba(232,25,122,.10)', color: 'var(--rose)',
+                border: '1px solid rgba(232,25,122,.25)', borderRadius: 6, fontSize: 12,
+                cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                transition: 'all .22s cubic-bezier(.4,0,.2,1)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,25,122,.18)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(232,25,122,.10)'; }}>
+                <Camera size={12} /> {isRejected ? 'Resubmit proof' : 'Submit proof'}
               </button>
-              <button onClick={onUnclaim} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }}>
-                Unclaim
-              </button>
+              {!isRejected && (
+                <button onClick={onUnclaim} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }}>
+                  Unclaim
+                </button>
+              )}
             </div>
           )}
-          {!isDone && !claimed && (
+          {!isApproved && !isPending && !isMine && !claimed && (
             <button onClick={onClaim} disabled={loading} className="btn-primary" style={{ padding: '5px 12px', fontSize: 12 }}>
               {loading && <Loader2 size={11} className="animate-spin" />}
               Claim +5🪙
             </button>
           )}
-          {!isDone && claimed && !isMine && (
+          {!isApproved && !isPending && claimed && !isMine && (
             <span className="badge badge-gray">Claimed</span>
           )}
         </div>
