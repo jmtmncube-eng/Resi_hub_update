@@ -7,7 +7,8 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
-import IsometricScene from '../../components/IsometricScene';
+import IsometricScene  from '../../components/IsometricScene';
+import SparkParticles  from '../../components/SparkParticles';
 
 const loginSchema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -124,6 +125,8 @@ export default function Login() {
           backgroundSize: '28px 28px',
           pointerEvents: 'none',
         }}/>
+        {/* Rising sparks */}
+        <SparkParticles color="#E8197A" rate={0.22} />
 
         <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="appear">
 

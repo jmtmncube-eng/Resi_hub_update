@@ -1,7 +1,10 @@
-import { X, Download, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { X, Download, CheckCircle2, AlertCircle, Upload, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ResidentDocument } from '../types/domain.types';
 import { useAuth } from '../contexts/AuthContext';
+import { submitPaymentProof } from '../services/document.service';
 import { format } from 'date-fns';
 
 interface Props {
@@ -11,6 +14,32 @@ interface Props {
 
 export default function InvoiceModal({ doc, onClose }: Props) {
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+
+  const uploadProof = useMutation({
+    mutationFn: (proofUrl: string) => submitPaymentProof(doc!.id, proofUrl),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['documents'] });
+      toast.success('Proof of payment uploaded! Admin will review shortly.');
+      setProofPreview(null);
+    },
+    onError: () => toast.error('Failed to upload proof.'),
+  });
+
+  function pickProof() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (re) => setProofPreview(re.target?.result as string);
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
 
   useEffect(() => {
     if (!doc) return;
@@ -194,6 +223,43 @@ export default function InvoiceModal({ doc, onClose }: Props) {
           {isOverdue && (
             <div style={{ background: 'rgba(232,25,122,.08)', border: '1px solid rgba(232,25,122,.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 20 }}>
               <p style={{ fontSize: 12, color: 'var(--rose)' }}>⚠ This invoice is overdue. Please contact admin to arrange payment.</p>
+            </div>
+          )}
+
+          {/* Proof of payment section */}
+          {!isPaid && (
+            <div style={{ marginBottom: 20 }}>
+              {doc.proofStatus === 'SUBMITTED' ? (
+                <div style={{ background: 'rgba(167,139,250,.07)', border: '1px solid rgba(167,139,250,.2)', borderRadius: 8, padding: '10px 14px' }}>
+                  <p style={{ fontSize: 12, color: '#a78bfa' }}>📎 Proof of payment submitted — awaiting admin review.</p>
+                </div>
+              ) : doc.proofStatus === 'CLEARED' ? (
+                <div style={{ background: 'rgba(0,204,204,.06)', border: '1px solid rgba(0,204,204,.2)', borderRadius: 8, padding: '10px 14px' }}>
+                  <p style={{ fontSize: 12, color: 'var(--cyan)' }}>✓ Payment cleared by admin.</p>
+                </div>
+              ) : (
+                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '14px 16px' }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 8 }}>Upload proof of payment</p>
+                  {doc.proofStatus === 'REJECTED' && (
+                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--rose)', marginBottom: 8 }}>⚠ Previous proof was rejected. Please upload a new one.</p>
+                  )}
+                  {proofPreview ? (
+                    <div style={{ marginBottom: 10 }}>
+                      <img src={proofPreview} alt="Proof preview" style={{ maxHeight: 140, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'contain' }} />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button onClick={() => uploadProof.mutate(proofPreview)} disabled={uploadProof.isPending} className="btn-primary" style={{ padding: '7px 16px', fontSize: 12 }}>
+                          {uploadProof.isPending ? <><Loader2 size={12} className="animate-spin" /> Uploading…</> : <><CheckCircle2 size={12} /> Submit</>}
+                        </button>
+                        <button onClick={() => setProofPreview(null)} className="btn-ghost" style={{ padding: '7px 12px', fontSize: 12 }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={pickProof} className="btn-ghost" style={{ padding: '8px 16px', fontSize: 12 }}>
+                      <Upload size={13} /> Select image…
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

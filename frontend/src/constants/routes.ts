@@ -18,14 +18,16 @@ export const ROUTES = {
   ROOMS:       '/rooms',
 
   // Admin
-  ADMIN:             '/admin',
-  ADMIN_OCCUPANCY:   '/admin/occupancy',
-  ADMIN_ALLOCATIONS: '/admin/allocations',
-  ADMIN_MAINTENANCE: '/admin/maintenance',
-  ADMIN_NEWS:        '/admin/news',
-  ADMIN_VISITORS:    '/admin/visitors',
-  ADMIN_REWARDS:     '/admin/rewards',
-  ADMIN_ACCOUNTS:    '/admin/accounts',
+  ADMIN:              '/admin',
+  ADMIN_OCCUPANCY:    '/admin/occupancy',
+  ADMIN_ALLOCATIONS:  '/admin/allocations',
+  ADMIN_MAINTENANCE:  '/admin/maintenance',
+  ADMIN_NEWS:         '/admin/news',
+  ADMIN_VISITORS:     '/admin/visitors',
+  ADMIN_REWARDS:      '/admin/rewards',
+  ADMIN_ACCOUNTS:     '/admin/accounts',
+  ADMIN_PAYMENTS:     '/admin/payments',
+  ADMIN_SETTINGS:     '/admin/settings',
 } as const;
 
 /** Where to redirect after login, keyed by role */

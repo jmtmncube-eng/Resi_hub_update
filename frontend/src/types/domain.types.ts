@@ -97,13 +97,25 @@ export interface WalletData {
 }
 
 export interface Voucher {
-  id:          string;
-  name:        string;
-  description: string;
-  cost:        number;
-  icon:        string;
-  stock:       number;
-  isActive:    boolean;
+  id:            string;
+  name:          string;
+  description:   string;
+  cost:          number;
+  icon:          string;
+  stock:         number;
+  isActive:      boolean;
+  requiresProof: boolean;
+  taskTitle:     string | null;
+  pin:           string | null;   // revealed only after claim approved
+  imageUrl:      string | null;   // revealed only after claim approved
+  myClaim:       VoucherClaim | null;
+}
+
+export interface VoucherClaim {
+  id:        string;
+  status:    'PENDING' | 'APPROVED' | 'REJECTED';
+  proofUrl:  string | null;
+  createdAt: string;
 }
 
 export interface LeaderboardEntry {
@@ -125,6 +137,9 @@ export interface ResidentDocument {
   fileUrl?:      string;
   signedAt?:     string;
   signedByName?: string;
+  proofUrl?:     string;
+  proofStatus?:  string;   // SUBMITTED | CLEARED | REJECTED
+  clearedAt?:    string;
   createdAt:     string;
 }
 

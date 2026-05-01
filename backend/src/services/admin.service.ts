@@ -200,9 +200,65 @@ export async function updateAccount(id: string, data: UpdateAccountInput) {
   });
 }
 
+// ── Revenue Report ────────────────────────────────────────────
+export async function getRevenueReport() {
+  // All invoices with user info
+  const invoices = await prisma.document.findMany({
+    where:   { type: 'INVOICE' },
+    include: { user: { select: { id: true, name: true, email: true, allocation: { select: { rent: true } } } } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Monthly buckets
+  const monthMap = new Map<string, { expected: number; cleared: number; submitted: number; pending: number }>();
+  for (const inv of invoices) {
+    const key = inv.period; // e.g. "April 2026"
+    if (!monthMap.has(key)) monthMap.set(key, { expected: 0, cleared: 0, submitted: 0, pending: 0 });
+    const bucket  = monthMap.get(key)!;
+    const amount  = Number(inv.amount?.replace(/[^0-9.]/g, '') ?? 0);
+    bucket.expected += amount;
+    if (inv.proofStatus === 'CLEARED') bucket.cleared   += amount;
+    if (inv.proofStatus === 'SUBMITTED') bucket.submitted += amount;
+    if (!inv.proofStatus || inv.proofStatus === 'REJECTED') bucket.pending += amount;
+  }
+
+  // Active allocations → monthly expected revenue
+  const activeAllocs = await prisma.allocation.findMany({
+    where:   { status: 'ACTIVE' },
+    select:  { rent: true, user: { select: { name: true, email: true } }, room: { select: { number: true, block: true } } },
+  });
+  const projectedMonthly = activeAllocs.reduce((s, a) => s + Number(a.rent), 0);
+
+  // Late payers: invoices that are Overdue or Pending (not CLEARED) older than 30 days
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const latePayers = invoices.filter(
+    inv => (inv.status === 'Overdue' || inv.status === 'Pending') &&
+           inv.proofStatus !== 'CLEARED' &&
+           new Date(inv.createdAt) < thirtyDaysAgo,
+  );
+
+  return {
+    monthlyBreakdown: Array.from(monthMap.entries()).map(([period, v]) => ({ period, ...v })),
+    projectedMonthly,
+    latePayers: latePayers.map(inv => ({
+      id:          inv.id,
+      period:      inv.period,
+      amount:      inv.amount,
+      status:      inv.status,
+      proofStatus: inv.proofStatus,
+      user:        inv.user,
+      createdAt:   inv.createdAt,
+    })),
+    totalActiveStudents: activeAllocs.length,
+  };
+}
+
 // ── Rewards / Vouchers ────────────────────────────────────────
 export async function getAllVouchers() {
-  return prisma.voucher.findMany({ orderBy: { cost: 'asc' } });
+  return prisma.voucher.findMany({
+    orderBy: { cost: 'asc' },
+    include: { _count: { select: { claims: true } } },
+  });
 }
 
 export async function createVoucher(data: CreateVoucherInput) {
@@ -244,6 +300,64 @@ export async function awardCredits(data: AwardCreditsInput) {
         note:     data.note,
       },
     });
+  });
+}
+
+// ── Voucher Claims (task-based vouchers) ──────────────────────
+export async function getVoucherClaims(status?: string) {
+  return prisma.voucherClaim.findMany({
+    where: status ? { status } : undefined,
+    include: {
+      voucher: { select: { id: true, name: true, icon: true, cost: true, pin: true, imageUrl: true } },
+      user:    { select: { id: true, name: true, email: true, avatarUrl: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function approveVoucherClaim(claimId: string, adminId: string) {
+  const claim = await prisma.voucherClaim.findUnique({
+    where:   { id: claimId },
+    include: { voucher: true, user: { include: { wallet: true } } },
+  });
+  if (!claim)                    throw new AppError('Claim not found', 404);
+  if (claim.status !== 'PENDING') throw new AppError('Claim already processed', 409);
+
+  return prisma.$transaction(async (tx) => {
+    // Update claim status
+    await tx.voucherClaim.update({
+      where: { id: claimId },
+      data:  { status: 'APPROVED', approvedBy: adminId, approvedAt: new Date() },
+    });
+
+    // Award credits
+    let wallet = await tx.wallet.findUnique({ where: { userId: claim.userId } });
+    if (!wallet) wallet = await tx.wallet.create({ data: { userId: claim.userId, credits: 0 } });
+
+    await tx.wallet.update({
+      where: { userId: claim.userId },
+      data:  { credits: { increment: claim.voucher.cost } },
+    });
+
+    return tx.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        type:     'EARN',
+        amount:   claim.voucher.cost,
+        note:     `Task approved: ${claim.voucher.name}`,
+      },
+    });
+  });
+}
+
+export async function rejectVoucherClaim(claimId: string, adminNote?: string) {
+  const claim = await prisma.voucherClaim.findUnique({ where: { id: claimId } });
+  if (!claim)                    throw new AppError('Claim not found', 404);
+  if (claim.status !== 'PENDING') throw new AppError('Claim already processed', 409);
+
+  return prisma.voucherClaim.update({
+    where: { id: claimId },
+    data:  { status: 'REJECTED', adminNote: adminNote ?? null },
   });
 }
 

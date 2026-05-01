@@ -108,6 +108,22 @@ html.light {
   to   { background-position:  200% 0; }
 }
 
+/* Liquid-glass blob drift animations */
+@keyframes blob1 {
+  0%,100% { transform: translate(0, 0)   scale(1);    }
+  33%     { transform: translate(40px,-30px) scale(1.08); }
+  66%     { transform: translate(-20px,20px) scale(.95); }
+}
+@keyframes blob2 {
+  0%,100% { transform: translate(0, 0)   scale(1);    }
+  33%     { transform: translate(-50px,25px) scale(1.06); }
+  66%     { transform: translate(30px,-40px) scale(.97); }
+}
+@keyframes blob3 {
+  0%,100% { transform: translate(0, 0)   scale(1);    }
+  50%     { transform: translate(20px, 50px) scale(1.05); }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    COMPONENT CLASSES
    ═══════════════════════════════════════════════════════════════ */
@@ -186,17 +202,24 @@ html.light {
 
   /* ── Cards ────────────────────────────────────────────────── */
   .card {
-    background:    var(--bg2);
-    border:        1px solid var(--border);
-    border-radius: 12px;
-    padding:       24px;
+    background:      rgba(22,22,27,.75);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border:          1px solid var(--border);
+    border-radius:   12px;
+    padding:         24px;
   }
   .card-sm {
-    background:    var(--bg2);
-    border:        1px solid var(--border);
-    border-radius: 10px;
-    padding:       18px;
+    background:      rgba(22,22,27,.75);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border:          1px solid var(--border);
+    border-radius:   10px;
+    padding:         18px;
   }
+
+  html.light .card    { background: rgba(255,255,255,.72); }
+  html.light .card-sm { background: rgba(255,255,255,.72); }
 
   /* KPI stat card with top accent stripe */
   .kpi-card {

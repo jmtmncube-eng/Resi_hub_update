@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker --version)",
+      "Bash(docker-compose --version)",
+      "Bash(docker compose *)",
+      "Bash(docker info *)",
+      "Bash(docker context *)",
+      "Bash(npm --version)",
+      "Bash(psql --version)",
+      "Bash(tasklist)",
+      "Bash(wsl --list --running)",
+      "Bash(wsl --list)",
+      "Bash(sc query *)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(docker exec *)",
+      "Bash(docker restart *)",
+      "Bash(git add *)"
+    ]
+  }
+}

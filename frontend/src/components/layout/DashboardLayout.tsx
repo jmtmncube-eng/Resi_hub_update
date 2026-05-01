@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
   Building2, SquareStack, Ticket, Megaphone, ClipboardList, Gift, BookUser,
-  Sun, Moon,
+  Sun, Moon, CreditCard, Settings,
 } from 'lucide-react';
 import { useAuth }  from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -30,11 +30,13 @@ const adminNav = [
   { to: ROUTES.ADMIN,             label: 'Overview',    icon: LayoutDashboard },
   { to: ROUTES.ADMIN_OCCUPANCY,   label: 'Occupancy',   icon: Building2       },
   { to: ROUTES.ADMIN_ALLOCATIONS, label: 'Allocations', icon: SquareStack     },
+  { to: ROUTES.ADMIN_PAYMENTS,    label: 'Payments',    icon: CreditCard      },
   { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets',     icon: Ticket          },
   { to: ROUTES.ADMIN_NEWS,        label: 'News',        icon: Megaphone       },
   { to: ROUTES.ADMIN_VISITORS,    label: 'Visitors',    icon: QrCode          },
   { to: ROUTES.ADMIN_REWARDS,     label: 'Rewards',     icon: Gift            },
   { to: ROUTES.ADMIN_ACCOUNTS,    label: 'Accounts',    icon: BookUser        },
+  { to: ROUTES.ADMIN_SETTINGS,    label: 'Settings',    icon: Settings        },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -196,8 +198,31 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 28px' }} className="appear">
-          {children}
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 28px', position: 'relative' }} className="appear">
+          {/* Liquid-glass ambient blobs */}
+          <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', top: '-15%', left: '10%',
+              width: 520, height: 520, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(0,204,204,.055) 0%, transparent 70%)',
+              animation: 'blob1 18s ease-in-out infinite',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: '-10%', right: '8%',
+              width: 480, height: 480, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(232,25,122,.045) 0%, transparent 70%)',
+              animation: 'blob2 22s ease-in-out infinite',
+            }} />
+            <div style={{
+              position: 'absolute', top: '40%', left: '55%',
+              width: 340, height: 340, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(0,204,204,.03) 0%, transparent 70%)',
+              animation: 'blob3 26s ease-in-out infinite',
+            }} />
+          </div>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

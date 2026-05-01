@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import * as adminService from '../services/admin.service';
 
 // ── Overview ──────────────────────────────────────────────────
@@ -92,6 +93,38 @@ export async function deleteVoucher(req: Request, res: Response, next: NextFunct
 export async function awardCredits(req: Request, res: Response, next: NextFunction) {
   try {
     const data = await adminService.awardCredits(req.body);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+// ── Revenue Report ────────────────────────────────────────────
+export async function getRevenueReport(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.getRevenueReport();
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+// ── Voucher Claims ────────────────────────────────────────────
+export async function getVoucherClaims(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { status } = req.query as { status?: string };
+    const data = await adminService.getVoucherClaims(status);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+export async function approveVoucherClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.approveVoucherClaim(req.params.id, req.user!.userId);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+export async function rejectVoucherClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { adminNote } = req.body as { adminNote?: string };
+    const data = await adminService.rejectVoucherClaim(req.params.id, adminNote);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }

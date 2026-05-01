@@ -1,6 +1,6 @@
 // ResiHub — Prisma Schema
 // Database: PostgreSQL 15+
-// Last Updated: 2026-03-25
+// Last Updated: 2026-05-01
 
 generator client {
   provider      = "prisma-client-js"
@@ -107,6 +107,7 @@ model User {
   documents          Document[]
   auditLogs          AuditLog[]
   newsAuthored       News[]
+  voucherClaims      VoucherClaim[]
 
   @@index([role])
   @@index([email])
@@ -255,18 +256,45 @@ model WalletTransaction {
 }
 
 model Voucher {
-  id          String   @id @default(cuid())
-  name        String
-  description String
-  cost        Int
-  icon        String
-  stock       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  cost          Int
+  icon          String
+  stock         Int      @default(0)
+  isActive      Boolean  @default(true)
+  // Task-voucher fields
+  requiresProof Boolean  @default(false)
+  taskTitle     String?
+  pin           String?
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   redemptions VoucherRedemption[]
+  claims      VoucherClaim[]
+}
+
+model VoucherClaim {
+  id         String    @id @default(cuid())
+  voucherId  String
+  userId     String
+  proofUrl   String?
+  status     String    @default("PENDING")  // PENDING | APPROVED | REJECTED
+  approvedBy String?
+  approvedAt DateTime?
+  adminNote  String?
+  createdAt  DateTime  @default(now())
+
+  // Relations
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId],    references: [id], onDelete: Cascade)
+
+  @@unique([voucherId, userId])
+  @@index([status])
+  @@index([voucherId])
+  @@index([userId])
 }
 
 model VoucherRedemption {
@@ -314,6 +342,11 @@ model Document {
   fileUrl      String?
   signedAt     DateTime?
   signedByName String?
+  // Payment proof
+  proofUrl     String?
+  proofStatus  String?      // SUBMITTED | CLEARED | REJECTED
+  clearedAt    DateTime?
+  clearedBy    String?
   createdAt    DateTime     @default(now())
 
   // Relations
@@ -321,6 +354,19 @@ model Document {
 
   @@index([userId])
   @@index([type])
+  @@index([proofStatus])
+}
+
+// Single-row settings table (id always = "settings")
+model ResidenceSettings {
+  id          String   @id @default("settings")
+  name        String   @default("ResiHub Student Residence")
+  tagline     String?
+  address     String?
+  phone       String?
+  email       String?
+  description String?
+  updatedAt   DateTime @updatedAt
 }
 
 model AuditLog {

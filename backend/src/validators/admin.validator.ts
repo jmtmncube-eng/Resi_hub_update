@@ -20,20 +20,28 @@ export const updateAccountSchema = z.object({
 });
 
 export const createVoucherSchema = z.object({
-  name:        z.string().min(2),
-  description: z.string().min(5),
-  cost:        z.number().int().positive(),
-  stock:       z.number().int().min(0),
-  icon:        z.string().default('🎁'),
+  name:          z.string().min(2),
+  description:   z.string().min(5),
+  cost:          z.number().int().positive(),
+  stock:         z.number().int().min(0),
+  icon:          z.string().default('🎁'),
+  requiresProof: z.boolean().optional(),
+  taskTitle:     z.string().optional(),
+  pin:           z.string().optional(),
+  imageUrl:      z.string().optional(),
 });
 
 export const updateVoucherSchema = z.object({
-  name:        z.string().min(2).optional(),
-  description: z.string().min(5).optional(),
-  cost:        z.number().int().positive().optional(),
-  stock:       z.number().int().min(0).optional(),
-  icon:        z.string().optional(),
-  isActive:    z.boolean().optional(),
+  name:          z.string().min(2).optional(),
+  description:   z.string().min(5).optional(),
+  cost:          z.number().int().positive().optional(),
+  stock:         z.number().int().min(0).optional(),
+  icon:          z.string().optional(),
+  isActive:      z.boolean().optional(),
+  requiresProof: z.boolean().optional(),
+  taskTitle:     z.string().optional(),
+  pin:           z.string().optional(),
+  imageUrl:      z.string().optional(),
 });
 
 export const awardCreditsSchema = z.object({

@@ -36,6 +36,8 @@ import AdminNews        from './pages/admin/AdminNews';
 import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
 import AdminAccounts    from './pages/admin/AdminAccounts';
+import AdminPayments    from './pages/admin/AdminPayments';
+import AdminSettings    from './pages/admin/AdminSettings';
 
 /** Wraps a page component with DashboardLayout + ErrorBoundary */
 function Page({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
@@ -90,6 +92,8 @@ function App() {
           <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
           <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
           <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
+          <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={ADMIN}><AdminPayments /></Page>} />
+          <Route path={ROUTES.ADMIN_SETTINGS}    element={<Page roles={ADMIN}><AdminSettings /></Page>} />
 
           {/* ── Default ────────────────────────────────────── */}
           <Route path="/"  element={<Navigate to={ROUTES.LOGIN} replace />} />
