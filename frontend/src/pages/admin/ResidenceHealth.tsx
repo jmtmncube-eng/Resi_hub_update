@@ -11,6 +11,8 @@ import {
 import { getOpsInsights } from '../../services/ops.service';
 import { ROUTES } from '../../constants/routes';
 import { formatPeriod } from '../../utils/period';
+import { useResidence } from '../../contexts/ResidenceContext';
+import { listResidences } from '../../services/residence.service';
 
 /**
  * Business-health summary for the residence. Pulls everything an admin
@@ -19,11 +21,16 @@ import { formatPeriod } from '../../utils/period';
  * the queue, room mix, top earners by chore credit.
  */
 export default function ResidenceHealth() {
+  const { selectedId: residenceId } = useResidence();
   const { data: stats }    = useQuery({ queryKey: ['admin-stats'],     queryFn: getAdminStats });
   const { data: revenue }  = useQuery({ queryKey: ['admin-revenue'],   queryFn: getRevenueReport });
-  const { data: occ }      = useQuery({ queryKey: ['admin-occupancy'], queryFn: () => getOccupancy() });
+  const { data: occ }      = useQuery({
+    queryKey: ['admin-occupancy', residenceId],
+    queryFn:  () => getOccupancy(undefined, residenceId ?? undefined),
+  });
   const { data: accounts } = useQuery({ queryKey: ['admin-accounts'],  queryFn: () => getAccounts() });
   const { data: ops }      = useQuery({ queryKey: ['ops-insights'],    queryFn: getOpsInsights });
+  const { data: residences = [] } = useQuery({ queryKey: ['residences'], queryFn: listResidences });
 
   const rooms       = occ?.rooms ?? [];
   const totalSlots  = rooms.reduce((s, r) => s + (r.capacity ?? 1), 0);
@@ -50,8 +57,41 @@ export default function ResidenceHealth() {
   return (
     <div className="space-y-5">
       <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
-        Live snapshot of residence health — financial, operational, community.
+        {residenceId === null
+          ? 'Portfolio rollup across all residences. Pick one in the picker for a focused view.'
+          : 'Live snapshot of this residence — financial, operational, community.'}
       </p>
+
+      {/* Portfolio rollup table — only when "All residences" is selected */}
+      {residenceId === null && residences.length > 0 && (
+        <div className="card-sm" style={{ padding: '18px 20px' }}>
+          <p className="micro-label" style={{ marginBottom: 12 }}>Per-residence breakdown</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {residences.map(r => (
+              <div key={r.id} style={{
+                display: 'grid',
+                gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
+                gap: 12, alignItems: 'center',
+                padding: '10px 12px', borderRadius: 9,
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+              }}>
+                <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {r.name}
+                </span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)' }}>
+                  {r.filledSlots}/{r.totalSlots} slots
+                </span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: r.occupancyPct >= 90 ? 'var(--cyan)' : r.occupancyPct >= 60 ? '#fb923c' : 'var(--rose)' }}>
+                  {r.occupancyPct}% full
+                </span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--cyan)', fontWeight: 700, textAlign: 'right' }}>
+                  R{r.projectedMonthly.toLocaleString()}/mo
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top KPI grid — operational + financial side-by-side */}
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>

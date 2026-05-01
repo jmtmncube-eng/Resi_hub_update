@@ -11,6 +11,7 @@ import {
   AdminRoom, getAccounts, createAllocation, removeAllocation,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useResidence } from '../../contexts/ResidenceContext';
 
 // ── Room type config ──────────────────────────────────────────
 const SHARING_OPTIONS = [
@@ -46,6 +47,7 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   usePageTitle(hideHeader ? '' : 'Residence · Admin');
   const qc = useQueryClient();
   const [tab, setTab] = useState<'info' | 'rooms'>(initialTab);
+  const { selectedId: residenceId } = useResidence();
 
   // ── Info form state ─────────────────────────────────────────
   const [form, setForm] = useState<Partial<ResidenceSettings>>(BLANK);
@@ -94,8 +96,8 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   ]);
 
   const { data: occupancy, isLoading: occLoading } = useQuery({
-    queryKey: ['admin-occupancy', selectedBlock],
-    queryFn:  () => getOccupancy(selectedBlock || undefined),
+    queryKey: ['admin-occupancy', selectedBlock, residenceId],
+    queryFn:  () => getOccupancy(selectedBlock || undefined, residenceId ?? undefined),
     enabled:  tab === 'rooms',
   });
 
@@ -156,9 +158,13 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
         return setupRoomsMixed({
           blocks: numBlocks,
           mix:    mix.filter(m => m.count > 0),
+          residenceId: residenceId ?? undefined,
         });
       }
-      return setupRooms({ count: roomCount, type: sharingType, blocks: numBlocks, pricePerRoom });
+      return setupRooms({
+        count: roomCount, type: sharingType, blocks: numBlocks, pricePerRoom,
+        residenceId: residenceId ?? undefined,
+      });
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['admin-occupancy'] });

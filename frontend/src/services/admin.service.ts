@@ -7,8 +7,11 @@ export const getAdminStats = async () => {
 };
 
 // ── Occupancy ─────────────────────────────────────────────────
-export const getOccupancy = async (block?: string) => {
-  const res = await api.get('/admin/occupancy', { params: block ? { block } : {} });
+export const getOccupancy = async (block?: string, residenceId?: string) => {
+  const params: Record<string, string> = {};
+  if (block)       params.block = block;
+  if (residenceId) params.residenceId = residenceId;
+  const res = await api.get('/admin/occupancy', { params });
   return res.data.data as { rooms: AdminRoom[]; blocks: string[] };
 };
 
@@ -135,6 +138,7 @@ export const rejectPaymentProof = async (id: string) => {
 // ── Room Setup ────────────────────────────────────────────────
 export const setupRooms = async (body: {
   count: number; type: string; blocks: number; pricePerRoom: number;
+  residenceId?: string;
 }) => {
   const res = await api.post('/admin/setup-rooms', body);
   return res.data.data as AdminRoom[];
@@ -144,6 +148,7 @@ export const setupRooms = async (body: {
 export const setupRoomsMixed = async (body: {
   blocks: number;
   mix:    Array<{ type: string; count: number; price: number }>;
+  residenceId?: string;
 }) => {
   const res = await api.post('/admin/setup-rooms', body);
   return res.data.data as AdminRoom[];

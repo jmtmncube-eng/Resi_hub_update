@@ -13,9 +13,9 @@ export async function getStats(req: Request, res: Response, next: NextFunction) 
 // ── Occupancy ─────────────────────────────────────────────────
 export async function getOccupancy(req: Request, res: Response, next: NextFunction) {
   try {
-    const { block } = req.query as { block?: string };
+    const { block, residenceId } = req.query as { block?: string; residenceId?: string };
     const [rooms, blocks] = await Promise.all([
-      adminService.getOccupancy(block),
+      adminService.getOccupancy(block, residenceId),
       adminService.getBlocks(),
     ]);
     res.json({ success: true, data: { rooms, blocks } });
@@ -31,6 +31,8 @@ export async function setupRooms(req: Request, res: Response, next: NextFunction
       mix?: Array<{ type: string; count: number; price: number }>;
       // Legacy mode
       count?: number; type?: string; pricePerRoom?: number;
+      // Both modes
+      residenceId?: string;
     };
     const VALID_TYPES = ['SINGLE','DOUBLE','TRIPLE','QUAD','STUDIO'] as const;
     type RoomTypeStr = typeof VALID_TYPES[number];
@@ -57,8 +59,9 @@ export async function setupRooms(req: Request, res: Response, next: NextFunction
         }
       }
       const data = await adminService.setupRooms({
-        blocks: Math.max(1, Math.floor(body.blocks ?? 1)),
-        mix:    body.mix.map(m => ({ type: m.type as RoomTypeStr, count: Math.floor(m.count), price: m.price })),
+        blocks:      Math.max(1, Math.floor(body.blocks ?? 1)),
+        mix:         body.mix.map(m => ({ type: m.type as RoomTypeStr, count: Math.floor(m.count), price: m.price })),
+        residenceId: body.residenceId,
       });
       res.json({ success: true, data });
       return;
@@ -79,6 +82,7 @@ export async function setupRooms(req: Request, res: Response, next: NextFunction
       type:  type as 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO',
       blocks: Math.max(1, Math.min(10, Math.floor(blocks ?? 1))),
       pricePerRoom: Number(pricePerRoom) || 0,
+      residenceId: body.residenceId,
     });
     res.json({ success: true, data });
   } catch (e) { next(e); }

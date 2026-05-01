@@ -107,9 +107,13 @@ async function recomputeRoomStatus(roomId: string): Promise<void> {
 }
 
 // ── Occupancy ─────────────────────────────────────────────────
-export async function getOccupancy(block?: string) {
+export async function getOccupancy(block?: string, residenceId?: string) {
+  const where: Record<string, unknown> = {};
+  if (block)       where.block = block;
+  if (residenceId) where.residenceId = residenceId;
+
   const rooms = await prisma.room.findMany({
-    where: block ? { block } : undefined,
+    where,
     include: {
       allocations: {
         where:   { status: { in: ['ACTIVE', 'RESERVED'] } },
@@ -163,12 +167,13 @@ interface SetupRoomsLegacy {
   type:         RoomTypeStr;
   blocks:       number;
   pricePerRoom: number;
+  residenceId?: string;
 }
 
 interface SetupRoomsMixed {
-  blocks: number;
-  /** Mixed-type generation. Each entry creates `count` rooms of that type. */
-  mix:    Array<{ type: RoomTypeStr; count: number; price: number }>;
+  blocks:       number;
+  mix:          Array<{ type: RoomTypeStr; count: number; price: number }>;
+  residenceId?: string;
 }
 
 /**
@@ -179,12 +184,14 @@ interface SetupRoomsMixed {
  *   mix instead of all the singles in Block A and all the doubles in Block B.
  */
 export async function setupRooms(args: SetupRoomsLegacy | SetupRoomsMixed) {
-  // Only remove rooms with NO allocations of any kind. Rooms that still
-  // hold (or once held) tenants stay — we never want to nuke history.
+  // Only remove rooms with NO allocations of any kind, scoped to the
+  // residence we're setting up. Rooms that still hold (or once held)
+  // tenants stay — we never nuke history.
   await prisma.room.deleteMany({
     where: {
       status:      'VACANT',
       allocations: { none: {} },
+      ...(args.residenceId ? { residenceId: args.residenceId } : {}),
     },
   });
 
@@ -213,7 +220,7 @@ export async function setupRooms(args: SetupRoomsLegacy | SetupRoomsMixed) {
 
   const toCreate: Array<{
     number: string; block: string; type: RoomTypeStr; price: number;
-    capacity: number; status: 'VACANT';
+    capacity: number; status: 'VACANT'; residenceId: string | null;
   }> = [];
 
   for (let i = 0; i < flat.length; i++) {
@@ -221,10 +228,11 @@ export async function setupRooms(args: SetupRoomsLegacy | SetupRoomsMixed) {
     counters[letter] = (counters[letter] ?? 100) + 1;
     const { type, price } = flat[i];
     toCreate.push({
-      number:   `${letter}${counters[letter]}`,
-      block:    letter,
+      number:      `${letter}${counters[letter]}`,
+      block:       letter,
       type,
       price,
+      residenceId: args.residenceId ?? null,
       capacity: TYPE_CAPACITY[type] ?? 1,
       status:   'VACANT',
     });

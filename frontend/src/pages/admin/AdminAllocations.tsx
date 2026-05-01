@@ -8,6 +8,7 @@ import {
   AdminAllocation,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useResidence } from '../../contexts/ResidenceContext';
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:   'badge-cyan',
@@ -23,6 +24,7 @@ interface AdminAllocationsProps {
 export default function AdminAllocations({ hideHeader = false }: AdminAllocationsProps = {}) {
   usePageTitle(hideHeader ? '' : 'Allocations · Admin');
   const qc = useQueryClient();
+  const { selectedId: residenceId } = useResidence();
   const [search, setSearch]       = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId]       = useState<string | null>(null);
@@ -40,8 +42,8 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
   });
 
   const { data: occupancyData } = useQuery({
-    queryKey: ['admin-occupancy-rooms'],
-    queryFn: () => getOccupancy(),
+    queryKey: ['admin-occupancy-rooms', residenceId],
+    queryFn: () => getOccupancy(undefined, residenceId ?? undefined),
   });
 
   // Rooms that have at least one open slot. With multi-tenant rooms,

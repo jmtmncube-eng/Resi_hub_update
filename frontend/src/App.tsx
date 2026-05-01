@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { AuthProvider }     from './contexts/AuthContext';
-import { ThemeProvider }    from './contexts/ThemeContext';
+import { AuthProvider }      from './contexts/AuthContext';
+import { ThemeProvider }     from './contexts/ThemeContext';
+import { ResidenceProvider } from './contexts/ResidenceContext';
 import { ProtectedRoute }   from './components/layout/ProtectedRoute';
 import { DashboardLayout }  from './components/layout/DashboardLayout';
 import { ErrorBoundary }    from './components/ErrorBoundary';
@@ -57,6 +58,7 @@ function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+    <ResidenceProvider>
       <BrowserRouter>
         <Toaster richColors position="bottom-right" theme="dark" />
         <Routes>
@@ -101,6 +103,7 @@ function App() {
 
         </Routes>
       </BrowserRouter>
+    </ResidenceProvider>
     </AuthProvider>
     </ThemeProvider>
   );
