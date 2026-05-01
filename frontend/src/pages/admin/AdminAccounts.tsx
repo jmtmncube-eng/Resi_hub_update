@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck } from 'lucide-react';
+import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAccounts, updateAccount, approveAccount, setAccountActive, AdminAccount } from '../../services/admin.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { Modal } from '../../components/Modal';
 
 // ─────────────────────────────────────────────────────────────────
 // Constants & helpers
@@ -52,6 +53,7 @@ export default function AdminAccounts() {
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<RoleFilter>('all');
   const [editing, setEditing]   = useState<AdminAccount | null>(null);
+  const [promoting, setPromoting] = useState<AdminAccount | null>(null);
 
   const { data: accounts = [], isLoading, isError } = useQuery<AdminAccount[]>({
     queryKey: ['admin-accounts', search],
@@ -286,11 +288,7 @@ export default function AdminAccounts() {
                         )}
                         {a.role === 'ACTIVE_STUDENT' && (
                           <button
-                            onClick={() => {
-                              if (confirm(`Promote ${a.name} to ADMIN?`)) {
-                                promoteMut.mutate({ id: a.id, role: 'ADMIN' });
-                              }
-                            }}
+                            onClick={() => setPromoting(a)}
                             className="btn-ghost press-soft"
                             title="Promote to admin"
                             style={{
@@ -368,6 +366,17 @@ export default function AdminAccounts() {
       )}
 
       {editing && <EditAccountModal account={editing} onClose={() => setEditing(null)} />}
+
+      {/* Promote-to-admin confirmation — replaces the native browser confirm */}
+      <PromoteModal
+        account={promoting}
+        onClose={() => setPromoting(null)}
+        onConfirm={() => {
+          if (promoting) promoteMut.mutate({ id: promoting.id, role: 'ADMIN' });
+          setPromoting(null);
+        }}
+        loading={promoteMut.isPending}
+      />
     </div>
   );
 }
@@ -413,6 +422,32 @@ interface EditFormState {
   university: string; program: string; year: string; bio: string;
 }
 
+// Strict-enough validators. Phone normalises before checking length.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Strip everything that isn't a digit or leading '+', then count digits.
+ *  Accepts SA-style 10-digit (e.g. 0712345678) or full international with +. */
+function validatePhone(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;                              // optional field
+  const digits = trimmed.replace(/[^\d]/g, '');
+  if (trimmed.startsWith('+')) {
+    if (digits.length < 10 || digits.length > 15) {
+      return 'International number must have 10–15 digits';
+    }
+    return null;
+  }
+  if (digits.length !== 10) return 'Phone must be exactly 10 digits';
+  return null;
+}
+
+function validateEmail(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return 'Email is required';
+  if (!EMAIL_RE.test(v)) return 'Enter a valid email address';
+  return null;
+}
+
 function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose: () => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<EditFormState>({
@@ -428,6 +463,12 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
 
   const update = (key: keyof EditFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
+
+  // Live validation — errors only show once the user has typed something
+  const emailError = validateEmail(form.email);
+  const phoneError = validatePhone(form.phone);
+  const nameError  = form.name.trim().length < 2 ? 'Name is too short' : null;
+  const hasErrors  = !!emailError || !!phoneError || !!nameError;
 
   const saveMut = useMutation({
     mutationFn: () => updateAccount(account.id, {
@@ -462,11 +503,20 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-          <ModalField label="Name">
-            <input value={form.name} onChange={update('name')} className="input-base" />
+          <ModalField label="Name" error={nameError}>
+            <input
+              value={form.name} onChange={update('name')}
+              className="input-base"
+              style={nameError ? { borderColor: '#f87171' } : undefined}
+            />
           </ModalField>
-          <ModalField label="Email">
-            <input value={form.email} onChange={update('email')} type="email" className="input-base" />
+          <ModalField label="Email" error={emailError}>
+            <input
+              value={form.email} onChange={update('email')} type="email"
+              autoComplete="email"
+              className="input-base"
+              style={emailError ? { borderColor: '#f87171' } : undefined}
+            />
           </ModalField>
           <ModalField label="Role">
             <select value={form.role} onChange={update('role')} className="input-base">
@@ -475,8 +525,21 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
               <option value="ADMIN">Admin</option>
             </select>
           </ModalField>
-          <ModalField label="Phone">
-            <input value={form.phone} onChange={update('phone')} placeholder="+27 ..." className="input-base" />
+          <ModalField label="Phone" error={phoneError} hint="10 digits — e.g. 0712345678">
+            <input
+              value={form.phone}
+              onChange={e => {
+                // Allow only digits, spaces, +, () and dashes — typical phone chars
+                const cleaned = e.target.value.replace(/[^\d+\s()-]/g, '');
+                setForm(f => ({ ...f, phone: cleaned }));
+              }}
+              placeholder="0712345678"
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={20}
+              className="input-base"
+              style={phoneError ? { borderColor: '#f87171' } : undefined}
+            />
           </ModalField>
           <ModalField label="University">
             <input value={form.university} onChange={update('university')} className="input-base" />
@@ -512,16 +575,27 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <div style={{
+          display: 'flex', gap: 10, marginTop: 22,
+          justifyContent: 'center',                     // centred actions, not flex-stretched
+        }}>
           <button
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || !form.name.trim()}
-            className="btn-primary"
-            style={{ flex: 1, padding: '10px 0', fontSize: 13 }}
+            disabled={saveMut.isPending || hasErrors}
+            className="btn-primary press-soft"
+            style={{
+              minWidth: 160, padding: '10px 22px', fontSize: 13,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
           >
-            {saveMut.isPending ? <Loader2 size={13} className="animate-spin" /> : 'Save changes'}
+            {saveMut.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+            {saveMut.isPending ? 'Saving…' : 'Save changes'}
           </button>
-          <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
+          <button
+            onClick={onClose}
+            className="btn-ghost press-soft"
+            style={{ minWidth: 120, padding: '10px 22px', fontSize: 13, justifyContent: 'center' }}
+          >
             Cancel
           </button>
         </div>
@@ -530,11 +604,171 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
   );
 }
 
-function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+function ModalField({ label, children, error, hint }: {
+  label: string; children: React.ReactNode;
+  error?: string | null; hint?: string;
+}) {
   return (
     <div>
       <label className="field-label">{label}</label>
       {children}
+      {error ? (
+        <p style={{
+          marginTop: 4, fontSize: 11, color: '#f87171',
+          fontFamily: "'IBM Plex Mono', monospace",
+        }}>
+          {error}
+        </p>
+      ) : hint ? (
+        <p style={{
+          marginTop: 4, fontSize: 10, color: 'var(--text3)',
+          fontFamily: "'IBM Plex Mono', monospace",
+        }}>
+          {hint}
+        </p>
+      ) : null}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Promote-to-admin modal — replaces the dated native confirm() dialog
+// ─────────────────────────────────────────────────────────────────
+
+function PromoteModal({
+  account, onClose, onConfirm, loading,
+}: {
+  account: AdminAccount | null;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Modal open={!!account} onClose={onClose} maxWidth={440}>
+      {account && (
+        <>
+          {/* Header — rose accent for "destructive / privilege-elevating" tone */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 11, flexShrink: 0,
+              background: 'rgba(232,25,122,.14)',
+              border: '1px solid rgba(232,25,122,.32)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <ShieldCheck size={20} style={{ color: 'var(--rose)' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
+                Promote to administrator?
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4, lineHeight: 1.5 }}>
+                Admins have full residence-management privileges.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Cancel"
+              className="btn-ghost"
+              style={{ padding: 6, borderRadius: 8, flexShrink: 0 }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* Identity card — show who you're about to promote */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 14px', borderRadius: 10,
+            background: 'var(--bg3)', border: '1px solid var(--border)',
+            marginBottom: 14,
+          }}>
+            {account.avatarUrl ? (
+              <img src={account.avatarUrl} alt="" style={{
+                width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0,
+              }} />
+            ) : (
+              <div className="avatar avatar-cyan" style={{
+                width: 36, height: 36, fontSize: 13, fontWeight: 700, flexShrink: 0,
+              }}>
+                {account.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {account.name}
+              </p>
+              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {account.email}
+              </p>
+            </div>
+            {/* Role transition pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span className="badge badge-cyan" style={{ fontSize: 9 }}>Active</span>
+              <span style={{ color: 'var(--text4)', fontSize: 11 }}>→</span>
+              <span className="badge badge-rose" style={{ fontSize: 9 }}>Admin</span>
+            </div>
+          </div>
+
+          {/* What changes */}
+          <div style={{
+            padding: '12px 14px', borderRadius: 10,
+            background: 'rgba(232,25,122,.05)',
+            border: '1px solid rgba(232,25,122,.18)',
+            marginBottom: 18,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <AlertTriangle size={13} style={{ color: 'var(--rose)', flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                  This unlocks:
+                </p>
+                <ul style={{
+                  listStyle: 'none', padding: 0, margin: '6px 0 0',
+                  fontSize: 12, color: 'var(--text2)', lineHeight: 1.7,
+                }}>
+                  <li>· Manage every residence, room and tenancy</li>
+                  <li>· Approve or reject payments, chores and applicants</li>
+                  <li>· Generate invoices, view financial health</li>
+                  <li>· Activate or deactivate other accounts</li>
+                </ul>
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, fontFamily: "'IBM Plex Mono', monospace" }}>
+                  Their existing room allocation and resident data are preserved.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Centred actions */}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="press-soft"
+              style={{
+                minWidth: 180, padding: '10px 22px',
+                borderRadius: 8, border: 'none',
+                background: 'var(--rose)', color: '#fff',
+                fontSize: 13, fontWeight: 600,
+                fontFamily: "'Space Grotesk', sans-serif",
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? .7 : 1,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {loading
+                ? <><Loader2 size={13} className="animate-spin" /> Promoting…</>
+                : <><ShieldCheck size={13} /> Yes, promote</>}
+            </button>
+            <button
+              onClick={onClose}
+              className="btn-ghost press-soft"
+              style={{ minWidth: 120, padding: '10px 22px', fontSize: 13, justifyContent: 'center' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
