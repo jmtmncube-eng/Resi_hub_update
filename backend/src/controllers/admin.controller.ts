@@ -92,6 +92,18 @@ export async function approveAccount(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
+export async function setAccountActive(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { isActive } = req.body as { isActive?: boolean };
+    if (typeof isActive !== 'boolean') {
+      res.status(400).json({ success: false, error: 'isActive (boolean) is required' });
+      return;
+    }
+    const data = await adminService.setAccountActive(req.params.id, isActive, req.user!.userId);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 // ── Rewards ───────────────────────────────────────────────────
 export async function getVouchers(req: Request, res: Response, next: NextFunction) {
   try {

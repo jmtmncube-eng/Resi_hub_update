@@ -60,3 +60,23 @@ export async function getAllInvoices(req: Request, res: Response, next: NextFunc
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
+
+/** POST /documents/invoices/initiate — student creates a rent invoice for a chosen month */
+export async function initiateRentInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { period } = req.body as { period?: string };
+    if (!period) { res.status(400).json({ success: false, error: 'period (YYYY-MM) is required' }); return; }
+    const doc = await svc.initiateRentInvoice(req.user!.userId, period);
+    res.json({ success: true, data: doc });
+  } catch (err) { next(err); }
+}
+
+/** POST /documents/admin/invoices/bulk — admin generates invoices for all active students */
+export async function bulkCreateInvoices(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { period, includeOwing } = req.body as { period?: string; includeOwing?: boolean };
+    if (!period) { res.status(400).json({ success: false, error: 'period (YYYY-MM) is required' }); return; }
+    const result = await svc.bulkCreateInvoices({ period, includeOwing });
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}

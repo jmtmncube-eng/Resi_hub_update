@@ -38,10 +38,12 @@ html.light {
   --bg3:       #ece6d6;   /* recessed/inputs — toasted cream */
   --border:    rgba(60,45,15,.09);
   --border2:   rgba(60,45,15,.16);
-  --text:      #1a1714;
-  --text2:     rgba(26,23,20,.66);
-  --text3:     rgba(26,23,20,.42);
-  --text4:     rgba(26,23,20,.18);
+  /* Bumped contrast for cream background — pure black is too harsh against
+     warm beige, so we use a deep ink-brown and lift opacity on every tier. */
+  --text:      #14110d;             /* near-black ink */
+  --text2:     rgba(20,17,13,.82);  /* was .66 — was washing out on cream */
+  --text3:     rgba(20,17,13,.62);  /* was .42 */
+  --text4:     rgba(20,17,13,.32);  /* was .18 */
   --input-bg:  rgba(60,45,15,.04);
   --sel-bg:    #f0ebde;
   --hover:     rgba(60,45,15,.035);
@@ -722,38 +724,40 @@ html.light .border-white\/15 { border-color: rgba(0,0,0,.15) !important; }
 html.light .divide-white\/4 > * + * { border-color: rgba(0,0,0,.06) !important; }
 html.light .divide-white\/7 > * + * { border-color: rgba(0,0,0,.07) !important; }
 
-/* Text */
-html.light .text-white        { color: #0f0f12 !important; }
-html.light .text-white\/20    { color: rgba(15,15,18,.20) !important; }
-html.light .text-white\/25    { color: rgba(15,15,18,.25) !important; }
-html.light .text-white\/30    { color: rgba(15,15,18,.30) !important; }
-html.light .text-white\/35    { color: rgba(15,15,18,.35) !important; }
-html.light .text-white\/40    { color: rgba(15,15,18,.40) !important; }
-html.light .text-white\/45    { color: rgba(15,15,18,.45) !important; }
-html.light .text-white\/50    { color: rgba(15,15,18,.50) !important; }
-html.light .text-white\/60    { color: rgba(15,15,18,.60) !important; }
-html.light .text-white\/70    { color: rgba(15,15,18,.70) !important; }
-html.light .text-white\/80    { color: rgba(15,15,18,.80) !important; }
+/* Text — every Tailwind text-white/N opacity rebound to ink-brown so it
+   reads cleanly on the cream background. Floors raised so even faint
+   text remains legible. */
+html.light .text-white        { color: #14110d !important; }
+html.light .text-white\/20    { color: rgba(20,17,13,.45) !important; }
+html.light .text-white\/25    { color: rgba(20,17,13,.50) !important; }
+html.light .text-white\/30    { color: rgba(20,17,13,.55) !important; }
+html.light .text-white\/35    { color: rgba(20,17,13,.58) !important; }
+html.light .text-white\/40    { color: rgba(20,17,13,.62) !important; }
+html.light .text-white\/45    { color: rgba(20,17,13,.66) !important; }
+html.light .text-white\/50    { color: rgba(20,17,13,.70) !important; }
+html.light .text-white\/60    { color: rgba(20,17,13,.76) !important; }
+html.light .text-white\/70    { color: rgba(20,17,13,.82) !important; }
+html.light .text-white\/80    { color: rgba(20,17,13,.88) !important; }
 
 /* Inputs */
 html.light .input-base,
 html.light .input-login {
-  background:   rgba(0,0,0,.03);
-  border-color: rgba(0,0,0,.15);
-  color:        #0f0f12;
+  background:   rgba(60,45,15,.04);
+  border-color: rgba(60,45,15,.18);
+  color:        #14110d;
 }
 html.light .input-base::placeholder,
-html.light .input-login::placeholder { color: rgba(15,15,18,.25); }
+html.light .input-login::placeholder { color: rgba(20,17,13,.45); }
 html.light .input-base:focus,
 html.light .input-login:focus {
-  border-color: #00CCCC;
-  background:   rgba(0,204,204,.05);
+  border-color: #00b3b3;
+  background:   rgba(0,179,179,.06);
 }
-html.light select.input-base option { background: #fbf8f1; color: #1a1714; }
+html.light select.input-base option { background: #fbf8f1; color: #14110d; }
 
 /* Sidebar — cream paper with subtle warm tint */
 html.light aside { background-color: #fbf8f1 !important; }
-html.light body  { background-color: #f7f4ec; color: #1a1714; }
+html.light body  { background-color: #f7f4ec; color: #14110d; }
 
 /* Toast in light mode */
 html.light .toast-success { background: #fbf8f1; }

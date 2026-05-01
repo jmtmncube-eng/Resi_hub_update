@@ -33,6 +33,7 @@ router.patch('/allocations/:id', validate(updateAllocationSchema), ctrl.updateAl
 router.get('/accounts',                                      ctrl.getAccounts);
 router.patch('/accounts/:id', validate(updateAccountSchema), ctrl.updateAccount);
 router.post('/accounts/:id/approve',                         ctrl.approveAccount);
+router.post('/accounts/:id/active',                          ctrl.setAccountActive);
 
 // ── Rewards / Vouchers ────────────────────────────────────────
 router.get('/vouchers',                                      ctrl.getVouchers);

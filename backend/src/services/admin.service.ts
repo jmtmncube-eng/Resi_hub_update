@@ -223,6 +223,7 @@ export async function getAllAccounts(search?: string) {
       year:       true,
       bio:        true,
       avatarUrl:  true,
+      isActive:   true,
       createdAt:  true,
       wallet:     { select: { credits: true } },
       allocation: {
@@ -260,6 +261,27 @@ export async function updateAccount(id: string, data: UpdateAccountInput) {
       university: true, program: true, year: true, bio: true,
       avatarUrl: true, createdAt: true,
     },
+  });
+}
+
+/** Toggle a user's active flag. Deactivated users cannot log in. */
+export async function setAccountActive(id: string, isActive: boolean, adminId: string) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError('User not found', 404);
+  if (user.id === adminId) throw new AppError("You can't deactivate your own account", 400);
+  if (user.role === 'ADMIN' && !isActive) {
+    // Belt-and-braces: prevent locking out the last admin
+    const otherActiveAdmins = await prisma.user.count({
+      where: { role: 'ADMIN', isActive: true, id: { not: id } },
+    });
+    if (otherActiveAdmins === 0) {
+      throw new AppError('Cannot deactivate the only active admin', 400);
+    }
+  }
+  return prisma.user.update({
+    where:  { id },
+    data:   { isActive },
+    select: { id: true, name: true, isActive: true, role: true },
   });
 }
 

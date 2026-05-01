@@ -98,6 +98,7 @@ model User {
   phone        String?
   bio          String?
   onboardedAt  DateTime?  // null = first-time user, show welcome tour
+  isActive     Boolean   @default(true)  // admin-toggleable; false blocks login
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

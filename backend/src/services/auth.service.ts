@@ -25,6 +25,11 @@ export async function loginUser(data: LoginInput) {
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
   }
 
+  // Deactivated accounts can't sign in — admins can re-activate at any time.
+  if (!user.isActive) {
+    throw new AppError('This account has been deactivated. Contact management.', 403, 'ACCOUNT_DEACTIVATED');
+  }
+
   const tokenPayload = { userId: user.id, role: user.role, email: user.email };
   const accessToken  = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);

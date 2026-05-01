@@ -10,7 +10,7 @@ import { Chore } from '../../types/domain.types';
 import ChoreProofModal from '../../components/ChoreProofModal';
 
 export default function Housemates() {
-  usePageTitle('Housemates');
+  usePageTitle('Housemates & Chores');
   const [tab, setTab] = useState<'mates'|'chores'>('mates');
   const [proofChore, setProofChore] = useState<Chore | null>(null);
   const { user } = useAuth();
@@ -33,7 +33,7 @@ export default function Housemates() {
   return (
     <div className="space-y-5 appear">
       <div>
-        <h1 className="page-title">Housemates</h1>
+        <h1 className="page-title">Housemates & Chores</h1>
         <p className="page-sub">Your block community and shared chores</p>
       </div>
 

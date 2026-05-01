@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck } from 'lucide-react';
+import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { getAccounts, updateAccount, approveAccount, AdminAccount } from '../../services/admin.service';
+import { getAccounts, updateAccount, approveAccount, setAccountActive, AdminAccount } from '../../services/admin.service';
+import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 
 // ─────────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ function extractError(err: unknown, fallback: string): string {
 export default function AdminAccounts() {
   usePageTitle('Accounts · Admin');
   const qc = useQueryClient();
+  const { user: me } = useAuth();
 
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<RoleFilter>('all');
@@ -87,6 +89,15 @@ export default function AdminAccounts() {
       toast.success('Role updated');
     },
     onError: (err) => toast.error(extractError(err, 'Failed to change role')),
+  });
+
+  const activeMut = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setAccountActive(id, isActive),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['admin-accounts'] });
+      toast.success(data.isActive ? `${data.name} reactivated` : `${data.name} deactivated`);
+    },
+    onError: (err) => toast.error(extractError(err, 'Failed to change account state')),
   });
 
   if (isError) return (
@@ -166,6 +177,7 @@ export default function AdminAccounts() {
                 <tr>
                   <th>User</th>
                   <th>Role</th>
+                  <th>State</th>
                   <th>Programme</th>
                   <th>Room</th>
                   <th>Credits</th>
@@ -174,20 +186,22 @@ export default function AdminAccounts() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(a => (
-                  <tr key={a.id} className="hover-lift">
+                {filtered.map(a => {
+                  const isDeactivated = a.isActive === false;
+                  return (
+                  <tr key={a.id} className="hover-lift" style={{ opacity: isDeactivated ? 0.55 : 1 }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         {a.avatarUrl ? (
-                          <img src={a.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                          <img src={a.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', filter: isDeactivated ? 'grayscale(1)' : 'none' }} />
                         ) : (
                           <div className={`avatar ${a.role === 'ADMIN' ? 'avatar-rose' : 'avatar-cyan'}`}
-                               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700 }}>
+                               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, filter: isDeactivated ? 'grayscale(1)' : 'none' }}>
                             {a.name.charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div style={{ minWidth: 0 }}>
-                          <p style={{ fontWeight: 500, color: 'var(--text)' }}>{a.name}</p>
+                          <p style={{ fontWeight: 500, color: 'var(--text)', textDecoration: isDeactivated ? 'line-through' : 'none' }}>{a.name}</p>
                           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{a.email}</p>
                         </div>
                       </div>
@@ -196,6 +210,31 @@ export default function AdminAccounts() {
                       <span className={`badge ${ROLE_BADGE[a.role] ?? 'badge-gray'}`}>
                         {roleLabel[a.role] ?? a.role}
                       </span>
+                    </td>
+                    <td>
+                      {isDeactivated ? (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 10, padding: '3px 9px', borderRadius: 999,
+                          background: 'rgba(232,25,122,.12)', color: 'var(--rose)',
+                          border: '1px solid rgba(232,25,122,.3)',
+                          fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em',
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--rose)' }} />
+                          Disabled
+                        </span>
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 10, padding: '3px 9px', borderRadius: 999,
+                          background: 'rgba(74,222,128,.10)', color: '#4ade80',
+                          border: '1px solid rgba(74,222,128,.25)',
+                          fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em',
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80' }} />
+                          Active
+                        </span>
+                      )}
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--text2)' }}>
                       {a.program
@@ -269,10 +308,59 @@ export default function AdminAccounts() {
                         >
                           <Pencil size={11} /> Edit
                         </button>
+                        {/* Self-protection: don't let the current admin disable their own account */}
+                        {a.id !== me?.id && (
+                          isDeactivated ? (
+                            <button
+                              onClick={() => activeMut.mutate({ id: a.id, isActive: true })}
+                              disabled={activeMut.isPending && activeMut.variables?.id === a.id}
+                              className="press-soft"
+                              title="Reactivate account — student can log in again"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px', borderRadius: 7,
+                                fontSize: 12, fontWeight: 600,
+                                background: 'rgba(74,222,128,.12)',
+                                color: '#4ade80',
+                                border: '1px solid rgba(74,222,128,.3)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {activeMut.isPending && activeMut.variables?.id === a.id
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <UserCheck size={11} />} Activate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Deactivate ${a.name}? They won't be able to sign in until reactivated.`)) {
+                                  activeMut.mutate({ id: a.id, isActive: false });
+                                }
+                              }}
+                              disabled={activeMut.isPending && activeMut.variables?.id === a.id}
+                              className="press-soft"
+                              title="Block this account from signing in"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px', borderRadius: 7,
+                                fontSize: 12, fontWeight: 500,
+                                background: 'rgba(232,25,122,.08)',
+                                color: 'var(--rose)',
+                                border: '1px solid rgba(232,25,122,.25)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {activeMut.isPending && activeMut.variables?.id === a.id
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <UserX size={11} />} Deactivate
+                            </button>
+                          )
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

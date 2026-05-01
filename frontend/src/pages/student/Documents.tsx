@@ -3,9 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Download, FileCheck, FileClock, PenLine,
   Eye, Upload, CheckCircle2, Clock, Loader2, ImagePlus,
+  Calendar, X, CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getMyDocuments, submitPaymentProof } from '../../services/document.service';
+import { AxiosError } from 'axios';
+import { getMyDocuments, submitPaymentProof, initiateRentInvoice } from '../../services/document.service';
+import { useAuth } from '../../contexts/AuthContext';
 import { ResidentDocument } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import InvoiceModal from '../../components/InvoiceModal';
@@ -47,10 +50,12 @@ function ProofBadge({ status }: { status?: string }) {
 export default function Documents() {
   usePageTitle('Documents & Invoices');
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   // ── Modal state ──────────────────────────────────────────────
   const [invoiceDoc,  setInvoiceDoc]  = useState<ResidentDocument | null>(null);
   const [contractDoc, setContractDoc] = useState<ResidentDocument | null>(null);
+  const [payRentOpen, setPayRentOpen] = useState(false);
 
   // ── Payment proof state ──────────────────────────────────────
   /** Which invoice row has its inline upload panel open */
@@ -128,9 +133,21 @@ export default function Documents() {
         onChange={onFileSelected}
       />
 
-      <div>
-        <h1 className="page-title">Documents & Invoices</h1>
-        <p className="page-sub">Your invoices, contracts, and official letters</p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">Documents & Invoices</h1>
+          <p className="page-sub">Your invoices, contracts, and official letters</p>
+        </div>
+        {user?.allocation && (
+          <button
+            onClick={() => setPayRentOpen(true)}
+            className="btn-primary press-soft"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13 }}
+          >
+            <CreditCard size={14} />
+            Pay rent
+          </button>
+        )}
       </div>
 
       {/* ── Payment prompt banner ── */}
@@ -319,6 +336,180 @@ export default function Documents() {
       {/* Modals */}
       <InvoiceModal      doc={invoiceDoc}  onClose={() => setInvoiceDoc(null)}  />
       <ContractSignModal doc={contractDoc} onClose={() => setContractDoc(null)} />
+
+      {payRentOpen && (
+        <PayRentModal
+          existingPeriods={new Set(invoices.map(i => i.period).filter(Boolean) as string[])}
+          rentAmount={user?.allocation?.rent != null ? Number(user.allocation.rent) : null}
+          onClose={() => setPayRentOpen(false)}
+          onCreated={(doc) => {
+            qc.invalidateQueries({ queryKey: ['documents'] });
+            setPayRentOpen(false);
+            // Open the inline upload panel for the new invoice straight away
+            expandPanel(doc.id);
+            toast.success(`Invoice for ${doc.period} ready — upload your proof of payment`);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PayRentModal — student picks a month, server creates the invoice
+// ─────────────────────────────────────────────────────────────────
+
+/** Build the next 6 months (current + 5 forward) and the 3 prior months. */
+function monthOptions(): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = -3; i <= 5; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    out.push({ value, label });
+  }
+  return out;
+}
+
+function PayRentModal({
+  existingPeriods, rentAmount, onClose, onCreated,
+}: {
+  existingPeriods: Set<string>;
+  rentAmount: number | null;
+  onClose: () => void;
+  onCreated: (doc: ResidentDocument) => void;
+}) {
+  const months = monthOptions();
+  // Default to the first month the student doesn't already have an invoice for
+  const firstAvailable = months.find(m => !existingPeriods.has(m.value)) ?? months[3];
+  const [period, setPeriod] = useState(firstAvailable.value);
+
+  const create = useMutation({
+    mutationFn: () => initiateRentInvoice(period),
+    onSuccess:  (doc) => onCreated(doc),
+    onError:    (err: unknown) => {
+      const msg = err instanceof AxiosError ? err.response?.data?.error : null;
+      toast.error(msg || 'Failed to create invoice');
+    },
+  });
+
+  const alreadyExists = existingPeriods.has(period);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Pay rent</p>
+            <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+              Pick a month and we'll create your invoice
+            </p>
+          </div>
+          <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }} aria-label="Close">
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Rent preview card */}
+        {rentAmount != null && (
+          <div style={{
+            padding: '14px 16px', marginBottom: 16,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(0,204,204,.08), var(--bg3))',
+            border: '1px solid rgba(0,204,204,.22)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: 'rgba(0,204,204,.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CreditCard size={16} color="var(--cyan)" />
+            </div>
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace" }}>Monthly rent</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                R{rentAmount.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <label className="field-label">
+          <Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+          Which month?
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 8, marginBottom: 14 }}>
+          {months.map(m => {
+            const had = existingPeriods.has(m.value);
+            const active = period === m.value;
+            return (
+              <button
+                key={m.value}
+                onClick={() => setPeriod(m.value)}
+                className="press-soft"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${active ? 'var(--cyan)' : 'var(--border)'}`,
+                  background: active ? 'rgba(0,204,204,.08)' : 'var(--bg3)',
+                  color: active ? 'var(--text)' : 'var(--text2)',
+                  fontSize: 12,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: active ? 600 : 500,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 6,
+                }}
+              >
+                <span>{m.label}</span>
+                {had && (
+                  <span style={{
+                    fontSize: 9, padding: '2px 6px', borderRadius: 999,
+                    background: 'var(--bg2)', color: 'var(--text3)',
+                    fontFamily: "'IBM Plex Mono', monospace",
+                  }}>
+                    on file
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {alreadyExists && (
+          <p style={{
+            padding: '8px 12px', marginBottom: 14,
+            background: 'rgba(167,139,250,.08)',
+            border: '1px solid rgba(167,139,250,.25)',
+            borderRadius: 8,
+            fontSize: 11, color: 'var(--text2)',
+            fontFamily: "'IBM Plex Mono', monospace",
+          }}>
+            You already have an invoice for this month. We'll just open it for you.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => create.mutate()}
+            disabled={create.isPending}
+            className="btn-primary press-soft"
+            style={{ flex: 1, padding: '10px 0', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            {create.isPending
+              ? <><Loader2 size={13} className="animate-spin" /> Creating…</>
+              : alreadyExists ? 'Open invoice' : 'Create invoice'}
+          </button>
+          <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

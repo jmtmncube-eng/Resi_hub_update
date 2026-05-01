@@ -51,6 +51,11 @@ export const approveAccount = async (id: string) => {
   return res.data.data;
 };
 
+export const setAccountActive = async (id: string, isActive: boolean) => {
+  const res = await api.post(`/admin/accounts/${id}/active`, { isActive });
+  return res.data.data;
+};
+
 // ── Rewards ───────────────────────────────────────────────────
 export const getAdminVouchers = async () => {
   const res = await api.get('/admin/vouchers');
@@ -180,6 +185,7 @@ export interface AdminAccount {
   phone: string | null; university: string | null;
   program?: string | null; year?: number | null; bio?: string | null;
   avatarUrl: string | null;
+  isActive?: boolean;
   createdAt: string;
   wallet: { credits: number } | null;
   allocation: { room: { number: string; block: string } } | null;
