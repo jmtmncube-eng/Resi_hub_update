@@ -30,7 +30,7 @@ export interface Room {
   id:     string;
   number: string;
   block:  string;
-  type:   'SINGLE' | 'DOUBLE' | 'STUDIO';
+  type:   'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
   price:  number;
   status: 'VACANT' | 'RESERVED' | 'OCCUPIED';
 }
