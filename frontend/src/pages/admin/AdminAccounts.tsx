@@ -7,6 +7,8 @@ import { getAccounts, updateAccount, approveAccount, setAccountActive, AdminAcco
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
+import { useConfirm } from '../../components/useConfirm';
+import { UserX as UserXIcon } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────
 // Constants & helpers
@@ -49,6 +51,7 @@ export default function AdminAccounts() {
   usePageTitle('Accounts · Admin');
   const qc = useQueryClient();
   const { user: me } = useAuth();
+  const confirm = useConfirm();
 
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<RoleFilter>('all');
@@ -330,10 +333,15 @@ export default function AdminAccounts() {
                             </button>
                           ) : (
                             <button
-                              onClick={() => {
-                                if (confirm(`Deactivate ${a.name}? They won't be able to sign in until reactivated.`)) {
-                                  activeMut.mutate({ id: a.id, isActive: false });
-                                }
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: `Deactivate ${a.name}?`,
+                                  message: `They won't be able to sign in until you reactivate them. Their data, allocation, and history are preserved.`,
+                                  confirmLabel: 'Deactivate',
+                                  tone: 'rose',
+                                  icon: UserXIcon,
+                                });
+                                if (ok) activeMut.mutate({ id: a.id, isActive: false });
                               }}
                               disabled={activeMut.isPending && activeMut.variables?.id === a.id}
                               className="press-soft"

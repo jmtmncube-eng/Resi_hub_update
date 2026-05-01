@@ -9,6 +9,8 @@ import {
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
+import { useConfirm } from '../../components/useConfirm';
+import { Trash2 } from 'lucide-react';
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:   'badge-cyan',
@@ -25,6 +27,7 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
   usePageTitle(hideHeader ? '' : 'Allocations · Admin');
   const qc = useQueryClient();
   const { selectedId: residenceId } = useResidence();
+  const confirm = useConfirm();
   const [search, setSearch]       = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId]       = useState<string | null>(null);
@@ -220,10 +223,15 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
                               Edit
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm(`Remove ${a.user.name} from ${a.room.block}-${a.room.number}? This frees up the slot.`)) {
-                                  removeMut.mutate(a.id);
-                                }
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: `Remove ${a.user.name}?`,
+                                  message: `This frees the slot in Block ${a.room.block} – ${a.room.number}. The student will need to be reallocated to use the residence again.`,
+                                  confirmLabel: 'Remove',
+                                  tone: 'rose',
+                                  icon: Trash2,
+                                });
+                                if (ok) removeMut.mutate(a.id);
                               }}
                               disabled={removeMut.isPending && removeMut.variables === a.id}
                               className="press-soft"

@@ -13,6 +13,7 @@ import {
   Contractor, ContractorType,
 } from '../../services/residence.service';
 import { Modal } from '../../components/Modal';
+import { useConfirm } from '../../components/useConfirm';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { formatPeriod, formatRand } from '../../utils/period';
 
@@ -26,6 +27,7 @@ const TYPE_META: Record<ContractorType, { label: string; icon: typeof Brush; col
 export default function ResidenceContractors() {
   const qc = useQueryClient();
   const { selectedId } = useResidence();
+  const confirm = useConfirm();
   const [adding, setAdding] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
 
@@ -118,10 +120,15 @@ export default function ResidenceContractors() {
               key={c.id}
               contractor={c}
               invoices={invoices.filter(i => i.contractorId === c.id)}
-              onEnd={() => {
-                if (confirm(`End ${c.name}'s contract? They won't be billed for future months.`)) {
-                  endMut.mutate(c.id);
-                }
+              onEnd={async () => {
+                const ok = await confirm({
+                  title: `End ${c.name}'s contract?`,
+                  message: `They won't be billed for future months. Past invoices and history are kept for your records.`,
+                  confirmLabel: 'End contract',
+                  tone: 'rose',
+                  icon: Pause,
+                });
+                if (ok) endMut.mutate(c.id);
               }}
               onPay={(id) => payMut.mutate(id)}
               payingId={payMut.isPending ? payMut.variables : undefined}

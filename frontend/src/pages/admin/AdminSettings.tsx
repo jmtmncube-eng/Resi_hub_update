@@ -12,6 +12,8 @@ import {
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
+import { useConfirm } from '../../components/useConfirm';
+import { UserMinus as UserMinusIcon } from 'lucide-react';
 
 // ── Room type config ──────────────────────────────────────────
 const SHARING_OPTIONS = [
@@ -48,6 +50,7 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   const qc = useQueryClient();
   const [tab, setTab] = useState<'info' | 'rooms'>(initialTab);
   const { selectedId: residenceId } = useResidence();
+  const confirm = useConfirm();
 
   // ── Info form state ─────────────────────────────────────────
   const [form, setForm] = useState<Partial<ResidenceSettings>>(BLANK);
@@ -709,10 +712,15 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                                   )}
                                 </span>
                                 <button
-                                  onClick={() => {
-                                    if (confirm(`Remove ${t.user.name} from ${room.number}?`)) {
-                                      removeTenantMut.mutate(t.allocationId);
-                                    }
+                                  onClick={async () => {
+                                    const ok = await confirm({
+                                      title: `Remove ${t.user.name}?`,
+                                      message: `Frees their slot in room ${room.number}. The student keeps their account — you can reallocate them later.`,
+                                      confirmLabel: 'Remove tenant',
+                                      tone: 'rose',
+                                      icon: UserMinusIcon,
+                                    });
+                                    if (ok) removeTenantMut.mutate(t.allocationId);
                                   }}
                                   className="press-soft"
                                   title="Remove tenant"

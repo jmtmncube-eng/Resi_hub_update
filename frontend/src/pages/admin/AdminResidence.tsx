@@ -11,6 +11,7 @@ import { listResidences, updateResidence, archiveResidence } from '../../service
 import { useResidence } from '../../contexts/ResidenceContext';
 import { ResidencePicker } from '../../components/ResidencePicker';
 import { Modal } from '../../components/Modal';
+import { useConfirm } from '../../components/useConfirm';
 
 import AdminAllocations    from './AdminAllocations';
 import AdminSettings       from './AdminSettings';
@@ -175,6 +176,7 @@ function EditResidenceModal({ residence, onClose }: {
 }) {
   const qc = useQueryClient();
   const { selectedId, setSelectedId } = useResidence();
+  const confirm = useConfirm();
   const [name,    setName]    = useState(residence.name);
   const [tagline, setTagline] = useState(residence.tagline ?? '');
   const [address, setAddress] = useState(residence.address ?? '');
@@ -254,10 +256,15 @@ function EditResidenceModal({ residence, onClose }: {
         marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)',
       }}>
         <button
-          onClick={() => {
-            if (confirm(`Archive "${residence.name}"? Only possible if no rooms are still attached.`)) {
-              archive.mutate();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              title: `Archive "${residence.name}"?`,
+              message: 'Hides this residence from the picker. Only works when no rooms are still attached — otherwise remove or reassign rooms first.',
+              confirmLabel: 'Archive',
+              tone: 'rose',
+              icon: Trash2,
+            });
+            if (ok) archive.mutate();
           }}
           disabled={archive.isPending}
           className="press-soft"

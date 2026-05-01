@@ -14,6 +14,7 @@ import {
   OpsType, OpsService,
 } from '../../services/ops.service';
 import { Modal } from '../../components/Modal';
+import { useConfirm } from '../../components/useConfirm';
 import { format } from 'date-fns';
 
 // ─────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ const SECTIONS: SectionConfig[] = [
 
 export default function ResidenceOps() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [logOpen, setLogOpen] = useState<SectionConfig | null>(null);
 
   const { data: services = [] } = useQuery({
@@ -200,8 +202,15 @@ export default function ResidenceOps() {
             services={services.filter(s => section.serviceTypes.includes(s.type))}
             stock={stock.filter(s => section.stockKeys.includes(s.key))}
             onLog={() => setLogOpen(section)}
-            onDelete={(id) => {
-              if (confirm('Remove this entry?')) removeMut.mutate(id);
+            onDelete={async (id) => {
+              const ok = await confirm({
+                title: 'Remove this entry?',
+                message: 'The cost, cadence and stock impact of this log will be undone in your reports.',
+                confirmLabel: 'Remove',
+                tone: 'rose',
+                icon: Trash2,
+              });
+              if (ok) removeMut.mutate(id);
             }}
             insights={insights}
           />

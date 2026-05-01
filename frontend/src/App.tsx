@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider }      from './contexts/AuthContext';
 import { ThemeProvider }     from './contexts/ThemeContext';
 import { ResidenceProvider } from './contexts/ResidenceContext';
+import { ConfirmProvider }   from './components/useConfirm';
 import { ProtectedRoute }   from './components/layout/ProtectedRoute';
 import { DashboardLayout }  from './components/layout/DashboardLayout';
 import { ErrorBoundary }    from './components/ErrorBoundary';
@@ -63,6 +64,7 @@ function App() {
     <ThemeProvider>
     <AuthProvider>
     <ResidenceProvider>
+    <ConfirmProvider>
       <BrowserRouter>
         <Toaster richColors position="bottom-right" theme="dark" />
         <Routes>
@@ -109,6 +111,7 @@ function App() {
 
         </Routes>
       </BrowserRouter>
+    </ConfirmProvider>
     </ResidenceProvider>
     </AuthProvider>
     </ThemeProvider>
