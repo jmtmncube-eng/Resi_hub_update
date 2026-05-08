@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { sendEmail } from './email.service';
 
 export async function getMyDocuments(userId: string) {
   return prisma.document.findMany({
@@ -139,7 +140,7 @@ export async function initiateRentInvoice(userId: string, period: string) {
   });
   if (existing) return existing;
 
-  return prisma.document.create({
+  const created = await prisma.document.create({
     data: {
       userId,
       type:   'INVOICE',
@@ -148,6 +149,26 @@ export async function initiateRentInvoice(userId: string, period: string) {
       status: 'Pending',
     },
   });
+
+  // Notify the student. Best-effort.
+  sendEmail({
+    to:       user.email,
+    template: 'invoiceCreated',
+    data:     {
+      name:   user.name,
+      period: prettyPeriod(period),
+      amount: Number(user.allocation.rent).toLocaleString(),
+    },
+  }).catch(() => { /* logged inside */ });
+
+  return created;
+}
+
+function prettyPeriod(period: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!m) return period;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
 }
 
 interface BulkInvoiceArgs {

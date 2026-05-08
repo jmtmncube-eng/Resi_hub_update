@@ -21,6 +21,8 @@ import applicationRoutes from './routes/application.routes';
 import settingsRoutes    from './routes/settings.routes';
 import opsRoutes         from './routes/ops.routes';
 import residenceRoutes   from './routes/residence.routes';
+import auditRoutes       from './routes/audit.routes';
+import gateRoutes        from './routes/gate.routes';
 
 const app = express();
 
@@ -38,6 +40,18 @@ const authLimiter = rateLimit({
   max: 20,
   message: { success: false, error: 'Too many requests, please try again later.' },
 });
+
+/** Global per-IP fail-safe — protects the DB from a misbehaving frontend
+ *  (infinite re-render loop, broken polling) hammering an endpoint. Real
+ *  abuse should still hit the dedicated authLimiter on /api/auth. */
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,    // 1 minute
+  max:      600,          // 10 req/sec sustained — generous for legit use
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { success: false, error: 'Too many requests in a short time. Slow down.' },
+});
+app.use('/api', globalLimiter);
 
 // ── Body parsing ───────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -73,6 +87,8 @@ app.use('/api/application', applicationRoutes);
 app.use('/api/settings',    settingsRoutes);
 app.use('/api/admin/ops',         opsRoutes);
 app.use('/api/admin/residences',  residenceRoutes);
+app.use('/api/admin/audit',       auditRoutes);
+app.use('/api/gate',              gateRoutes);   // public — QR is the credential
 
 // ── 404 handler ───────────────────────────────────────────────
 app.use('*', (req, res) => {

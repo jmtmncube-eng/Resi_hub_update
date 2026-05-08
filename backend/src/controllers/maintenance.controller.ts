@@ -32,7 +32,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
 
 export async function getAllTickets(req: Request, res: Response, next: NextFunction) {
   try {
-    const { status, priority, search } = req.query as Record<string, string>;
-    res.json({ success: true, data: await svc.getAllTickets({ status, priority, search }) });
+    const { status, priority, search, residenceId } = req.query as Record<string, string>;
+    res.json({ success: true, data: await svc.getAllTickets({ status, priority, search, residenceId }) });
   } catch (err) { next(err); }
 }

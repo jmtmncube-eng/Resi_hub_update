@@ -22,14 +22,25 @@ import { listResidences } from '../../services/residence.service';
  */
 export default function ResidenceHealth() {
   const { selectedId: residenceId } = useResidence();
-  const { data: stats }    = useQuery({ queryKey: ['admin-stats'],     queryFn: getAdminStats });
-  const { data: revenue }  = useQuery({ queryKey: ['admin-revenue'],   queryFn: getRevenueReport });
+  // Every metric query is now keyed AND scoped on residenceId so swapping
+  // residences in the picker re-fetches scoped numbers (no stale rollup).
+  const { data: stats }    = useQuery({
+    queryKey: ['admin-stats', residenceId],
+    queryFn:  () => getAdminStats(residenceId ?? undefined),
+  });
+  const { data: revenue }  = useQuery({
+    queryKey: ['admin-revenue', residenceId],
+    queryFn:  () => getRevenueReport(residenceId ?? undefined),
+  });
   const { data: occ }      = useQuery({
     queryKey: ['admin-occupancy', residenceId],
     queryFn:  () => getOccupancy(undefined, residenceId ?? undefined),
   });
   const { data: accounts } = useQuery({ queryKey: ['admin-accounts'],  queryFn: () => getAccounts() });
-  const { data: ops }      = useQuery({ queryKey: ['ops-insights'],    queryFn: getOpsInsights });
+  const { data: ops }      = useQuery({
+    queryKey: ['ops-insights', residenceId],
+    queryFn:  () => getOpsInsights(residenceId ?? undefined),
+  });
   const { data: residences = [] } = useQuery({ queryKey: ['residences'], queryFn: listResidences });
 
   const rooms       = occ?.rooms ?? [];

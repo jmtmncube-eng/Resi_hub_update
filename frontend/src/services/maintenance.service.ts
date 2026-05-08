@@ -19,9 +19,9 @@ export async function createTicket(formData: FormData): Promise<MaintenanceTicke
   return res.data.data;
 }
 
-// Admin: all tickets with optional filters
+// Admin: all tickets with optional filters (including residence scope)
 export async function getTickets(filters?: {
-  status?: string; priority?: string; search?: string;
+  status?: string; priority?: string; search?: string; residenceId?: string;
 }): Promise<MaintenanceTicket[]> {
   const res = await api.get<ApiResponse<MaintenanceTicket[]>>('/maintenance/admin/all', {
     params: filters,

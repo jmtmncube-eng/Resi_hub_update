@@ -178,6 +178,7 @@ model Allocation {
 model MaintenanceTicket {
   id          String       @id @default(cuid())
   studentId   String
+  residenceId String?                            // derived from student's allocation at creation; null for orphan/legacy tickets
   category    String
   location    String
   description String
@@ -189,7 +190,8 @@ model MaintenanceTicket {
   updatedAt   DateTime     @updatedAt
 
   // Relations
-  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student   User       @relation(fields: [studentId],   references: [id], onDelete: Cascade)
+  residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
 
   @@index([studentId])
   @@index([status])
@@ -351,24 +353,27 @@ model VoucherRedemption {
 }
 
 model News {
-  id        String   @id @default(cuid())
-  type      String
-  tag       String
-  tagColor  String   @default("#00CCCC")
-  pinned    Boolean  @default(false)
-  authorId  String
-  title     String
-  date      String
-  body      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  residenceId String?                       // null = portfolio-wide announcement (visible to all)
+  type        String
+  tag         String
+  tagColor    String   @default("#00CCCC")
+  pinned      Boolean  @default(false)
+  authorId    String
+  title       String
+  date        String
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  author User       @relation(fields: [authorId], references: [id])
-  reads  NewsRead[]
+  author    User       @relation(fields: [authorId],   references: [id])
+  residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
+  reads     NewsRead[]
 
   @@index([pinned])
   @@index([createdAt])
+  @@index([residenceId])
 }
 
 model NewsRead {
@@ -449,6 +454,7 @@ model AuditLog {
 /// `meta` holds type-specific blobs (litres, kWh, panel readings).
 model OpsService {
   id          String         @id @default(cuid())
+  residenceId String?                            // null = legacy / portfolio-wide
   type        OpsServiceType
   date        DateTime
   amount      Decimal?       @db.Decimal(10, 2)  // R cost; null for telemetry-only
@@ -459,20 +465,30 @@ model OpsService {
   createdById String                             // admin user id (audit)
   createdAt   DateTime       @default(now())
 
+  residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
+
   @@index([type, date])
   @@index([date])
+  @@index([residenceId])
 }
 
 /// Current stock level for consumables we want to know are running out
 /// (chlorine, pH, gas in cylinder, prepaid electricity units).
 model OpsStock {
-  id        String   @id @default(cuid())
-  key       String   @unique             // POOL_CHLORINE, POOL_PH, GAS_KG, ELECTRICITY_UNITS
-  label     String                       // "Chlorine"
-  quantity  Decimal  @db.Decimal(10, 2) @default(0)
-  unit      String                       // "L", "kg", "kWh", "units"
-  threshold Decimal? @db.Decimal(10, 2)  // warn when below
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  residenceId String?                          // null = legacy single-residence data
+  key         String                           // POOL_CHLORINE, POOL_PH, GAS_KG, ELECTRICITY_UNITS
+  label       String                           // "Chlorine"
+  quantity    Decimal  @db.Decimal(10, 2) @default(0)
+  unit        String                           // "L", "kg", "kWh", "units"
+  threshold   Decimal? @db.Decimal(10, 2)      // warn when below
+  updatedAt   DateTime @updatedAt
+
+  residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
+
+  // Composite uniqueness so each residence has its own stock per key.
+  @@unique([residenceId, key])
+  @@index([residenceId])
 }
 
 /// A property an admin manages. One admin can manage many residences.
@@ -491,6 +507,10 @@ model Residence {
 
   rooms       Room[]
   contractors ServiceContractor[]
+  opsServices OpsService[]
+  opsStock    OpsStock[]
+  tickets     MaintenanceTicket[]
+  news        News[]
 }
 
 /// Paid service workers — pool guy, cleaner, gardener, grounds-keeper.

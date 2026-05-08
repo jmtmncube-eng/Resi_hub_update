@@ -26,8 +26,9 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
       setPreview(null); setNote('');
       onClose();
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to submit proof.');
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to submit proof.');
     },
   });
 

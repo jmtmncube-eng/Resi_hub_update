@@ -15,6 +15,7 @@ import {
 } from '../../services/ops.service';
 import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
+import { useResidence } from '../../contexts/ResidenceContext';
 import { format } from 'date-fns';
 
 // ─────────────────────────────────────────────────────────────────
@@ -94,19 +95,22 @@ const SECTIONS: SectionConfig[] = [
 export default function ResidenceOps() {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const { selectedId: residenceId } = useResidence();
   const [logOpen, setLogOpen] = useState<SectionConfig | null>(null);
 
+  // Every ops query keyed on residenceId so the picker actually narrows
+  // the data instead of just labelling it.
   const { data: services = [] } = useQuery({
-    queryKey: ['ops-services'],
-    queryFn:  () => listOpsServices(),
+    queryKey: ['ops-services', residenceId],
+    queryFn:  () => listOpsServices({ residenceId: residenceId ?? undefined }),
   });
   const { data: insights } = useQuery({
-    queryKey: ['ops-insights'],
-    queryFn:  getOpsInsights,
+    queryKey: ['ops-insights', residenceId],
+    queryFn:  () => getOpsInsights(residenceId ?? undefined),
   });
   const { data: stock = [] } = useQuery({
-    queryKey: ['ops-stock'],
-    queryFn:  listOpsStock,
+    queryKey: ['ops-stock', residenceId],
+    queryFn:  () => listOpsStock(residenceId ?? undefined),
   });
 
   const removeMut = useMutation({
@@ -435,6 +439,7 @@ function LogModal({ section, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { selectedId: residenceId } = useResidence();
   const today = new Date().toISOString().slice(0, 10);
   const [type,    setType]    = useState<OpsType>(section.serviceTypes[0]);
   const [date,    setDate]    = useState(today);
@@ -445,7 +450,10 @@ function LogModal({ section, onClose, onSaved }: {
   const [proof,   setProof]   = useState<string | null>(null);
   const [adjustStock, setAdjustStock] = useState<Record<string, string>>({});
 
-  const stockQuery = useQuery({ queryKey: ['ops-stock'], queryFn: listOpsStock });
+  const stockQuery = useQuery({
+    queryKey: ['ops-stock', residenceId],
+    queryFn:  () => listOpsStock(residenceId ?? undefined),
+  });
   const sectionStock = (stockQuery.data ?? []).filter(s => section.stockKeys.includes(s.key));
 
   function onProofPicked(e: React.ChangeEvent<HTMLInputElement>) {

@@ -68,6 +68,10 @@ export async function registerUser(data: RegisterInput) {
   // Create a wallet for the new student
   await prisma.wallet.create({ data: { userId: user.id, credits: 0 } });
 
+  // Notify every active admin that a new applicant just signed up.
+  // Best-effort, fire-and-forget — registration must not fail on email.
+  void notifyAdminsOfNewApplicant(user).catch(() => { /* logged inside */ });
+
   const tokenPayload = { userId: user.id, role: user.role, email: user.email };
   const accessToken  = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
@@ -77,6 +81,21 @@ export async function registerUser(data: RegisterInput) {
     refreshToken,
     user: sanitizeUser(user),
   };
+}
+
+async function notifyAdminsOfNewApplicant(applicant: { name: string; email: string }): Promise<void> {
+  const { sendEmail } = await import('./email.service');
+  const admins = await prisma.user.findMany({
+    where:  { role: 'ADMIN', isActive: true },
+    select: { name: true, email: true },
+  });
+  await Promise.all(admins.map(a =>
+    sendEmail({
+      to:       a.email,
+      template: 'newApplicant',
+      data:     { adminName: a.name, applicantName: applicant.name, applicantEmail: applicant.email },
+    }),
+  ));
 }
 
 export async function refreshTokens(token: string) {

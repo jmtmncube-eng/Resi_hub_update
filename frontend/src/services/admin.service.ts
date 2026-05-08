@@ -1,8 +1,8 @@
 import api from './api';
 
 // ── Overview ──────────────────────────────────────────────────
-export const getAdminStats = async () => {
-  const res = await api.get('/admin/stats');
+export const getAdminStats = async (residenceId?: string) => {
+  const res = await api.get('/admin/stats', { params: residenceId ? { residenceId } : {} });
   return res.data.data;
 };
 
@@ -37,6 +37,14 @@ export const updateAllocation = async (id: string, body: {
 
 export const removeAllocation = async (id: string) => {
   const res = await api.delete(`/admin/allocations/${id}`);
+  return res.data.data;
+};
+
+/** Move a student from their current room to a new one in one transaction. */
+export const moveAllocation = async (body: {
+  userId: string; targetRoomId: string; rent: number; status?: 'ACTIVE' | 'RESERVED';
+}) => {
+  const res = await api.post('/admin/allocations/move', body);
   return res.data.data;
 };
 
@@ -114,8 +122,8 @@ export const rejectVoucherClaim = async (id: string, adminNote?: string) => {
 };
 
 // ── Revenue Report ────────────────────────────────────────────
-export const getRevenueReport = async () => {
-  const res = await api.get('/admin/revenue');
+export const getRevenueReport = async (residenceId?: string) => {
+  const res = await api.get('/admin/revenue', { params: residenceId ? { residenceId } : {} });
   return res.data.data as RevenueReport;
 };
 
@@ -144,6 +152,12 @@ export const setupRooms = async (body: {
   return res.data.data as AdminRoom[];
 };
 
+/** Hard-delete a single room. Backend refuses if any tenants are attached. */
+export const deleteRoom = async (id: string) => {
+  const res = await api.delete(`/admin/rooms/${id}`);
+  return res.data.data as { id: string; number: string };
+};
+
 /** Mixed-type generation — pass an array of slices: e.g. 5 SINGLE + 4 DOUBLE + 2 QUAD. */
 export const setupRoomsMixed = async (body: {
   blocks: number;
@@ -166,6 +180,24 @@ export const updateSettings = async (body: Partial<ResidenceSettings>) => {
 };
 
 // ── Visitor Log ───────────────────────────────────────────────
+/** Force-check-out a visitor pass when student forgot. */
+export const adminCheckOutVisitor = async (id: string) => {
+  const res = await api.patch(`/visitors/${id}/checkout`);
+  return res.data.data;
+};
+
+/** Hard-delete a visitor pass (admin only — students can only cancel their own). */
+export const adminDeleteVisitor = async (id: string) => {
+  const res = await api.delete(`/visitors/admin/${id}`);
+  return res.data.data;
+};
+
+/** Force-check-in a visitor pass (e.g. gate guard couldn't, admin bypasses). */
+export const adminCheckInVisitor = async (id: string) => {
+  const res = await api.patch(`/visitors/${id}/checkin`);
+  return res.data.data;
+};
+
 export const getAdminVisitors = async (search?: string) => {
   const res = await api.get('/admin/visitors', { params: search ? { search } : {} });
   return res.data.data as AdminVisitorPass[];

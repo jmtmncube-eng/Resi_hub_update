@@ -7,6 +7,7 @@ import { signContract } from '../services/document.service';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { formatPeriod } from '../utils/period';
+import { downloadContractPdf } from '../utils/pdf';
 
 interface Props {
   doc: ResidentDocument | null;
@@ -49,95 +50,23 @@ export default function ContractSignModal({ doc, onClose }: Props) {
 
   function downloadContract() {
     if (!doc) return;
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Lease Agreement ${contractRef} — ResiHub</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Georgia', serif; color: #1a1a2e; background: #fff; padding: 56px; max-width: 800px; margin: 0 auto; }
-    h1 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 4px; }
-    .subtitle { font-family: monospace; font-size: 11px; color: #888; text-align: center; letter-spacing: .1em; margin-bottom: 40px; }
-    .section { margin-bottom: 28px; }
-    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #00aaaa; font-family: monospace; border-bottom: 1px solid #e8ecf0; padding-bottom: 6px; margin-bottom: 12px; }
-    p { font-size: 13px; line-height: 1.8; color: #333; margin-bottom: 10px; }
-    .parties-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-    .label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: .06em; font-family: monospace; margin-bottom: 4px; }
-    .value { font-size: 14px; font-weight: 600; }
-    .signature-box { border: 2px solid #00cccc; border-radius: 12px; padding: 24px; margin-top: 32px; background: rgba(0,204,204,.03); }
-    .sig-label { font-family: monospace; font-size: 10px; color: #888; letter-spacing: .06em; margin-bottom: 8px; }
-    .sig-name { font-family: 'Georgia', serif; font-size: 28px; color: #1a1a2e; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; }
-    .sig-meta { font-family: monospace; font-size: 11px; color: #888; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: monospace; background: rgba(0,204,204,.12); color: #00aaaa; }
-    .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e8ecf0; font-size: 11px; color: #aaa; font-family: monospace; text-align: center; }
-  </style>
-</head>
-<body>
-  <h1>Residential Lease Agreement</h1>
-  <div class="subtitle">CONTRACT REF: ${contractRef} · RESIHUB STUDENT ACCOMMODATION</div>
-
-  <div class="section">
-    <div class="section-title">Parties</div>
-    <div class="parties-grid">
-      <div>
-        <div class="label">Landlord / Manager</div>
-        <div class="value">ResiHub Property Management</div>
-        <p style="margin-top:6px;font-size:12px">admin@resihub.co</p>
-      </div>
-      <div>
-        <div class="label">Tenant / Resident</div>
-        <div class="value">${user?.name ?? 'Resident'}</div>
-        <p style="margin-top:6px;font-size:12px">${user?.email ?? ''}</p>
-        <p style="font-size:12px">${user?.allocation ? `Room ${user.allocation.room.number}, Block ${user.allocation.room.block}` : ''}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Lease Terms</div>
-    <p>Period: <strong>${formatPeriod(doc.period)}</strong></p>
-    <p>Monthly Rent: <strong>${doc.amount ?? (user?.allocation ? 'R' + Number(user?.allocation?.rent ?? 0).toLocaleString() : '—')}</strong></p>
-    <p>Room Type: <strong>${user?.allocation?.room.type ?? '—'}</strong></p>
-    ${user?.allocation?.moveIn ? `<p>Move-in Date: <strong>${format(new Date(user.allocation.moveIn), 'dd MMMM yyyy')}</strong></p>` : ''}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Terms & Conditions</div>
-    <p>1. The tenant agrees to pay the monthly rent by the 1st of each month.</p>
-    <p>2. The tenant agrees to maintain the room in good condition and report any damage promptly.</p>
-    <p>3. Visitors must be registered via the ResiHub visitor management system.</p>
-    <p>4. The tenant must adhere to residence rules including quiet hours (22:00–07:00).</p>
-    <p>5. Subletting is strictly prohibited without written consent from management.</p>
-    <p>6. A one-month notice period is required for early termination of this agreement.</p>
-    <p>7. Management reserves the right to inspect rooms with 24-hour notice.</p>
-    <p>8. Any damage beyond normal wear and tear will be charged to the tenant.</p>
-  </div>
-
-  ${isSigned ? `
-  <div class="signature-box">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div>
-        <div class="sig-label">TENANT SIGNATURE</div>
-        <div class="sig-name">${doc.signedByName}</div>
-        <div class="sig-meta">Signed digitally on ${doc.signedAt ? format(new Date(doc.signedAt), 'dd MMMM yyyy, HH:mm') : '—'}</div>
-      </div>
-      <span class="badge">✓ SIGNED</span>
-    </div>
-  </div>
-  ` : '<div style="height:80px;border-bottom:1px solid #ccc;margin-top:48px"><p style="font-size:11px;color:#aaa;font-family:monospace;margin-top:8px">Tenant Signature</p></div>'}
-
-  <div class="footer">Document generated by ResiHub · Contract Ref: ${contractRef} · This document is legally binding when signed.</div>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: 'text/html' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${contractRef}-LeaseAgreement.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadContractPdf({
+      id:           doc.id,
+      period:       doc.period,
+      status:       doc.status,
+      signedAt:     doc.signedAt,
+      signedByName: doc.signedByName,
+      user:         { name: user?.name ?? 'Resident', email: user?.email ?? '' },
+      room:         user?.allocation
+        ? {
+            number: user.allocation.room.number,
+            block:  user.allocation.room.block,
+            type:   user.allocation.room.type,
+            price:  Number(user.allocation.rent ?? 0),
+          }
+        : undefined,
+      startDate:    user?.allocation?.moveIn ?? doc.createdAt,
+    });
   }
 
   return (

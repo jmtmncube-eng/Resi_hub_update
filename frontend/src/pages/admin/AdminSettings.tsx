@@ -2,17 +2,19 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Save, Loader2, Settings2, LayoutGrid,
-  DoorOpen, RefreshCw, ChevronUp, Plus, Minus, UserPlus, UserMinus,
+  DoorOpen, RefreshCw, ChevronUp, Plus, Minus, UserPlus, UserMinus, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getSettings, updateSettings, getOccupancy,
   setupRooms, setupRoomsMixed, ResidenceSettings,
-  AdminRoom, getAccounts, createAllocation, removeAllocation,
+  AdminRoom, getAccounts, createAllocation, removeAllocation, moveAllocation,
+  deleteRoom,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { useConfirm } from '../../components/useConfirm';
+import { Modal } from '../../components/Modal';
 import { UserMinus as UserMinusIcon } from 'lucide-react';
 
 // ── Room type config ──────────────────────────────────────────
@@ -138,6 +140,37 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
     onError: (err) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       toast.error(msg ?? 'Failed to add tenant');
+    },
+  });
+
+  const deleteRoomMut = useMutation({
+    mutationFn: (id: string) => deleteRoom(id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      toast.success(`Room ${data.number} removed`);
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to delete room');
+    },
+  });
+
+  /** Used when an admin picks a student who's already in a different room
+   *  — we ask for confirmation, then transactionally move them. */
+  const moveTenantMut = useMutation({
+    mutationFn: (vars: { userId: string; targetRoomId: string; rent: number; status: 'ACTIVE' | 'RESERVED' }) =>
+      moveAllocation(vars),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-allocations'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      setAddTenantRoom(null);
+      toast.success('Tenant moved to new room');
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to move tenant');
     },
   });
 
@@ -655,19 +688,53 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                             display: 'flex', flexDirection: 'column', gap: 8,
                           }}
                         >
-                          {/* Header row: number + type */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          {/* Header row: number + type + delete (only when empty) */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                               {room.number}
                             </span>
-                            <span style={{
-                              fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
-                              padding: '2px 6px', borderRadius: 4,
-                              background: tc.bg, color: tc.color,
-                              border: `1px solid ${tc.color}33`,
-                            }}>
-                              {room.type}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{
+                                fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+                                padding: '2px 6px', borderRadius: 4,
+                                background: tc.bg, color: tc.color,
+                                border: `1px solid ${tc.color}33`,
+                              }}>
+                                {room.type}
+                              </span>
+                              {/* Delete — only enabled when no tenants. Locked rooms get a tooltip. */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (tenants.length > 0) return;     // belt-and-braces, button is disabled below
+                                  const ok = await confirm({
+                                    title: `Delete room ${room.number}?`,
+                                    message: `This removes Block ${room.block} – ${room.number} from your residence permanently. The room has no tenants, so no history is lost.`,
+                                    confirmLabel: 'Delete room',
+                                    tone: 'rose',
+                                    icon: Trash2,
+                                  });
+                                  if (ok) deleteRoomMut.mutate(room.id);
+                                }}
+                                disabled={tenants.length > 0 || (deleteRoomMut.isPending && deleteRoomMut.variables === room.id)}
+                                title={tenants.length > 0
+                                  ? `Locked — ${tenants.length} tenant${tenants.length === 1 ? '' : 's'} still in this room`
+                                  : 'Delete this empty room'}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  borderRadius: 5,
+                                  padding: 3, display: 'flex',
+                                  cursor: tenants.length > 0 ? 'not-allowed' : 'pointer',
+                                  color: tenants.length > 0 ? 'var(--text4)' : 'var(--rose)',
+                                  opacity: tenants.length > 0 ? .4 : 1,
+                                }}
+                              >
+                                {deleteRoomMut.isPending && deleteRoomMut.variables === room.id
+                                  ? <Loader2 size={11} className="animate-spin" />
+                                  : <Trash2 size={11} />}
+                              </button>
+                            </div>
                           </div>
                           {/* Block + capacity */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
@@ -797,13 +864,19 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
           room={addTenantRoom}
           accounts={accountsList}
           onClose={() => setAddTenantRoom(null)}
-          onSubmit={(userId, status) => addTenantMut.mutate({
+          onSubmitNew={(userId, status) => addTenantMut.mutate({
             userId,
             roomId: addTenantRoom.id,
             rent:   Number(addTenantRoom.price),
             status,
           })}
-          loading={addTenantMut.isPending}
+          onSubmitMove={(userId, status) => moveTenantMut.mutate({
+            userId,
+            targetRoomId: addTenantRoom.id,
+            rent:         Number(addTenantRoom.price),
+            status,
+          })}
+          loading={addTenantMut.isPending || moveTenantMut.isPending}
         />
       )}
     </div>
@@ -820,75 +893,114 @@ interface AccountListItem {
 }
 
 function AddTenantModal({
-  room, accounts, onClose, onSubmit, loading,
+  room, accounts, onClose, onSubmitNew, onSubmitMove, loading,
 }: {
   room: AdminRoom;
   accounts: AccountListItem[];
   onClose: () => void;
-  onSubmit: (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
+  /** Called when student has no current allocation. */
+  onSubmitNew:  (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
+  /** Called when student needs to be moved from another room to this one. */
+  onSubmitMove: (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
   loading: boolean;
 }) {
-  // Only show students who don't already have a room
-  const eligible = accounts.filter(a => a.role !== 'ADMIN' && !a.allocation);
+  const confirm = useConfirm();
+  // Show every non-admin student. Allocated ones surface a "move from"
+  // label so admin sees the cost of the action.
+  const eligible = accounts.filter(a => a.role !== 'ADMIN');
   const [userId, setUserId] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'RESERVED'>('ACTIVE');
 
+  const selectedStudent = eligible.find(s => s.id === userId);
+  const currentRoom = selectedStudent?.allocation?.room;
+
+  async function handleSubmit() {
+    if (!userId) return;
+    if (!currentRoom) {
+      onSubmitNew(userId, status);
+      return;
+    }
+    // Re-allocation — confirm before moving
+    const ok = await confirm({
+      title: `Move ${selectedStudent?.name} to ${room.number}?`,
+      message: `${selectedStudent?.name} is currently in Block ${currentRoom.block} – ${currentRoom.number}. Moving them frees that slot and assigns them here. Past invoices and history stay attached to them.`,
+      confirmLabel: 'Move tenant',
+      tone: 'rose',
+      icon: UserPlus,
+    });
+    if (ok) onSubmitMove(userId, status);
+  }
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
-        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-          Add tenant to {room.number}
+    <Modal open={true} onClose={onClose} maxWidth={460}>
+      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+        Add tenant to {room.number}
+      </p>
+      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 18 }}>
+        Block {room.block} · {room.type} · R{Number(room.price).toLocaleString()}/month · {(room.capacity ?? 1) - (room.tenants?.length ?? 0)} slot{(room.capacity ?? 1) - (room.tenants?.length ?? 0) !== 1 ? 's' : ''} open
+      </p>
+
+      <label className="field-label">Student</label>
+      <select value={userId} onChange={e => setUserId(e.target.value)} className="input-base" style={{ marginBottom: 6 }}>
+        <option value="">— pick a student —</option>
+        {eligible.length === 0 ? (
+          <option disabled>No students available</option>
+        ) : eligible.map(s => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+            {s.allocation?.room
+              ? ` · currently in ${s.allocation.room.block}-${s.allocation.room.number}`
+              : ` · ${s.email}`}
+          </option>
+        ))}
+      </select>
+
+      {/* Hint when re-allocating */}
+      {currentRoom && (
+        <p style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--rose)',
+          marginBottom: 14, marginTop: 2,
+        }}>
+          ⚠ This student is in {currentRoom.block}-{currentRoom.number}. Saving will move them; we'll confirm first.
         </p>
-        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 18 }}>
-          Block {room.block} · {room.type} · R{Number(room.price).toLocaleString()}/month · {(room.capacity ?? 1) - (room.tenants?.length ?? 0)} slot{(room.capacity ?? 1) - (room.tenants?.length ?? 0) !== 1 ? 's' : ''} open
-        </p>
+      )}
+      {!currentRoom && <div style={{ marginBottom: 14 }} />}
 
-        <label className="field-label">Student</label>
-        <select value={userId} onChange={e => setUserId(e.target.value)} className="input-base" style={{ marginBottom: 14 }}>
-          <option value="">— pick a student —</option>
-          {eligible.length === 0 ? (
-            <option disabled>No unallocated students available</option>
-          ) : eligible.map(s => (
-            <option key={s.id} value={s.id}>{s.name} · {s.email}</option>
-          ))}
-        </select>
-
-        <label className="field-label">Allocation status</label>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-          {(['ACTIVE', 'RESERVED'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              className="press-soft"
-              style={{
-                flex: 1, padding: '8px 12px', borderRadius: 8,
-                border: `1px solid ${status === s ? 'var(--cyan)' : 'var(--border)'}`,
-                background: status === s ? 'rgba(0,204,204,.08)' : 'var(--bg3)',
-                color: status === s ? 'var(--text)' : 'var(--text2)',
-                fontSize: 12, fontWeight: status === s ? 600 : 500, cursor: 'pointer',
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}
-            >
-              {s === 'ACTIVE' ? 'Move-in immediately' : 'Reserve only'}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
+      <label className="field-label">Allocation status</label>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+        {(['ACTIVE', 'RESERVED'] as const).map(s => (
           <button
-            onClick={() => onSubmit(userId, status)}
-            disabled={!userId || loading}
-            className="btn-primary press-soft"
-            style={{ flex: 1, padding: '10px 0', fontSize: 13 }}
+            key={s}
+            onClick={() => setStatus(s)}
+            className="press-soft"
+            style={{
+              flex: 1, padding: '8px 12px', borderRadius: 8,
+              border: `1px solid ${status === s ? 'var(--cyan)' : 'var(--border)'}`,
+              background: status === s ? 'rgba(0,204,204,.08)' : 'var(--bg3)',
+              color: status === s ? 'var(--text)' : 'var(--text2)',
+              fontSize: 12, fontWeight: status === s ? 600 : 500, cursor: 'pointer',
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
           >
-            {loading ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
-            {loading ? 'Adding…' : 'Add tenant'}
+            {s === 'ACTIVE' ? 'Move-in immediately' : 'Reserve only'}
           </button>
-          <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
-            Cancel
-          </button>
-        </div>
+        ))}
       </div>
-    </div>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <button
+          onClick={handleSubmit}
+          disabled={!userId || loading}
+          className="btn-primary press-soft"
+          style={{ minWidth: 160, padding: '10px 22px', fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+          {loading ? 'Working…' : currentRoom ? 'Move tenant' : 'Add tenant'}
+        </button>
+        <button onClick={onClose} className="btn-ghost" style={{ minWidth: 120, padding: '10px 22px', fontSize: 13, justifyContent: 'center' }}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
   );
 }

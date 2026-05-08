@@ -66,7 +66,7 @@ export interface OpsInsights {
 // Endpoints
 // ─────────────────────────────────────────────────────────────────
 
-export async function listOpsServices(filters: { type?: OpsType; from?: string; to?: string } = {}) {
+export async function listOpsServices(filters: { type?: OpsType; from?: string; to?: string; residenceId?: string } = {}) {
   const res = await api.get<{ success: boolean; data: OpsService[] }>('/admin/ops/services', { params: filters });
   return res.data.data;
 }
@@ -79,6 +79,7 @@ export async function createOpsService(input: {
   note?: string;
   proofUrl?: string;
   meta?: Record<string, unknown>;
+  residenceId?: string;
 }) {
   const res = await api.post<{ success: boolean; data: OpsService }>('/admin/ops/services', input);
   return res.data.data;
@@ -88,17 +89,24 @@ export async function deleteOpsService(id: string) {
   await api.delete(`/admin/ops/services/${id}`);
 }
 
-export async function listOpsStock() {
-  const res = await api.get<{ success: boolean; data: OpsStock[] }>('/admin/ops/stock');
+export async function listOpsStock(residenceId?: string) {
+  const res = await api.get<{ success: boolean; data: OpsStock[] }>('/admin/ops/stock', {
+    params: residenceId ? { residenceId } : {},
+  });
   return res.data.data;
 }
 
-export async function setOpsStock(key: string, body: { quantity: number; threshold?: number }) {
+export async function setOpsStock(
+  key: string,
+  body: { quantity: number; threshold?: number; residenceId?: string },
+) {
   const res = await api.put<{ success: boolean; data: OpsStock }>(`/admin/ops/stock/${key}`, body);
   return res.data.data;
 }
 
-export async function getOpsInsights() {
-  const res = await api.get<{ success: boolean; data: OpsInsights }>('/admin/ops/insights');
+export async function getOpsInsights(residenceId?: string) {
+  const res = await api.get<{ success: boolean; data: OpsInsights }>('/admin/ops/insights', {
+    params: residenceId ? { residenceId } : {},
+  });
   return res.data.data;
 }

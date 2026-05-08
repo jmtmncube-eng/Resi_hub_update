@@ -19,11 +19,13 @@ export interface CreateOpsServiceInput {
   note?:   string;
   proofUrl?: string;
   meta?:   Record<string, unknown>;
+  residenceId?: string;
 }
 
-export async function listOpsServices(filters: { type?: OpsType; from?: string; to?: string } = {}) {
+export async function listOpsServices(filters: { type?: OpsType; from?: string; to?: string; residenceId?: string } = {}) {
   const where: Record<string, unknown> = {};
-  if (filters.type)                     where.type = filters.type;
+  if (filters.type)        where.type = filters.type;
+  if (filters.residenceId) where.residenceId = filters.residenceId;
   if (filters.from || filters.to) {
     const dateClause: Record<string, Date> = {};
     if (filters.from) dateClause.gte = new Date(filters.from);
@@ -46,6 +48,7 @@ export async function createOpsService(adminId: string, input: CreateOpsServiceI
       vendor:      input.vendor?.trim() || null,
       note:        input.note?.trim() || null,
       proofUrl:    input.proofUrl || null,
+      residenceId: input.residenceId ?? null,
       // Prisma JSON column rejects `Record<string, unknown>` directly;
       // serialise/deserialise to coerce into a plain InputJsonValue.
       ...(input.meta ? { meta: JSON.parse(JSON.stringify(input.meta)) } : {}),
@@ -65,15 +68,22 @@ export async function deleteOpsService(id: string) {
 // Stock levels
 // ─────────────────────────────────────────────────────────────────
 
-export async function listOpsStock() {
-  return prisma.opsStock.findMany({ orderBy: { key: 'asc' } });
+export async function listOpsStock(residenceId?: string) {
+  return prisma.opsStock.findMany({
+    where:   residenceId ? { residenceId } : undefined,
+    orderBy: { key: 'asc' },
+  });
 }
 
-export async function setOpsStock(key: string, quantity: number, threshold?: number) {
-  const stock = await prisma.opsStock.findUnique({ where: { key } });
+export async function setOpsStock(key: string, quantity: number, threshold?: number, residenceId?: string) {
+  // Composite-unique on (residenceId, key) — find precisely the stock row
+  // owned by the current residence (or the legacy NULL bucket).
+  const stock = await prisma.opsStock.findFirst({
+    where: { key, residenceId: residenceId ?? null },
+  });
   if (!stock) throw new AppError(`Unknown stock key: ${key}`, 404);
   return prisma.opsStock.update({
-    where: { key },
+    where: { id: stock.id },
     data:  {
       quantity,
       ...(threshold !== undefined && { threshold }),
@@ -149,8 +159,9 @@ function avgIntervalDays(dates: Date[]): number | null {
   return total / (sorted.length - 1);
 }
 
-export async function getOpsInsights(): Promise<OpsInsights> {
+export async function getOpsInsights(residenceId?: string): Promise<OpsInsights> {
   const all = await prisma.opsService.findMany({
+    where:   residenceId ? { residenceId } : undefined,
     orderBy: { date: 'desc' },
   });
 
@@ -205,8 +216,11 @@ export async function getOpsInsights(): Promise<OpsInsights> {
       return s + (m && typeof m.kWh === 'number' ? m.kWh : 0);
     }, 0);
 
-  // Stock with low flag
-  const stockRaw = await prisma.opsStock.findMany({ orderBy: { key: 'asc' } });
+  // Stock with low flag — scoped to the same residence (or all when null)
+  const stockRaw = await prisma.opsStock.findMany({
+    where:   residenceId ? { residenceId } : undefined,
+    orderBy: { key: 'asc' },
+  });
   const stock = stockRaw.map(s => ({
     key:       s.key,
     label:     s.label,

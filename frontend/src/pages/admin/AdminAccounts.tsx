@@ -434,18 +434,16 @@ interface EditFormState {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /** Strip everything that isn't a digit or leading '+', then count digits.
- *  Accepts SA-style 10-digit (e.g. 0712345678) or full international with +. */
+ *  Lenient — empty is OK, 9–15 digits accepted (SA mobile minus leading 0
+ *  works at 9; full international up to 15). Hard error only on
+ *  obviously-broken input so admins can save existing records that
+ *  pre-date the validator. */
 function validatePhone(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;                              // optional field
   const digits = trimmed.replace(/[^\d]/g, '');
-  if (trimmed.startsWith('+')) {
-    if (digits.length < 10 || digits.length > 15) {
-      return 'International number must have 10–15 digits';
-    }
-    return null;
-  }
-  if (digits.length !== 10) return 'Phone must be exactly 10 digits';
+  if (digits.length < 9)  return 'Phone is too short';
+  if (digits.length > 15) return 'Phone is too long';
   return null;
 }
 
@@ -486,7 +484,8 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
       phone:      form.phone.trim(),
       university: form.university.trim(),
       program:    form.program.trim(),
-      year:       form.year ? Number(form.year) : null,
+      // Coerce empty / 0 / negative to null so backend (min 1) doesn't reject
+      year:       form.year && Number(form.year) >= 1 ? Number(form.year) : null,
       bio:        form.bio.trim(),
     }),
     onSuccess: () => {

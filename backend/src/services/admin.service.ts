@@ -1,6 +1,8 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { ensureContractForUser, initiateRentInvoice } from './document.service';
+import { sendEmail } from './email.service';
+import { createAuditLog } from '../utils/audit.util';
 
 /** Build the YYYY-MM period string for "next month from today". Used so a
  *  freshly-activated student lands with their upcoming-month invoice
@@ -20,7 +22,14 @@ import {
 } from '../validators/admin.validator';
 
 // ── Overview Stats ─────────────────────────────────────────────
-export async function getAdminStats() {
+/**
+ * KPIs for the admin dashboard. Scopes to a single residence when
+ * `residenceId` is provided; rolls up the entire portfolio otherwise.
+ *
+ * Visitors and vouchers stay portfolio-wide (no residenceId on those models).
+ * Rooms / occupancy / tickets / revenue / students all narrow correctly.
+ */
+export async function getAdminStats(residenceId?: string) {
   const [
     totalStudents,
     pendingStudents,
@@ -32,12 +41,25 @@ export async function getAdminStats() {
     todayVisitors,
     totalVouchers,
   ] = await Promise.all([
-    prisma.user.count({ where: { role: 'ACTIVE_STUDENT' } }),
+    prisma.user.count({
+      where: residenceId
+        ? { role: 'ACTIVE_STUDENT',  allocation: { is: { room: { is: { residenceId } } } } }
+        : { role: 'ACTIVE_STUDENT' },
+    }),
+    // Pending students don't have an allocation yet — keep portfolio-wide
     prisma.user.count({ where: { role: 'PENDING_STUDENT' } }),
-    prisma.room.count(),
-    prisma.room.count({ where: { status: 'OCCUPIED' } }),
-    prisma.maintenanceTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
-    prisma.maintenanceTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, priority: 'EMERGENCY' } }),
+    prisma.room.count({ where: residenceId ? { residenceId } : undefined }),
+    prisma.room.count({ where: residenceId ? { residenceId, status: 'OCCUPIED' } : { status: 'OCCUPIED' } }),
+    prisma.maintenanceTicket.count({
+      where: residenceId
+        ? { residenceId, status: { in: ['OPEN', 'IN_PROGRESS'] } }
+        : {                status: { in: ['OPEN', 'IN_PROGRESS'] } },
+    }),
+    prisma.maintenanceTicket.count({
+      where: residenceId
+        ? { residenceId, status: { in: ['OPEN', 'IN_PROGRESS'] }, priority: { in: ['HIGH', 'EMERGENCY'] } }
+        : {                status: { in: ['OPEN', 'IN_PROGRESS'] }, priority: { in: ['HIGH', 'EMERGENCY'] } },
+    }),
     prisma.visitorPass.count(),
     prisma.visitorPass.count({
       where: {
@@ -50,9 +72,12 @@ export async function getAdminStats() {
     prisma.voucher.count({ where: { isActive: true } }),
   ]);
 
-  // Revenue estimate from active allocations
+  // Revenue estimate from active allocations (scoped via the room → residence FK)
   const allocations = await prisma.allocation.findMany({
-    where: { status: 'ACTIVE' },
+    where: {
+      status: 'ACTIVE',
+      ...(residenceId ? { room: { residenceId } } : {}),
+    },
     select: { rent: true },
   });
   const monthlyRevenue = allocations.reduce(
@@ -304,6 +329,62 @@ export async function createAllocation(data: CreateAllocationInput) {
 }
 
 /**
+ * Move a student from their current room to a new one. Wraps remove +
+ * recreate in a single transaction so we never leave the user halfway
+ * between rooms. The audit trail preserves the move via two AuditLog
+ * entries (REMOVED + CREATED).
+ *
+ * Use this whenever you'd otherwise need to delete-then-create an
+ * allocation — it handles the rare race where two admins try to move
+ * the same student into different rooms simultaneously.
+ */
+export async function moveAllocation(args: {
+  userId: string; targetRoomId: string; rent: number;
+  status?: 'ACTIVE' | 'RESERVED';
+}) {
+  const user = await prisma.user.findUnique({
+    where:   { id: args.userId },
+    include: { allocation: true },
+  });
+  if (!user)             throw new AppError('User not found', 404);
+  if (!user.allocation)  throw new AppError('Student has no current allocation', 400);
+  if (user.allocation.roomId === args.targetRoomId) {
+    throw new AppError('Student is already in that room', 400);
+  }
+
+  const target = await prisma.room.findUnique({
+    where:   { id: args.targetRoomId },
+    include: { allocations: { where: { status: { in: ['ACTIVE', 'RESERVED'] } } } },
+  });
+  if (!target) throw new AppError('Target room not found', 404);
+  const capacity = target.capacity || TYPE_CAPACITY[target.type] || 1;
+  if (target.allocations.length >= capacity) {
+    throw new AppError(`Target room is full (${target.allocations.length}/${capacity})`, 409);
+  }
+
+  const oldRoomId = user.allocation.roomId;
+  await prisma.$transaction(async (tx) => {
+    // Delete (not just end) so the unique-on-userId constraint frees up
+    await tx.allocation.delete({ where: { id: user.allocation!.id } });
+    await tx.allocation.create({
+      data: {
+        userId:  args.userId,
+        roomId:  args.targetRoomId,
+        rent:    args.rent,
+        status:  args.status ?? 'ACTIVE',
+        moveIn:  user.allocation!.moveIn ?? new Date(),
+      },
+    });
+  });
+
+  await Promise.all([recomputeRoomStatus(oldRoomId), recomputeRoomStatus(args.targetRoomId)]);
+  return prisma.user.findUnique({
+    where:   { id: args.userId },
+    include: { allocation: { include: { room: true } } },
+  });
+}
+
+/**
  * Admin removes a student from a room. We end the allocation rather than
  * delete it so historical records are preserved (for audits, ended-leases
  * reporting, etc.). The user.allocation FK is unique, so to let them be
@@ -412,6 +493,27 @@ export async function updateAccount(id: string, data: UpdateAccountInput) {
   });
 }
 
+/**
+ * Hard-delete a single room. Refuses if it has any allocations of any
+ * status — admins must end/move the tenants first. Recomputes nothing
+ * because the room is gone after this.
+ */
+export async function deleteRoom(id: string) {
+  const room = await prisma.room.findUnique({
+    where:   { id },
+    include: { allocations: true },
+  });
+  if (!room) throw new AppError('Room not found', 404);
+  if (room.allocations.length > 0) {
+    throw new AppError(
+      `Can't delete — room has ${room.allocations.length} tenant${room.allocations.length === 1 ? '' : 's'}. Remove or move them first.`,
+      409,
+    );
+  }
+  await prisma.room.delete({ where: { id } });
+  return { id, number: room.number };
+}
+
 /** Toggle a user's active flag. Deactivated users cannot log in. */
 export async function setAccountActive(id: string, isActive: boolean, adminId: string) {
   const user = await prisma.user.findUnique({ where: { id } });
@@ -426,11 +528,29 @@ export async function setAccountActive(id: string, isActive: boolean, adminId: s
       throw new AppError('Cannot deactivate the only active admin', 400);
     }
   }
-  return prisma.user.update({
+  const result = await prisma.user.update({
     where:  { id },
     data:   { isActive },
     select: { id: true, name: true, isActive: true, role: true },
   });
+
+  // Notify on deactivation only — reactivation is silent
+  if (!isActive) {
+    sendEmail({
+      to:       user.email,
+      template: 'accountDeactivated',
+      data:     { name: user.name },
+    }).catch(() => { /* logged inside */ });
+  }
+
+  void createAuditLog({
+    userId: adminId,
+    action: isActive ? 'ACCOUNT_REACTIVATED' : 'ACCOUNT_DEACTIVATED',
+    entity: 'User', entityId: id,
+    meta: { targetName: user.name, targetEmail: user.email },
+  });
+
+  return result;
 }
 
 /** One-click approve: PENDING_STUDENT → ACTIVE_STUDENT. If they already
@@ -465,14 +585,30 @@ export async function approveAccount(id: string) {
     ]);
   }
 
+  // Email — best-effort; never blocks the response
+  sendEmail({
+    to:       user.email,
+    template: 'accountApproved',
+    data:     { name: user.name },
+  }).catch(() => { /* logged inside sendEmail */ });
+
+  // Audit trail
+  void createAuditLog({
+    userId: id, action: 'ACCOUNT_APPROVED', entity: 'User', entityId: id,
+    meta: { name: user.name, hadReservedRoom: !!user.allocation },
+  });
+
   return updated;
 }
 
 // ── Revenue Report ────────────────────────────────────────────
-export async function getRevenueReport() {
-  // All invoices with user info
+export async function getRevenueReport(residenceId?: string) {
+  // All invoices with user info, scoped via the user's allocation room.residenceId
   const invoices = await prisma.document.findMany({
-    where:   { type: 'INVOICE' },
+    where:   {
+      type: 'INVOICE',
+      ...(residenceId ? { user: { allocation: { is: { room: { is: { residenceId } } } } } } : {}),
+    },
     include: { user: { select: { id: true, name: true, email: true, allocation: { select: { rent: true } } } } },
     orderBy: { createdAt: 'desc' },
   });
@@ -492,8 +628,11 @@ export async function getRevenueReport() {
 
   // Active allocations → monthly expected revenue
   const activeAllocs = await prisma.allocation.findMany({
-    where:   { status: 'ACTIVE' },
-    select:  { rent: true, user: { select: { name: true, email: true } }, room: { select: { number: true, block: true } } },
+    where: {
+      status: 'ACTIVE',
+      ...(residenceId ? { room: { residenceId } } : {}),
+    },
+    select: { rent: true, user: { select: { name: true, email: true } }, room: { select: { number: true, block: true } } },
   });
   const projectedMonthly = activeAllocs.reduce((s, a) => s + Number(a.rent), 0);
 

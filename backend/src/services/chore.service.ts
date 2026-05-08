@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { earnCredits } from './wallet.service';
+import { sendEmail } from './email.service';
 
 const COMPLETE_REWARD = 20;
 const APPROVAL_WINDOW_HOURS = 24;
@@ -139,6 +140,16 @@ export async function approveChoreProof(choreId: string, adminId: string) {
   // Award credits OUTSIDE the same tx so wallet helpers stay decoupled
   await earnCredits(studentId, COMPLETE_REWARD, `Chore approved: ${chore.name}`);
 
+  // Best-effort email
+  const student = await prisma.user.findUnique({ where: { id: studentId } });
+  if (student) {
+    sendEmail({
+      to: student.email,
+      template: 'choreApproved',
+      data: { name: student.name, choreName: chore.name, credits: COMPLETE_REWARD },
+    }).catch(() => { /* logged inside */ });
+  }
+
   return prisma.chore.findUnique({ where: { id: choreId } });
 }
 
@@ -167,5 +178,16 @@ export async function rejectChoreProof(choreId: string, adminId: string, adminNo
       data: { choreId, userId: studentId, action: 'UNCLAIMED', note: `Proof rejected${adminNote ? ': ' + adminNote : ''}` },
     }),
   ]);
+
+  // Best-effort email
+  const student = await prisma.user.findUnique({ where: { id: studentId } });
+  if (student) {
+    sendEmail({
+      to: student.email,
+      template: 'choreRejected',
+      data: { name: student.name, choreName: chore.name, reason: adminNote ?? '' },
+    }).catch(() => { /* logged inside */ });
+  }
+
   return updated;
 }

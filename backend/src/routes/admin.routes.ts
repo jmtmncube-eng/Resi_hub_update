@@ -23,12 +23,14 @@ router.get('/stats',          ctrl.getStats);
 // ── Occupancy ─────────────────────────────────────────────────
 router.get('/occupancy',      ctrl.getOccupancy);
 router.post('/setup-rooms',   ctrl.setupRooms);
+router.delete('/rooms/:id',   ctrl.deleteRoom);
 
 // ── Allocations ───────────────────────────────────────────────
 router.get('/allocations',                                   ctrl.getAllocations);
 router.post('/allocations',   validate(createAllocationSchema), ctrl.createAllocation);
 router.patch('/allocations/:id', validate(updateAllocationSchema), ctrl.updateAllocation);
 router.delete('/allocations/:id',                            ctrl.removeAllocation);
+router.post('/allocations/move',                             ctrl.moveAllocation);
 
 // ── Accounts ──────────────────────────────────────────────────
 router.get('/accounts',                                      ctrl.getAccounts);

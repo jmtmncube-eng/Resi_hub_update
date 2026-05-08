@@ -6,6 +6,7 @@ export const ROUTES = {
   // Public legal pages
   PRIVACY:  '/privacy',
   TERMS:    '/terms',
+  GATE:     '/gate',
 
   // Active student
   DASHBOARD:   '/dashboard',
@@ -30,6 +31,7 @@ export const ROUTES = {
   ADMIN_VISITORS:     '/admin/visitors',
   ADMIN_REWARDS:      '/admin/rewards',
   ADMIN_ACCOUNTS:     '/admin/accounts',
+  ADMIN_AUDIT:        '/admin/activity',
   ADMIN_PAYMENTS:     '/admin/payments',
   ADMIN_SETTINGS:     '/admin/settings',
   /** Consolidated Residence hub — tabs: allocations / rooms / info */

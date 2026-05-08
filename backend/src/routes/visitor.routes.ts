@@ -15,6 +15,8 @@ router.delete('/:id', requireRole('ACTIVE_STUDENT'), ctrl.cancelPass);
 
 // Admin
 router.get('/admin/all',     requireRole('ADMIN'), ctrl.getAllPasses);
-router.patch('/:id/checkin', requireRole('ADMIN'), ctrl.checkIn);
+router.patch('/:id/checkin',     requireRole('ADMIN'), ctrl.checkIn);
+router.patch('/:id/checkout',    requireRole('ADMIN'), ctrl.checkOut);
+router.delete('/admin/:id',      requireRole('ADMIN'), ctrl.adminDeletePass);
 
 export default router;

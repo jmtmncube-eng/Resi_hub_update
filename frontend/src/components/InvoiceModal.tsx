@@ -6,7 +6,8 @@ import { ResidentDocument } from '../types/domain.types';
 import { useAuth } from '../contexts/AuthContext';
 import { submitPaymentProof } from '../services/document.service';
 import { format } from 'date-fns';
-import { formatPeriod, formatRand } from '../utils/period';
+import { formatPeriod } from '../utils/period';
+import { downloadInvoicePdf } from '../utils/pdf';
 
 interface Props {
   doc: ResidentDocument | null;
@@ -66,77 +67,28 @@ export default function InvoiceModal({ doc, onClose }: Props) {
   const isOverdue = doc.status === 'Overdue';
 
   function downloadInvoice() {
-    const invoiceNum = `INV-${doc!.id.slice(-8).toUpperCase()}`;
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Invoice ${invoiceNum} — ResiHub</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 48px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px; }
-    .brand { font-size: 28px; font-weight: 800; color: #00cccc; letter-spacing: -.03em; }
-    .brand-sub { font-size: 11px; color: #888; letter-spacing: .08em; margin-top: 2px; font-family: monospace; }
-    .inv-label { font-size: 13px; color: #888; font-family: monospace; text-align: right; }
-    .inv-num { font-size: 20px; font-weight: 700; color: #1a1a2e; font-family: monospace; }
-    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; font-family: monospace; margin-top: 6px;
-      background: ${isPaid ? 'rgba(0,204,204,.12)' : 'rgba(232,25,122,.12)'}; color: ${isPaid ? '#00aaaa' : '#E8197A'}; }
-    .divider { height: 1px; background: #e8ecf0; margin: 32px 0; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 40px; }
-    .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .06em; font-family: monospace; margin-bottom: 6px; }
-    .value { font-size: 14px; color: #1a1a2e; font-weight: 500; line-height: 1.6; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .06em; font-family: monospace; padding: 10px 16px; text-align: left; background: #f8f9fa; border-bottom: 1px solid #e8ecf0; }
-    td { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
-    .total-row { background: #f8f9fa; font-weight: 700; font-size: 16px; }
-    .total-row td { padding: 16px; border-top: 2px solid #e8ecf0; }
-    .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #e8ecf0; font-size: 12px; color: #aaa; font-family: monospace; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="brand">ResiHub</div>
-      <div class="brand-sub">STUDENT ACCOMMODATION PLATFORM</div>
-    </div>
-    <div style="text-align:right">
-      <div class="inv-label">INVOICE</div>
-      <div class="inv-num">${invoiceNum}</div>
-      <div><span class="status-badge">${doc!.status.toUpperCase()}</span></div>
-    </div>
-  </div>
-  <div class="grid-2">
-    <div>
-      <div class="label">Billed To</div>
-      <div class="value">${user?.name ?? 'Resident'}<br/>${user?.email ?? ''}<br/>${user?.allocation ? `Room ${user.allocation.room.number}, Block ${user.allocation.room.block}` : ''}</div>
-    </div>
-    <div>
-      <div class="label">Invoice Details</div>
-      <div class="value">Period: ${formatPeriod(doc!.period)}<br/>Issue Date: ${format(new Date(doc!.createdAt), 'dd MMMM yyyy')}<br/>Due: Net 30 days</div>
-    </div>
-  </div>
-  <table>
-    <thead><tr><th>Description</th><th>Period</th><th style="text-align:right">Amount</th></tr></thead>
-    <tbody>
-      <tr><td>Monthly Rent — ${user?.allocation ? `Room ${user.allocation.room.number} (${user.allocation.room.type})` : 'Student Accommodation'}</td><td>${formatPeriod(doc!.period)}</td><td style="text-align:right;font-family:monospace">${formatRand(doc!.amount ?? user?.allocation?.rent)}</td></tr>
-    </tbody>
-    <tfoot>
-      <tr class="total-row"><td colspan="2">Total Due</td><td style="text-align:right;font-family:monospace">${doc!.amount ?? (user?.allocation ? 'R' + Number(user?.allocation?.rent ?? 0).toLocaleString() : '—')}</td></tr>
-    </tfoot>
-  </table>
-  <div class="footer">ResiHub Student Accommodation · admin@resihub.co · This is a computer-generated invoice.</div>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: 'text/html' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${invoiceNum}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!doc) return;
+    // Real PDF — replaces the previous HTML blob.
+    downloadInvoicePdf({
+      id:           doc.id,
+      period:       doc.period ?? null,
+      amount:       doc.amount ?? null,
+      status:       doc.status ?? null,
+      proofStatus:  doc.proofStatus ?? null,
+      createdAt:    doc.createdAt,
+      user:         {
+        name:  user?.name ?? 'Resident',
+        email: user?.email ?? '',
+        phone: user?.phone ?? null,
+      },
+      room:         user?.allocation
+        ? { number: user.allocation.room.number, block: user.allocation.room.block, type: user.allocation.room.type }
+        : undefined,
+      rentLineItem: doc.amount != null ? Number(doc.amount) : Number(user?.allocation?.rent ?? 0),
+    });
   }
+
+  // ── Legacy HTML download removed; jspdf does the heavy lifting now ──
 
   const invoiceNum = `INV-${doc.id.slice(-8).toUpperCase()}`;
 

@@ -152,7 +152,8 @@ export default function Visitors() {
               marginBottom: 18,
               boxShadow: '0 0 0 1px var(--border), 0 1px 0 var(--shadow)',
             }}>
-              <QRCodeSVG value={qrPass.qrCode} size={220} level="M" />
+              {/* Encode a deep-link URL so a phone camera scan opens the gate page directly. */}
+              <QRCodeSVG value={`${window.location.origin}/gate?code=${encodeURIComponent(qrPass.qrCode)}`} size={220} level="M" />
             </div>
 
             {/* Visitor info — centered & generously spaced */}

@@ -20,6 +20,8 @@ export async function createPass(userId: string, data: CreateVisitorInput) {
 
   const room    = user.allocation.room;
   const dateStr = data.date.replace(/-/g, '');
+  // The qrCode field stores the unique credential. The frontend QRCodeSVG
+  // wraps it as a deep-link URL so phone cameras open the gate page directly.
   const qrCode  = `QR-${room.number}-${dateStr}-${randomUUID().slice(0, 6).toUpperCase()}`;
 
   return prisma.visitorPass.create({
@@ -60,5 +62,101 @@ export async function checkIn(id: string) {
   return prisma.visitorPass.update({
     where: { id },
     data: { checkedIn: true, checkedInAt: new Date(), status: 'ACTIVE' },
+  });
+}
+
+/**
+ * Public gate scan — no auth. The QR code itself is the credential.
+ * Toggles the pass status:
+ *   UPCOMING (or any pre-arrival)  → ACTIVE + checkedIn        (entry)
+ *   ACTIVE                         → EXPIRED                   (exit)
+ *   EXPIRED / CANCELLED            → reject with clear message
+ *
+ * Returns enough information for the gate UI to show a green/rose card
+ * with the visitor name, host name + room, and the new state.
+ */
+export async function gateScan(qrCode: string) {
+  const code = qrCode.trim();
+  if (!code) throw new AppError('QR code is required', 400);
+
+  const pass = await prisma.visitorPass.findUnique({
+    where:   { qrCode: code },
+    include: {
+      host: {
+        select: {
+          id: true, name: true, email: true,
+          allocation: { select: { room: { select: { number: true, block: true } } } },
+        },
+      },
+    },
+  });
+  if (!pass) throw new AppError('Unknown QR code — pass not found', 404);
+
+  // Reject terminal states
+  if (pass.status === 'CANCELLED') throw new AppError('This pass was cancelled by the host', 410);
+  if (pass.status === 'EXPIRED')   throw new AppError('This visitor has already checked out', 410);
+
+  let action: 'ENTRY' | 'EXIT';
+  let updated;
+  if (pass.status === 'ACTIVE' && pass.checkedIn) {
+    // Already inside → exit
+    action  = 'EXIT';
+    updated = await prisma.visitorPass.update({
+      where: { id: pass.id },
+      data:  { status: 'EXPIRED' },
+    });
+  } else {
+    // Not yet inside → entry
+    action  = 'ENTRY';
+    updated = await prisma.visitorPass.update({
+      where: { id: pass.id },
+      data:  { status: 'ACTIVE', checkedIn: true, checkedInAt: new Date() },
+    });
+  }
+
+  return {
+    action,
+    pass: {
+      id:           pass.id,
+      visitorName:  pass.visitorName,
+      visitorPhone: pass.visitorPhone,
+      purpose:      pass.purpose,
+      date:         pass.date,
+      timeFrom:     pass.timeFrom,
+      timeTo:       pass.timeTo,
+      qrCode:       pass.qrCode,
+      status:       updated.status,
+      checkedInAt:  updated.checkedInAt,
+    },
+    host: {
+      id:    pass.host.id,
+      name:  pass.host.name,
+      email: pass.host.email,
+      room:  pass.host.allocation?.room
+        ? { number: pass.host.allocation.room.number, block: pass.host.allocation.room.block }
+        : null,
+    },
+  };
+}
+
+/** Admin: hard-delete any visitor pass. Use for spam, mistakes, or test
+ *  records — gate-log history is preserved via the AuditLog system. */
+export async function adminDeletePass(id: string) {
+  const pass = await prisma.visitorPass.findUnique({ where: { id } });
+  if (!pass) throw new AppError('Visitor pass not found', 404);
+  await prisma.visitorPass.delete({ where: { id } });
+  return { id };
+}
+
+/** Admin: force-check-out a visitor when the student forgot to do it.
+ *  Sets the pass to EXPIRED so it appears resolved on the dashboard. */
+export async function checkOut(id: string) {
+  const pass = await prisma.visitorPass.findUnique({ where: { id } });
+  if (!pass) throw new AppError('Visitor pass not found', 404);
+  if (!pass.checkedIn) throw new AppError('Visitor never checked in', 400);
+  if (pass.status === 'EXPIRED') return pass;
+  return prisma.visitorPass.update({
+    where: { id },
+    data:  { status: 'EXPIRED' },
   });
 }

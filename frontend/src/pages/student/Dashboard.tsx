@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, QrCode, Newspaper, ClipboardList, AlertCircle, Bell, Pin } from 'lucide-react';
 import { getDashboard } from '../../services/dashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { WeatherWidget } from '../../components/WeatherWidget';
 import { format } from 'date-fns';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -37,11 +39,11 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 appear">
 
-      {/* Welcome banner — avatar + greeting (brand mark lives in the sidebar) */}
+      {/* Welcome banner — avatar + greeting on the left, live clock + weather on the right */}
       <div style={{
         background: 'var(--bg2)', border: '1px solid var(--border)',
         borderRadius: 12, padding: '20px 24px',
-        display: 'flex', alignItems: 'center', gap: 16,
+        display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
       }}>
         <div className="avatar avatar-cyan" style={{
           width: 48, height: 48, fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: 'hidden',
@@ -58,11 +60,13 @@ export default function Dashboard() {
             {allocation ? `Room ${allocation.room.number} · Block ${allocation.room.block}` : 'No active room'}
           </p>
         </div>
+        <StudentClock />
       </div>
 
       {/* Notifications banner — unread pinned only */}
       {(() => {
-        const unreadPinned = pinnedNews.filter((n: any) => !n.read);
+        // pinnedNews has the wider news shape from the dashboard endpoint
+        const unreadPinned = (pinnedNews as Array<{ id: string; read?: boolean; title: string; tag: string; tagColor: string }>).filter(n => !n.read);
         if (unreadPinned.length === 0) return null;
         return (
         <Link to={ROUTES.UPDATES} style={{ display: 'block', textDecoration: 'none' }}>
@@ -311,4 +315,47 @@ function getGreeting() {
   if (h < 12) return 'morning';
   if (h < 17) return 'afternoon';
   return 'evening';
+}
+
+/** Student-side clock + weather, mirrors the admin LiveClock visually. */
+function StudentClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+      padding: '8px 14px',
+      borderRadius: 10,
+      background: 'var(--bg3)',
+      border: '1px solid var(--border)',
+      lineHeight: 1.1,
+      gap: 4,
+      minWidth: 200,
+    }}>
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 18, fontWeight: 700,
+        color: 'var(--cyan)', letterSpacing: '.02em',
+      }}>
+        {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+      </span>
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
+        textTransform: 'uppercase',
+      }}>
+        {now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+      </span>
+      <span style={{
+        paddingTop: 4, borderTop: '1px solid var(--border)',
+        width: '100%', display: 'flex', justifyContent: 'flex-end',
+      }}>
+        <WeatherWidget />
+      </span>
+    </div>
+  );
 }

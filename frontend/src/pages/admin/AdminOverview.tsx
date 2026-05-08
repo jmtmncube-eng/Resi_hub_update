@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCircle2, XCircle, Pin, Image as ImageIcon, Clock } from 'lucide-react';
 import {
@@ -12,17 +12,25 @@ import {
 import { getNews } from '../../services/news.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ResiMark } from '../../components/Brand';
+import { WeatherWidget } from '../../components/WeatherWidget';
+import { useResidence } from '../../contexts/ResidenceContext';
+
+/** Pull a meaningful error message from an axios-or-other rejection. */
+function errMsg(e: unknown, fallback: string): string {
+  return (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? fallback;
+}
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function AdminOverview() {
   usePageTitle('Admin Overview');
   const qc = useQueryClient();
+  const { selectedId: residenceId } = useResidence();
   const [proofPreview, setProofPreview] = useState<string | null>(null);
 
   const { data: stats, isLoading, isError } = useQuery<AdminStats>({
-    queryKey: ['admin-stats'],
-    queryFn: getAdminStats,
+    queryKey: ['admin-stats', residenceId],
+    queryFn: () => getAdminStats(residenceId ?? undefined),
     refetchInterval: 30_000,
   });
 
@@ -50,7 +58,7 @@ export default function AdminOverview() {
       qc.invalidateQueries({ queryKey: ['admin-stats'] });
       toast.success('Claim approved');
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to approve'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to approve')),
   });
 
   const rejectMut = useMutation({
@@ -59,7 +67,7 @@ export default function AdminOverview() {
       qc.invalidateQueries({ queryKey: ['admin-claims'] });
       toast.success('Claim rejected');
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to reject'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to reject')),
   });
 
   const approveChoreMut = useMutation({
@@ -69,7 +77,7 @@ export default function AdminOverview() {
       qc.invalidateQueries({ queryKey: ['chores'] });
       toast.success('Chore approved · student credited +20 🪙');
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to approve chore'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to approve chore')),
   });
 
   const rejectChoreMut = useMutation({
@@ -79,7 +87,7 @@ export default function AdminOverview() {
       qc.invalidateQueries({ queryKey: ['chores'] });
       toast.success('Chore proof rejected');
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to reject chore'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to reject chore')),
   });
 
   if (isError) return (
@@ -94,49 +102,91 @@ export default function AdminOverview() {
     );
   }
 
-  const cards = [
-    { label: 'Active Students',  value: stats.students.total,              note: `${stats.students.pending} pending`,  color: 'cyan', icon: '🎓' },
-    { label: 'Occupancy Rate',   value: `${stats.occupancyRate}%`,         note: `${stats.rooms.vacant} vacant`,        color: 'cyan', icon: '🏠' },
-    { label: 'Open Tickets',     value: stats.maintenance.open,            note: `${stats.maintenance.urgent} urgent`,  color: stats.maintenance.urgent > 0 ? 'rose' : 'cyan', icon: '🔧' },
-    { label: "Today's Visitors", value: stats.visitors.today,              note: `${stats.visitors.total} total`,       color: 'cyan', icon: '🪪' },
-    { label: 'Monthly Revenue',  value: `R${stats.monthlyRevenue.toLocaleString()}`, note: `${stats.rooms.occupied} rooms`, color: 'cyan', icon: '💰' },
-    { label: 'Active Vouchers',  value: stats.vouchers.active,             note: 'in reward shop',                      color: 'cyan', icon: '🎁' },
-  ] as const;
+  // Revenue / financial KPIs come FIRST so admin's eye lands there.
+  // Student / operational KPIs sit in their own visual group below.
+  type CardTone = 'cyan' | 'rose';
+  const revenueCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
+    { label: 'Monthly Revenue',  value: `R${stats.monthlyRevenue.toLocaleString()}`, note: `${stats.rooms.occupied} occupied`, color: 'cyan', icon: '💰' },
+    { label: 'Occupancy Rate',   value: `${stats.occupancyRate}%`,         note: `${stats.rooms.vacant} vacant`,         color: 'cyan', icon: '🏠' },
+    { label: 'Active Vouchers',  value: stats.vouchers.active,             note: 'in reward shop',                       color: 'cyan', icon: '🎁' },
+  ];
+  const operationalCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
+    { label: 'Active Students',  value: stats.students.total,              note: `${stats.students.pending} pending`,    color: 'cyan', icon: '🎓' },
+    { label: "Today's Visitors", value: stats.visitors.today,              note: `${stats.visitors.total} total`,        color: 'cyan', icon: '🪪' },
+    { label: 'Open Tickets',     value: stats.maintenance.open,            note: `${stats.maintenance.urgent} urgent`,   color: stats.maintenance.urgent > 0 ? 'rose' : 'cyan', icon: '🔧' },
+  ];
 
   const recentNews = news.slice(0, 5);
 
   return (
     <div className="space-y-6 appear">
 
-      {/* Header */}
+      {/* Header — left: title; right: live clock + pending approvals chip */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <ResiMark size={44} />
+          <ResiMark size={40} />
           <div>
             <h1 className="page-title">Admin Overview</h1>
             <p className="page-sub">Real-time residence statistics</p>
           </div>
         </div>
-        {(pendingClaims.length + pendingChores.length) > 0 && (
-          <span className="badge badge-fill-rose" style={{ fontSize: 11, padding: '6px 12px' }}>
-            {pendingClaims.length + pendingChores.length} pending approval{(pendingClaims.length + pendingChores.length) === 1 ? '' : 's'}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {(pendingClaims.length + pendingChores.length) > 0 && (
+            <span className="badge badge-fill-rose" style={{ fontSize: 11, padding: '6px 12px' }}>
+              {pendingClaims.length + pendingChores.length} pending approval{(pendingClaims.length + pendingChores.length) === 1 ? '' : 's'}
+            </span>
+          )}
+          <LiveClock />
+        </div>
       </div>
 
-      {/* KPI stat grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 stagger">
-        {cards.map(c => (
-          <div key={c.label} className={`kpi-card ${c.color === 'rose' ? 'rose' : ''}`}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 22 }}>{c.icon}</span>
-              <span className={`badge ${c.color === 'rose' ? 'badge-rose' : 'badge-cyan'}`}>{c.note}</span>
+      {/* ── REVENUE & OCCUPANCY (financial) ─────────────────────── */}
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ width: 4, height: 14, background: 'var(--cyan)', borderRadius: 2 }} />
+          <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: "'IBM Plex Mono', monospace" }}>
+            Revenue &amp; Occupancy
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 stagger">
+          {revenueCards.map(c => (
+            <div key={c.label} className={`kpi-card ${c.color === 'rose' ? 'rose' : ''}`} style={{ padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 18 }}>{c.icon}</span>
+                <span className={`badge ${c.color === 'rose' ? 'badge-rose' : 'badge-cyan'}`} style={{ fontSize: 9, padding: '2px 7px' }}>{c.note}</span>
+              </div>
+              <p style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: 'var(--text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-.01em' }}>
+                {c.value}
+              </p>
+              <p className="kpi-card-label" style={{ marginTop: 4, marginBottom: 0, fontSize: 10 }}>{c.label}</p>
             </div>
-            <p className="kpi-card-value">{c.value}</p>
-            <p className="kpi-card-label" style={{ marginTop: 6, marginBottom: 0 }}>{c.label}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── STUDENTS & OPERATIONS ──────────────────────────────── */}
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ width: 4, height: 14, background: 'var(--rose)', borderRadius: 2 }} />
+          <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: "'IBM Plex Mono', monospace" }}>
+            Students &amp; Operations
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 stagger">
+          {operationalCards.map(c => (
+            <div key={c.label} className={`kpi-card ${c.color === 'rose' ? 'rose' : ''}`} style={{ padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 18 }}>{c.icon}</span>
+                <span className={`badge ${c.color === 'rose' ? 'badge-rose' : 'badge-cyan'}`} style={{ fontSize: 9, padding: '2px 7px' }}>{c.note}</span>
+              </div>
+              <p style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: 'var(--text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-.01em' }}>
+                {c.value}
+              </p>
+              <p className="kpi-card-label" style={{ marginTop: 4, marginBottom: 0, fontSize: 10 }}>{c.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Two-column: Pending Approvals + System Notifications */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger">
@@ -407,6 +457,50 @@ export default function AdminOverview() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Live clock + date + weather — ticks every second so HH:MM:SS feels alive.
+ *  Weather widget polls Open-Meteo every 15 minutes (handled internally). */
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+      padding: '8px 14px',
+      borderRadius: 10,
+      background: 'var(--bg3)',
+      border: '1px solid var(--border)',
+      lineHeight: 1.1,
+      gap: 4,
+      minWidth: 200,
+    }}>
+      {/* Big time — HH:MM:SS */}
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 18, fontWeight: 700,
+        color: 'var(--cyan)', letterSpacing: '.02em',
+      }}>
+        {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+      </span>
+      {/* Date */}
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
+        textTransform: 'uppercase',
+      }}>
+        {now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+      </span>
+      {/* Weather just below the date */}
+      <span style={{ paddingTop: 4, borderTop: '1px solid var(--border)', width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+        <WeatherWidget />
+      </span>
     </div>
   );
 }

@@ -19,6 +19,9 @@ import NotFound from './pages/NotFound';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import TermsOfUse    from './pages/legal/TermsOfUse';
 
+// ── Public gate scanner ───────────────────────────────────────
+import Gate from './pages/Gate';
+
 // ── Active Student ─────────────────────────────────────────────
 import Dashboard   from './pages/student/Dashboard';
 import Maintenance from './pages/student/Maintenance';
@@ -41,6 +44,7 @@ import AdminNews        from './pages/admin/AdminNews';
 import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
 import AdminAccounts    from './pages/admin/AdminAccounts';
+import AdminAudit       from './pages/admin/AdminAudit';
 import AdminPayments    from './pages/admin/AdminPayments';
 
 /** Wraps a page component with DashboardLayout + ErrorBoundary */
@@ -74,6 +78,7 @@ function App() {
           <Route path={ROUTES.REGISTER} element={<Register />} />
           <Route path={ROUTES.PRIVACY}  element={<PrivacyPolicy />} />
           <Route path={ROUTES.TERMS}    element={<TermsOfUse />} />
+          <Route path={ROUTES.GATE}     element={<Gate />} />
 
           {/* ── Active Student ─────────────────────────────── */}
           <Route path={ROUTES.DASHBOARD}   element={<Page roles={ACTIVE}><Dashboard /></Page>} />
@@ -103,6 +108,7 @@ function App() {
           <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
           <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
           <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
+          <Route path={ROUTES.ADMIN_AUDIT}       element={<Page roles={ADMIN}><AdminAudit /></Page>} />
           <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={ADMIN}><AdminPayments /></Page>} />
 
           {/* ── Default ────────────────────────────────────── */}

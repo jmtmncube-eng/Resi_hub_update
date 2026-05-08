@@ -5,7 +5,8 @@ import * as adminService from '../services/admin.service';
 // ── Overview ──────────────────────────────────────────────────
 export async function getStats(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = await adminService.getAdminStats();
+    const { residenceId } = req.query as { residenceId?: string };
+    const data = await adminService.getAdminStats(residenceId);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }
@@ -118,6 +119,27 @@ export async function removeAllocation(req: Request, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
+export async function deleteRoom(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.deleteRoom(req.params.id);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+export async function moveAllocation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { userId, targetRoomId, rent, status } = req.body as {
+      userId: string; targetRoomId: string; rent: number; status?: 'ACTIVE' | 'RESERVED';
+    };
+    if (!userId || !targetRoomId || !rent) {
+      res.status(400).json({ success: false, error: 'userId, targetRoomId, and rent are required' });
+      return;
+    }
+    const data = await adminService.moveAllocation({ userId, targetRoomId, rent, status });
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 // ── Accounts ──────────────────────────────────────────────────
 export async function getAccounts(req: Request, res: Response, next: NextFunction) {
   try {
@@ -190,9 +212,10 @@ export async function awardCredits(req: Request, res: Response, next: NextFuncti
 }
 
 // ── Revenue Report ────────────────────────────────────────────
-export async function getRevenueReport(_req: Request, res: Response, next: NextFunction) {
+export async function getRevenueReport(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = await adminService.getRevenueReport();
+    const { residenceId } = req.query as { residenceId?: string };
+    const data = await adminService.getRevenueReport(residenceId);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }

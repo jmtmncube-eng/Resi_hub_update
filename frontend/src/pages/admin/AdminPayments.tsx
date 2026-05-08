@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { format } from 'date-fns';
 import { getRevenueReport, getAllInvoices, clearPayment, rejectPaymentProof, AdminInvoice } from '../../services/admin.service';
+import { useResidence } from '../../contexts/ResidenceContext';
 import { bulkCreateInvoices, BulkInvoiceResult } from '../../services/document.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { formatPeriod, formatRand } from '../../utils/period';
@@ -24,14 +25,15 @@ const PROOF_COLOR: Record<string, string> = {
 export default function AdminPayments() {
   usePageTitle('Payments · Admin');
   const qc = useQueryClient();
+  const { selectedId: residenceId } = useResidence();
   const [tab, setTab] = useState<'overview' | 'invoices' | 'late'>('overview');
   const [proofModal, setProofModal] = useState<AdminInvoice | null>(null);
   const [clearTarget, setClearTarget] = useState<AdminInvoice | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const { data: report, isLoading: repLoading } = useQuery({
-    queryKey: ['admin-revenue'],
-    queryFn:  getRevenueReport,
+    queryKey: ['admin-revenue', residenceId],
+    queryFn:  () => getRevenueReport(residenceId ?? undefined),
   });
 
   const { data: invoices = [], isLoading: invLoading } = useQuery({

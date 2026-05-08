@@ -2,21 +2,30 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 
 export async function listResidences() {
+  // One query — Prisma JOINs rooms (and their active/reserved allocations)
+  // alongside the residence row so N residences = 1 round-trip, not N+1.
   const list = await prisma.residence.findMany({
     where:   { archived: false },
-    include: { _count: { select: { rooms: true, contractors: true } } },
+    include: {
+      _count: { select: { rooms: true, contractors: true } },
+      rooms:  {
+        select: {
+          capacity: true,
+          price:    true,
+          allocations: {
+            where:  { status: { in: ['ACTIVE', 'RESERVED'] } },
+            select: { status: true },
+          },
+        },
+      },
+    },
     orderBy: { createdAt: 'asc' },
   });
 
-  // Decorate each residence with quick health metrics
-  const decorated = await Promise.all(list.map(async (r) => {
-    const rooms = await prisma.room.findMany({
-      where: { residenceId: r.id },
-      include: { allocations: { where: { status: { in: ['ACTIVE', 'RESERVED'] } } } },
-    });
-    const totalSlots  = rooms.reduce((s, rm) => s + (rm.capacity || 1), 0);
-    const filledSlots = rooms.reduce((s, rm) => s + rm.allocations.length, 0);
-    const projected   = rooms.reduce((s, rm) => {
+  return list.map(r => {
+    const totalSlots  = r.rooms.reduce((s, rm) => s + (rm.capacity || 1), 0);
+    const filledSlots = r.rooms.reduce((s, rm) => s + rm.allocations.length, 0);
+    const projected   = r.rooms.reduce((s, rm) => {
       const active = rm.allocations.filter(a => a.status === 'ACTIVE').length;
       return s + active * Number(rm.price ?? 0);
     }, 0);
@@ -30,8 +39,7 @@ export async function listResidences() {
       occupancyPct: totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0,
       projectedMonthly: projected,
     };
-  }));
-  return decorated;
+  });
 }
 
 export async function createResidence(data: {

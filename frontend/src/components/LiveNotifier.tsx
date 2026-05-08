@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Bell, FileText, ClipboardList, AlertCircle,
-  Wrench, Megaphone, UserPlus,
+  Wrench, Megaphone, UserPlus, LogIn, LogOut,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROUTES }  from '../constants/routes';
@@ -13,6 +13,7 @@ import { getMyDocuments } from '../services/document.service';
 import { getChores } from '../services/chore.service';
 import { getAccounts } from '../services/admin.service';
 import { getTickets } from '../services/maintenance.service';
+import { getMyPasses } from '../services/visitor.service';
 import { Chore } from '../types/domain.types';
 import { formatPeriod } from '../utils/period';
 
@@ -41,6 +42,9 @@ export function LiveNotifier() {
   const choreStateRef   = useRef<Map<string, string>>(new Map());
   const seenPendingRef  = useRef<Set<string> | null>(null);
   const seenTicketRef   = useRef<Set<string> | null>(null);
+  // Track each pass's status so we can detect UPCOMING→ACTIVE (entry) and
+  // ACTIVE→EXPIRED (exit) transitions and toast the host.
+  const passStateRef    = useRef<Map<string, string>>(new Map());
 
   const isStudent = user?.role === 'ACTIVE_STUDENT';
   const isAdmin   = user?.role === 'ADMIN';
@@ -194,6 +198,55 @@ export function LiveNotifier() {
     seenChoreRef.current = ids;
     choreStateRef.current = stateMap;
   }, [chores, user, nav, qc]);
+
+  // ── Student: visitor pass scans (gate entry / exit toast) ──────
+  // Polls /api/visitors every 30s. When a pass goes UPCOMING→ACTIVE the
+  // host gets a green entry toast; ACTIVE→EXPIRED becomes the exit toast.
+  const { data: passes } = useQuery({
+    queryKey: ['live-passes'],
+    queryFn:  getMyPasses,
+    enabled:  enabled && isStudent,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  useEffect(() => {
+    if (!passes) return;
+    // Seed silently on first poll so we don't toast for old data
+    if (passStateRef.current.size === 0) {
+      for (const p of passes) passStateRef.current.set(p.id, p.status);
+      return;
+    }
+    for (const p of passes) {
+      const prev = passStateRef.current.get(p.id);
+      if (prev && prev !== p.status) {
+        if (prev === 'UPCOMING' && p.status === 'ACTIVE') {
+          toast.success(
+            <ToastBody
+              icon={<LogIn size={15} style={{ color: '#4ade80' }} />}
+              title={`${p.visitorName} just checked in`}
+              subtitle={`Verified at the gate · ${p.purpose}`}
+              tag="Visitor entry"
+              action={() => { nav(ROUTES.VISITORS); qc.invalidateQueries({ queryKey: ['visitors'] }); }}
+            />,
+            { duration: 7000 },
+          );
+        } else if (prev === 'ACTIVE' && p.status === 'EXPIRED') {
+          toast(
+            <ToastBody
+              icon={<LogOut size={15} style={{ color: 'var(--rose)' }} />}
+              title={`${p.visitorName} has left`}
+              subtitle="Checked out at the gate"
+              tag="Visitor exit"
+              action={() => { nav(ROUTES.VISITORS); qc.invalidateQueries({ queryKey: ['visitors'] }); }}
+            />,
+            { duration: 6000 },
+          );
+        }
+      }
+      passStateRef.current.set(p.id, p.status);
+    }
+  }, [passes, nav, qc]);
 
   // ── Admin: new pending student registrations ───────────────────
   const { data: accounts } = useQuery({
