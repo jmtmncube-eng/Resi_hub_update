@@ -23,6 +23,7 @@ export const getAllocations = async (search?: string) => {
 
 export const createAllocation = async (body: {
   userId: string; roomId: string; rent: number; status?: string;
+  electricitySelfManaged?: boolean;
 }) => {
   const res = await api.post('/admin/allocations', body);
   return res.data.data;
@@ -30,6 +31,7 @@ export const createAllocation = async (body: {
 
 export const updateAllocation = async (id: string, body: {
   rent?: number; status?: string; endDate?: string;
+  electricitySelfManaged?: boolean;
 }) => {
   const res = await api.patch(`/admin/allocations/${id}`, body);
   return res.data.data;

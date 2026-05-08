@@ -10,6 +10,7 @@ import {
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { useConfirm } from '../../components/useConfirm';
+import { Modal } from '../../components/Modal';
 import { Trash2 } from 'lucide-react';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -266,10 +267,8 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
       )}
 
       {/* Create Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>New Allocation</p>
+      <Modal open={showModal} onClose={() => setShowModal(false)} maxWidth={440}>
+        <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 20 }}>New Allocation</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
@@ -347,9 +346,7 @@ export default function AdminAllocations({ hideHeader = false }: AdminAllocation
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

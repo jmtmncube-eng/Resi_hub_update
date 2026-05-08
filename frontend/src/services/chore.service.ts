@@ -38,3 +38,38 @@ export async function rejectChoreProof(id: string, adminNote?: string): Promise<
   const res = await api.post<ApiResponse<Chore>>(`/chores/admin/${id}/reject`, { adminNote });
   return res.data.data;
 }
+
+/* ── Admin chore CRUD ───────────────────────────────────────── */
+
+export interface AdminChore extends Chore {
+  active:        boolean;
+  residenceId:   string | null;
+  claimedByName: string | null;
+  doneByName:    string | null;
+}
+
+export async function listAllChores(residenceId?: string): Promise<AdminChore[]> {
+  const res = await api.get<ApiResponse<AdminChore[]>>('/chores/admin', { params: residenceId ? { residenceId } : {} });
+  return res.data.data;
+}
+
+export async function createChore(body: {
+  icon?: string; name: string; description?: string;
+  frequency?: string; block: string; residenceId?: string;
+}): Promise<AdminChore> {
+  const res = await api.post<ApiResponse<AdminChore>>('/chores/admin', body);
+  return res.data.data;
+}
+
+export async function updateChore(id: string, body: Partial<{
+  icon: string; name: string; description: string;
+  frequency: string; block: string; active: boolean;
+}>): Promise<AdminChore> {
+  const res = await api.patch<ApiResponse<AdminChore>>(`/chores/admin/${id}`, body);
+  return res.data.data;
+}
+
+export async function deleteChore(id: string): Promise<{ id: string; name: string }> {
+  const res = await api.delete<ApiResponse<{ id: string; name: string }>>(`/chores/admin/${id}`);
+  return res.data.data;
+}

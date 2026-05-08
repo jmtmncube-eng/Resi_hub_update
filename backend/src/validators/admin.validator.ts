@@ -6,11 +6,14 @@ export const createAllocationSchema = z.object({
   rent:      z.number().positive(),
   startDate: z.string().optional(),
   status:    z.enum(['ACTIVE', 'RESERVED']).optional(),
+  /** True = tenant tops up their own electricity meter; false (default) = admin handles bulk. */
+  electricitySelfManaged: z.boolean().optional(),
 });
 
 export const updateAllocationSchema = z.object({
   rent:   z.number().positive().optional(),
   status: z.enum(['ACTIVE', 'RESERVED', 'ENDED']).optional(),
+  electricitySelfManaged: z.boolean().optional(),
 });
 
 export const updateAccountSchema = z.object({

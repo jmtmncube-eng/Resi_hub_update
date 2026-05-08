@@ -10,6 +10,7 @@ import { bulkCreateInvoices, BulkInvoiceResult } from '../../services/document.s
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { formatPeriod, formatRand } from '../../utils/period';
 import ConfirmModal from '../../components/ConfirmModal';
+import { Modal } from '../../components/Modal';
 
 const PROOF_LABEL: Record<string, string> = {
   SUBMITTED: 'Proof Submitted',
@@ -263,10 +264,10 @@ export default function AdminPayments() {
       )}
 
       {/* Proof review modal */}
-      {proofModal && (
-        <div className="modal-overlay" onClick={() => setProofModal(null)} style={{ zIndex: 9999 }}>
-          <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 560, padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Modal open={!!proofModal} onClose={() => setProofModal(null)} maxWidth={560}>
+        {proofModal && (
+          <>
+            <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>PAYMENT PROOF</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{proofModal.user.name} — {formatPeriod(proofModal.period)}</p>
@@ -275,40 +276,38 @@ export default function AdminPayments() {
                 <X size={16} />
               </button>
             </div>
-            <div style={{ padding: 24 }}>
-              {proofModal.proofUrl ? (
-                <img
-                  src={proofModal.proofUrl}
-                  alt="Payment proof"
-                  style={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 20 }}
-                />
-              ) : (
-                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 40, textAlign: 'center', marginBottom: 20 }}>
-                  <p style={{ color: 'var(--text3)' }}>No image uploaded</p>
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>Close</button>
-                <button
-                  onClick={() => rejectMut.mutate(proofModal.id)}
-                  disabled={rejectMut.isPending}
-                  style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}
-                >
-                  {rejectMut.isPending ? <Loader2 size={12} className="animate-spin" /> : 'Reject'}
-                </button>
-                <button
-                  onClick={() => setClearTarget(proofModal)}
-                  disabled={clearMut.isPending}
-                  className="btn-primary"
-                  style={{ padding: '9px 18px', fontSize: 13 }}
-                >
-                  <CheckCircle2 size={14} /> Approve & Clear
-                </button>
+            {proofModal.proofUrl ? (
+              <img
+                src={proofModal.proofUrl}
+                alt="Payment proof"
+                style={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 20 }}
+              />
+            ) : (
+              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 40, textAlign: 'center', marginBottom: 20 }}>
+                <p style={{ color: 'var(--text3)' }}>No image uploaded</p>
               </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>Close</button>
+              <button
+                onClick={() => rejectMut.mutate(proofModal.id)}
+                disabled={rejectMut.isPending}
+                style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}
+              >
+                {rejectMut.isPending ? <Loader2 size={12} className="animate-spin" /> : 'Reject'}
+              </button>
+              <button
+                onClick={() => setClearTarget(proofModal)}
+                disabled={clearMut.isPending}
+                className="btn-primary"
+                style={{ padding: '9px 18px', fontSize: 13 }}
+              >
+                <CheckCircle2 size={14} /> Approve & Clear
+              </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       <ConfirmModal
         open={!!clearTarget}
@@ -372,9 +371,8 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
   });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+    <Modal open={true} onClose={onClose} maxWidth={520}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Generate invoices</p>
             <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
@@ -514,8 +512,7 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

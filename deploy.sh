@@ -1,7 +1,12 @@
 #!/bin/sh
 # Resi-Hub VPS deploy script.
-# Run from the project root:  ./deploy.sh
-# Pulls latest code, rebuilds containers fresh, applies schema, reseeds.
+# Run from the project root:
+#
+#   ./deploy.sh             # code + schema only — keeps existing data
+#   SEED=1 ./deploy.sh      # also reseed the DB (DESTRUCTIVE — wipes users)
+#
+# Pulls latest code, rebuilds containers fresh, applies Prisma schema,
+# optionally reseeds, reloads nginx if installed.
 set -e
 
 echo ""
@@ -45,13 +50,16 @@ echo "[5/6] Applying Prisma schema…"
 docker compose exec -T backend npx prisma db push --accept-data-loss
 
 # ── 6. Reseed (only if SEED=1 passed) ──────────────────────────
+# The seed has a FORCE_SEED guard that refuses to wipe a non-empty DB.
+# We pass FORCE_SEED=1 here so SEED=1 ./deploy.sh always succeeds — caller
+# already opted in by setting SEED=1, no point in a second confirmation.
 if [ "$SEED" = "1" ]; then
   echo ""
-  echo "[6/6] Reseeding (SEED=1 was set)…"
-  docker compose exec -T backend npx prisma db seed
+  echo "[6/6] Reseeding (SEED=1 was set — DB will be wiped)…"
+  docker compose exec -T -e FORCE_SEED=1 backend npx prisma db seed
 else
   echo ""
-  echo "[6/6] Skipping seed.  Run with  SEED=1 ./deploy.sh  to reseed."
+  echo "[6/6] Skipping seed.  Run with  SEED=1 ./deploy.sh  to reseed (DESTRUCTIVE)."
 fi
 
 # ── Reload nginx if installed ───────────────────────────────────

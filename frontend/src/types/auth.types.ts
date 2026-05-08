@@ -24,6 +24,8 @@ export interface Allocation {
   moveIn?: string;
   rent:    number;
   balance: number;
+  /** True = tenant tops up own electricity meter; false (default) = admin handles bulk + bills back. */
+  electricitySelfManaged?: boolean;
   room:    Room;
 }
 

@@ -7,6 +7,7 @@ import { AxiosError } from 'axios';
 import { getAvailableRooms, selectRoom, AvailableRoom } from '../../services/application.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ROUTES } from '../../constants/routes';
+import { Modal } from '../../components/Modal';
 
 const typeLabel: Record<string, string> = {
   SINGLE: 'Single', DOUBLE: 'Double', TRIPLE: 'Triple', QUAD: 'Quad', STUDIO: 'Studio',
@@ -162,9 +163,9 @@ export default function BrowseRooms() {
       )}
 
       {/* Confirm modal */}
-      {confirming && (
-        <div className="modal-overlay" onClick={() => setConfirming(null)}>
-          <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+      <Modal open={!!confirming} onClose={() => setConfirming(null)} maxWidth={420}>
+        {confirming && (
+          <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Reserve this room?</p>
               <button onClick={() => setConfirming(null)} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }}>
@@ -206,9 +207,9 @@ export default function BrowseRooms() {
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

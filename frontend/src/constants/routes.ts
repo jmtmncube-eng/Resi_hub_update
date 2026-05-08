@@ -30,6 +30,7 @@ export const ROUTES = {
   ADMIN_NEWS:         '/admin/news',
   ADMIN_VISITORS:     '/admin/visitors',
   ADMIN_REWARDS:      '/admin/rewards',
+  ADMIN_CHORES:       '/admin/chores',
   ADMIN_ACCOUNTS:     '/admin/accounts',
   ADMIN_AUDIT:        '/admin/activity',
   ADMIN_PAYMENTS:     '/admin/payments',

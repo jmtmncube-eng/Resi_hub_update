@@ -14,6 +14,7 @@ import { ResidentDocument } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import InvoiceModal from '../../components/InvoiceModal';
 import ContractSignModal from '../../components/ContractSignModal';
+import { Modal } from '../../components/Modal';
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
   INVOICE:  <FileClock  size={16} />,
@@ -398,9 +399,8 @@ function PayRentModal({
   const alreadyExists = existingPeriods.has(period);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+    <Modal open={true} onClose={onClose} maxWidth={460}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Pay rent</p>
             <p style={{ fontSize: 11, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
@@ -510,8 +510,7 @@ function PayRentModal({
             Cancel
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

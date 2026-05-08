@@ -9,6 +9,7 @@ import {
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import ConfirmModal from '../../components/ConfirmModal';
+import { Modal } from '../../components/Modal';
 
 const BLANK_V = { name: '', description: '', cost: '', stock: '', icon: '🎁', requiresProof: false, taskTitle: '', pin: '', imageUrl: '' };
 const BLANK_A = { userId: '', amount: '', note: '' };
@@ -411,10 +412,10 @@ export default function AdminRewards() {
       )}
 
       {/* Proof image modal */}
-      {proofModal && (
-        <div className="modal-overlay" onClick={() => setProofModal(null)} style={{ zIndex: 9999 }}>
-          <div className="modal-card appear" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Modal open={!!proofModal} onClose={() => setProofModal(null)} maxWidth={520}>
+        {proofModal && (
+          <>
+            <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>TASK PROOF</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
@@ -423,27 +424,25 @@ export default function AdminRewards() {
               </div>
               <button onClick={() => setProofModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}><X size={16} /></button>
             </div>
-            <div style={{ padding: 24 }}>
-              {(proofModal as AdminVoucherClaim).proofUrl ? (
-                <img src={(proofModal as AdminVoucherClaim).proofUrl!} alt="Task proof" style={{ width: '100%', maxHeight: 380, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 20 }} />
-              ) : (
-                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 40, textAlign: 'center', marginBottom: 20 }}>
-                  <p style={{ color: 'var(--text3)' }}>No image uploaded</p>
-                </div>
-              )}
-              {(proofModal as AdminVoucherClaim).status === 'PENDING' && (
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>Close</button>
-                  <button onClick={() => rejectClaim.mutate((proofModal as AdminVoucherClaim).id)} disabled={rejectClaim.isPending} style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}>Reject</button>
-                  <button onClick={() => approveClaim.mutate((proofModal as AdminVoucherClaim).id)} disabled={approveClaim.isPending} className="btn-primary" style={{ padding: '9px 18px', fontSize: 13 }}>
-                    <CheckCircle2 size={14} /> Approve
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+            {(proofModal as AdminVoucherClaim).proofUrl ? (
+              <img src={(proofModal as AdminVoucherClaim).proofUrl!} alt="Task proof" style={{ width: '100%', maxHeight: 380, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 20 }} />
+            ) : (
+              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 40, textAlign: 'center', marginBottom: 20 }}>
+                <p style={{ color: 'var(--text3)' }}>No image uploaded</p>
+              </div>
+            )}
+            {(proofModal as AdminVoucherClaim).status === 'PENDING' && (
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>Close</button>
+                <button onClick={() => rejectClaim.mutate((proofModal as AdminVoucherClaim).id)} disabled={rejectClaim.isPending} style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}>Reject</button>
+                <button onClick={() => approveClaim.mutate((proofModal as AdminVoucherClaim).id)} disabled={approveClaim.isPending} className="btn-primary" style={{ padding: '9px 18px', fontSize: 13 }}>
+                  <CheckCircle2 size={14} /> Approve
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
 
       <ConfirmModal
         open={!!deleteTarget}

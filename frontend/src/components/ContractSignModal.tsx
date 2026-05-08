@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, FileCheck, PenLine, Download, CheckCircle2, Loader2 } from 'lucide-react';
+import { Modal } from './Modal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ResidentDocument } from '../types/domain.types';
@@ -22,16 +23,8 @@ export default function ContractSignModal({ doc, onClose }: Props) {
   useEffect(() => {
     if (!doc) return;
     setSigName(user?.name ?? '');
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [doc, onClose, user?.name]);
-
-  useEffect(() => {
-    if (doc) document.body.style.overflow = 'hidden';
-    else     document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
-  }, [doc]);
+  }, [doc, user?.name]);
+  // ESC + scroll-lock are handled by <Modal> wrapper.
 
   const { mutate: sign, isPending: signing } = useMutation({
     mutationFn: () => signContract(doc!.id, sigName),
@@ -70,12 +63,8 @@ export default function ContractSignModal({ doc, onClose }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div
-        className="modal-card appear"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 520, padding: 0, overflow: 'hidden' }}
-      >
+    <Modal open={true} onClose={onClose} maxWidth={520}>
+      <div style={{ margin: '-28px -32px', padding: 0, overflow: 'hidden' }}>
         {/* Header */}
         <div style={{
           background: isSigned
@@ -197,7 +186,7 @@ export default function ContractSignModal({ doc, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

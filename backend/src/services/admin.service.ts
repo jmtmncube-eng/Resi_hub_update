@@ -310,6 +310,7 @@ export async function createAllocation(data: CreateAllocationInput) {
       rent:    data.rent,
       status:  (data.status ?? 'ACTIVE') as never,
       moveIn:  data.startDate ? new Date(data.startDate) : new Date(),
+      electricitySelfManaged: data.electricitySelfManaged ?? false,
     },
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -406,8 +407,9 @@ export async function updateAllocation(id: string, data: UpdateAllocationInput) 
   const updated = await prisma.allocation.update({
     where: { id },
     data: {
-      ...(data.rent   !== undefined && { rent:   data.rent }),
-      ...(data.status !== undefined && { status: data.status as never }),
+      ...(data.rent                   !== undefined && { rent:   data.rent }),
+      ...(data.status                 !== undefined && { status: data.status as never }),
+      ...(data.electricitySelfManaged !== undefined && { electricitySelfManaged: data.electricitySelfManaged }),
     },
     include: {
       user: { select: { id: true, name: true, email: true } },

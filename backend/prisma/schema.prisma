@@ -193,6 +193,9 @@ model Allocation {
   moveIn    DateTime?
   rent      Decimal          @db.Decimal(10, 2)
   balance   Decimal          @default(0) @db.Decimal(10, 2)
+  /// True = tenant tops up their own prepaid meter / smart electricity account.
+  /// False (default) = admin buys electricity in bulk for the residence and bills back.
+  electricitySelfManaged Boolean @default(false)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
@@ -253,11 +256,13 @@ model VisitorPass {
 
 model Chore {
   id              String    @id @default(cuid())
+  residenceId     String?                          // null = legacy / portfolio-wide; new chores get scoped
   icon            String
   name            String
   description     String
-  frequency       String
+  frequency       String                           // Free-text, e.g. "Weekly · Tuesdays"
   block           String
+  active          Boolean   @default(true)         // Admin can deactivate without deleting (preserves history)
   claimedById     String?
   doneById        String?
   doneAt          DateTime?
@@ -273,10 +278,12 @@ model Chore {
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  logs ChoreLog[]
+  logs      ChoreLog[]
+  residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
 
   @@index([block])
   @@index([proofStatus])
+  @@index([residenceId])
 }
 
 model ChoreLog {
@@ -540,6 +547,7 @@ model Residence {
   opsStock    OpsStock[]
   tickets     MaintenanceTicket[]
   news        News[]
+  chores      Chore[]
 }
 
 /// Paid service workers — pool guy, cleaner, gardener, grounds-keeper.

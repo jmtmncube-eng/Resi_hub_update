@@ -145,7 +145,7 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
   });
 
   const addTenantMut = useMutation({
-    mutationFn: (vars: { userId: string; roomId: string; rent: number; status: 'ACTIVE' | 'RESERVED' }) =>
+    mutationFn: (vars: { userId: string; roomId: string; rent: number; status: 'ACTIVE' | 'RESERVED'; electricitySelfManaged?: boolean }) =>
       createAllocation(vars),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
@@ -904,11 +904,12 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
           room={addTenantRoom}
           accounts={accountsList}
           onClose={() => setAddTenantRoom(null)}
-          onSubmitNew={(userId, status) => addTenantMut.mutate({
+          onSubmitNew={(userId, status, electricitySelfManaged) => addTenantMut.mutate({
             userId,
             roomId: addTenantRoom.id,
             rent:   Number(addTenantRoom.price),
             status,
+            electricitySelfManaged,
           })}
           onSubmitMove={(userId, status) => moveTenantMut.mutate({
             userId,
@@ -1051,7 +1052,7 @@ function AddTenantModal({
   accounts: AccountListItem[];
   onClose: () => void;
   /** Called when student has no current allocation. */
-  onSubmitNew:  (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
+  onSubmitNew:  (userId: string, status: 'ACTIVE' | 'RESERVED', electricitySelfManaged: boolean) => void;
   /** Called when student needs to be moved from another room to this one. */
   onSubmitMove: (userId: string, status: 'ACTIVE' | 'RESERVED') => void;
   loading: boolean;
@@ -1062,6 +1063,7 @@ function AddTenantModal({
   const eligible = accounts.filter(a => a.role !== 'ADMIN');
   const [userId, setUserId] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'RESERVED'>('ACTIVE');
+  const [electricitySelfManaged, setElectricitySelfManaged] = useState(false);
 
   const selectedStudent = eligible.find(s => s.id === userId);
   const currentRoom = selectedStudent?.allocation?.room;
@@ -1069,7 +1071,7 @@ function AddTenantModal({
   async function handleSubmit() {
     if (!userId) return;
     if (!currentRoom) {
-      onSubmitNew(userId, status);
+      onSubmitNew(userId, status, electricitySelfManaged);
       return;
     }
     // Re-allocation — confirm before moving
@@ -1138,6 +1140,39 @@ function AddTenantModal({
           </button>
         ))}
       </div>
+
+      {/* Electricity — per-tenant choice. Default: admin handles bulk. */}
+      {!currentRoom && (
+        <>
+          <label className="field-label">Electricity</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 18 }}>
+            {([
+              { val: false, label: 'Admin handles',  hint: 'Bulk-bought · billed back' },
+              { val: true,  label: 'Tenant self-loads', hint: 'Own meter top-ups' },
+            ] as const).map(opt => {
+              const active = electricitySelfManaged === opt.val;
+              return (
+                <button key={String(opt.val)}
+                  type="button"
+                  onClick={() => setElectricitySelfManaged(opt.val)}
+                  className="press-soft"
+                  style={{
+                    padding: '10px 12px', borderRadius: 8,
+                    border: `1px solid ${active ? 'var(--cyan)' : 'var(--border)'}`,
+                    background: active ? 'rgba(0,204,204,.08)' : 'var(--bg3)',
+                    color: active ? 'var(--text)' : 'var(--text2)',
+                    fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+                  }}>
+                  <span>{opt.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 400 }}>{opt.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
         <button

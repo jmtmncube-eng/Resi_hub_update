@@ -1,5 +1,6 @@
 import { X, Download, CheckCircle2, AlertCircle, Upload, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { Modal } from './Modal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ResidentDocument } from '../types/domain.types';
@@ -48,18 +49,7 @@ export default function InvoiceModal({ doc, onClose }: Props) {
     e.target.value = '';
   }
 
-  useEffect(() => {
-    if (!doc) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [doc, onClose]);
-
-  useEffect(() => {
-    if (doc) document.body.style.overflow = 'hidden';
-    else     document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
-  }, [doc]);
+  // ESC handling + scroll lock are handled by the <Modal> wrapper.
 
   if (!doc) return null;
 
@@ -93,7 +83,7 @@ export default function InvoiceModal({ doc, onClose }: Props) {
   const invoiceNum = `INV-${doc.id.slice(-8).toUpperCase()}`;
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
+    <Modal open={true} onClose={onClose} maxWidth={520}>
       {/* Hidden file input — in DOM so .click() reliably opens the OS file picker */}
       <input
         ref={fileInputRef}
@@ -102,11 +92,7 @@ export default function InvoiceModal({ doc, onClose }: Props) {
         style={{ display: 'none' }}
         onChange={onFileSelected}
       />
-      <div
-        className="modal-card appear"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 520, padding: 0, overflow: 'hidden' }}
-      >
+      <div style={{ margin: '-28px -32px', padding: 0, overflow: 'hidden' }}>
         {/* Header bar */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(0,204,204,.1) 0%, var(--bg2) 100%)',
@@ -238,6 +224,6 @@ export default function InvoiceModal({ doc, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

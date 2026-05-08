@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { WeatherWidget } from '../../components/WeatherWidget';
+import ElectricityCard from '../../components/ElectricityCard';
 import { format } from 'date-fns';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -142,6 +143,14 @@ export default function Dashboard() {
           color={openTickets.length > 0 ? 'rose' : 'cyan'}
         />
       </div>
+
+      {/* Electricity status — only shown for active allocations */}
+      {allocation && (
+        <ElectricityCard
+          selfManaged={allocation.electricitySelfManaged ?? false}
+          roomNumber={allocation.room.number}
+        />
+      )}
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger">

@@ -48,6 +48,33 @@ export async function rejectChoreProof(req: AuthRequest, res: Response, next: Ne
   } catch (err) { next(err); }
 }
 
+// ── Admin chore CRUD ──────────────────────────────────────────
+export async function listAllChores(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { residenceId } = req.query as { residenceId?: string };
+    res.json({ success: true, data: await svc.listAllChores(residenceId) });
+  } catch (err) { next(err); }
+}
+
+export async function createChore(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const data = await svc.createChore(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function updateChore(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.updateChore(req.params.id, req.body) });
+  } catch (err) { next(err); }
+}
+
+export async function deleteChore(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await svc.deleteChore(req.params.id) });
+  } catch (err) { next(err); }
+}
+
 async function getUserBlock(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({
     where: { id: userId },

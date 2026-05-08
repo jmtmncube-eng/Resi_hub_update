@@ -12,6 +12,7 @@ import {
 import { getNews } from '../../services/news.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ResiMark } from '../../components/Brand';
+import { Modal } from '../../components/Modal';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { useResidence } from '../../contexts/ResidenceContext';
 
@@ -438,16 +439,10 @@ export default function AdminOverview() {
       </div>
 
       {/* Proof image preview */}
-      {proofPreview && (
-        <div className="modal-overlay" onClick={() => setProofPreview(null)}>
-          <div onClick={e => e.stopPropagation()} style={{
-            maxWidth: 720, width: '100%', position: 'relative',
-            borderRadius: 14, overflow: 'hidden',
-            border: '1px solid var(--border2)',
-            boxShadow: '0 24px 60px -20px rgba(0,0,0,.7)',
-            animation: 'appear .25s ease forwards',
-          }}>
-            <img src={proofPreview} alt="Proof of work" style={{ width: '100%', display: 'block' }} />
+      <Modal open={!!proofPreview} onClose={() => setProofPreview(null)} maxWidth={720}>
+        {proofPreview && (
+          <div style={{ position: 'relative' }}>
+            <img src={proofPreview} alt="Proof of work" style={{ width: '100%', display: 'block', borderRadius: 8 }} />
             <button onClick={() => setProofPreview(null)} style={{
               position: 'absolute', top: 12, right: 12,
               background: 'rgba(0,0,0,.6)', border: 'none', color: '#fff',
@@ -455,8 +450,8 @@ export default function AdminOverview() {
               fontSize: 12, fontFamily: "'IBM Plex Mono', monospace",
             }}>Close</button>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

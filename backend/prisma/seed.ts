@@ -29,6 +29,24 @@ const daysFromNow = (n: number) => {
 async function main() {
   console.log('Seeding ResiHub database (full demo seed)...\n');
 
+  // ── Safety guard ──────────────────────────────────────────────
+  // Refuse to wipe an existing DB unless the operator explicitly opts in
+  // with FORCE_SEED=1. Prevents an accidental `npm run db:seed` from
+  // nuking real users in production.
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0 && process.env.FORCE_SEED !== '1') {
+    console.log(`⚠  Database already has ${existingUsers} user(s) — refusing to wipe.`);
+    console.log('   To reseed anyway (DESTRUCTIVE), run:');
+    console.log('       FORCE_SEED=1 npm run db:seed');
+    console.log('   Or via prisma:');
+    console.log('       FORCE_SEED=1 npx prisma db seed');
+    console.log('');
+    return;
+  }
+  if (existingUsers > 0) {
+    console.log(`⚠  FORCE_SEED=1 set — wiping ${existingUsers} user(s) and reseeding.\n`);
+  }
+
   // ── Wipe (FK order matters) ──────────────────────────────────
   await prisma.auditLog.deleteMany();
   await prisma.voucherRedemption.deleteMany();
@@ -201,8 +219,8 @@ async function main() {
   // ═════════════════════════════════════════════════════════════
   const moveIn = D('2026-02-01');
   await Promise.all([
-    // Great Den
-    prisma.allocation.create({ data: { userId: sarah.id,  roomId: greatRooms[0].id, status: AllocationStatus.ACTIVE, moveIn, rent: 4500, balance: 4500 } }), // Sarah owes May rent
+    // Great Den — sarah self-manages own electricity, marcus is admin-handled (default)
+    prisma.allocation.create({ data: { userId: sarah.id,  roomId: greatRooms[0].id, status: AllocationStatus.ACTIVE, moveIn, rent: 4500, balance: 4500, electricitySelfManaged: true } }), // Sarah owes May rent + self-loads
     prisma.allocation.create({ data: { userId: marcus.id, roomId: greatRooms[1].id, status: AllocationStatus.ACTIVE, moveIn, rent: 4500, balance: 0    } }),
     prisma.allocation.create({ data: { userId: leah.id,   roomId: greatRooms[2].id, status: AllocationStatus.ACTIVE, moveIn, rent: 5200, balance: 0    } }),
     prisma.allocation.create({ data: { userId: david.id,  roomId: greatRooms[2].id, status: AllocationStatus.ACTIVE, moveIn, rent: 5200, balance: 5200 } }), // shares double
@@ -212,7 +230,7 @@ async function main() {
     prisma.allocation.create({ data: { userId: riaan.id,  roomId: greatRooms[8].id, status: AllocationStatus.ACTIVE, moveIn, rent: 6500, balance: 0    } }),
 
     // Lions Den
-    prisma.allocation.create({ data: { userId: thandi.id, roomId: lionsRooms[0].id, status: AllocationStatus.ACTIVE, moveIn, rent: 3800, balance: 3800 } }),
+    prisma.allocation.create({ data: { userId: thandi.id, roomId: lionsRooms[0].id, status: AllocationStatus.ACTIVE, moveIn, rent: 3800, balance: 3800, electricitySelfManaged: true } }), // Thandi self-loads
     prisma.allocation.create({ data: { userId: jason.id,  roomId: lionsRooms[1].id, status: AllocationStatus.ACTIVE, moveIn, rent: 3800, balance: 0    } }),
     prisma.allocation.create({ data: { userId: mia.id,    roomId: lionsRooms[2].id, status: AllocationStatus.ACTIVE, moveIn, rent: 4600, balance: 0    } }),
 
@@ -414,14 +432,16 @@ async function main() {
   // CHORES — Great Den block A
   // ═════════════════════════════════════════════════════════════
   await Promise.all([
-    prisma.chore.create({ data: { icon: '🗑️', name: 'Take out dustbin',         description: 'Wheel the bin to the gate by 06:30 on collection day.',         frequency: 'Weekly · Tuesdays',     block: 'A', claimedById: sarah.id } }),
-    prisma.chore.create({ data: { icon: '🧹', name: 'Sweep common corridor',    description: 'Sweep floors 1–3 common corridors.',                              frequency: 'Bi-weekly · Mon & Thu', block: 'A' } }),
-    prisma.chore.create({ data: { icon: '💡', name: 'Check stairwell lights',   description: 'Walk all stairwells — report dead bulbs to admin.',               frequency: 'Weekly · Sundays',      block: 'A', claimedById: marcus.id } }),
-    prisma.chore.create({ data: { icon: '🧴', name: 'Refill soap dispensers',   description: 'Top up all common-area soap dispensers.',                          frequency: 'Weekly · Fridays',      block: 'B' } }),
-    prisma.chore.create({ data: { icon: '🌿', name: 'Water indoor plants',      description: 'Water the plants in lounge + study room.',                         frequency: 'Twice weekly',          block: 'B', claimedById: zoe.id } }),
-    prisma.chore.create({ data: { icon: '🪟', name: 'Wipe common-area windows', description: 'Inside windows of lounge and dining area.',                        frequency: 'Monthly',               block: 'C' } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '🗑️', name: 'Take out dustbin',         description: 'Wheel the bin to the gate by 06:30 on collection day.',         frequency: 'Weekly · Tuesdays',     block: 'A', claimedById: sarah.id } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '🧹', name: 'Sweep common corridor',    description: 'Sweep floors 1–3 common corridors.',                              frequency: 'Weekly · Mondays',      block: 'A' } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '💡', name: 'Check stairwell lights',   description: 'Walk all stairwells — report dead bulbs to admin.',               frequency: 'Weekly · Sundays',      block: 'A', claimedById: marcus.id } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '🧴', name: 'Refill soap dispensers',   description: 'Top up all common-area soap dispensers.',                          frequency: 'Weekly · Fridays',      block: 'B' } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '🌿', name: 'Water indoor plants',      description: 'Water the plants in lounge + study room.',                         frequency: 'Weekly · Wednesdays',   block: 'B', claimedById: zoe.id } }),
+    prisma.chore.create({ data: { residenceId: greatDen.id, icon: '🪟', name: 'Wipe common-area windows', description: 'Inside windows of lounge and dining area.',                        frequency: 'Monthly',               block: 'C' } }),
+    prisma.chore.create({ data: { residenceId: lionsDen.id, icon: '🧹', name: 'Sweep main corridor',      description: 'Sweep the main corridor + entrance area.',                        frequency: 'Weekly · Mondays',      block: 'Main' } }),
+    prisma.chore.create({ data: { residenceId: lionsDen.id, icon: '🌿', name: 'Water garden plants',      description: 'Water the front garden — early morning is best.',                 frequency: 'Weekly · Wednesdays',   block: 'Main', claimedById: thandi.id } }),
   ]);
-  console.log('  chores: 6 (3 claimed)');
+  console.log('  chores: 8 (residence-scoped, 4 claimed)');
 
   // ═════════════════════════════════════════════════════════════
   // WALLETS + transactions

@@ -43,6 +43,7 @@ import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminNews        from './pages/admin/AdminNews';
 import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
+import AdminChores      from './pages/admin/AdminChores';
 import AdminAccounts    from './pages/admin/AdminAccounts';
 import AdminAudit       from './pages/admin/AdminAudit';
 import AdminPayments    from './pages/admin/AdminPayments';
@@ -107,6 +108,7 @@ function App() {
           <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />
           <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
           <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
+          <Route path={ROUTES.ADMIN_CHORES}      element={<Page roles={ADMIN}><AdminChores /></Page>} />
           <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
           <Route path={ROUTES.ADMIN_AUDIT}       element={<Page roles={ADMIN}><AdminAudit /></Page>} />
           <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={ADMIN}><AdminPayments /></Page>} />

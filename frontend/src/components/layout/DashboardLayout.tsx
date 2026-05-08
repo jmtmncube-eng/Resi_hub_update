@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
   Building2, Ticket, Megaphone, ClipboardList, Gift, BookUser,
-  Sun, Moon, CreditCard, Activity,
+  Sun, Moon, CreditCard, Activity, ListChecks,
 } from 'lucide-react';
 import { useAuth }     from '../../contexts/AuthContext';
 import { useTheme }    from '../../contexts/ThemeContext';
@@ -40,6 +40,7 @@ const adminNav = [
   { to: ROUTES.ADMIN_NEWS,        label: 'News',      icon: Megaphone       },
   { to: ROUTES.ADMIN_VISITORS,    label: 'Visitors',  icon: QrCode          },
   { to: ROUTES.ADMIN_REWARDS,     label: 'Rewards',   icon: Gift            },
+  { to: ROUTES.ADMIN_CHORES,      label: 'Chores',    icon: ListChecks      },
   { to: ROUTES.ADMIN_AUDIT,       label: 'Activity',  icon: Activity        },
 ];
 

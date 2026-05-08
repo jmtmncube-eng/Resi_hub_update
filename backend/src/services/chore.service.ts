@@ -8,7 +8,8 @@ const APPROVAL_WINDOW_HOURS = 24;
 
 export async function getChores(block: string) {
   return prisma.chore.findMany({
-    where: { block },
+    // Students only see ACTIVE chores — paused/archived ones stay admin-only.
+    where: { block, active: true },
     include: {
       logs: {
         orderBy: { createdAt: 'desc' },
@@ -100,7 +101,95 @@ export async function completeChore(choreId: string, userId: string, proofUrl: s
   return updated;
 }
 
-/* ── Admin endpoints ──────────────────────────────────────────── */
+/* ── Admin: full chore CRUD ───────────────────────────────────── */
+
+/** List ALL chores (any block, any status) for admin management.
+ *  Optionally scoped by residence. Resolves claimedBy/doneBy names manually
+ *  since those FKs aren't formal Prisma relations. */
+export async function listAllChores(residenceId?: string) {
+  const chores = await prisma.chore.findMany({
+    where: residenceId ? { residenceId } : undefined,
+    include: {
+      logs: {
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        include: { user: { select: { name: true } } },
+      },
+    },
+    orderBy: [{ active: 'desc' }, { block: 'asc' }, { createdAt: 'desc' }],
+  });
+
+  // Pull claimer + completer names in one query (avoid N+1)
+  const ids = Array.from(new Set([
+    ...chores.map(c => c.claimedById).filter((x): x is string => !!x),
+    ...chores.map(c => c.doneById).filter((x): x is string => !!x),
+  ]));
+  const users = ids.length === 0 ? [] : await prisma.user.findMany({
+    where:  { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(users.map(u => [u.id, u.name]));
+
+  return chores.map(c => ({
+    ...c,
+    claimedByName: c.claimedById ? nameById.get(c.claimedById) ?? null : null,
+    doneByName:    c.doneById    ? nameById.get(c.doneById)    ?? null : null,
+  }));
+}
+
+export async function createChore(data: {
+  icon?: string; name: string; description?: string;
+  frequency?: string; block: string;
+  residenceId?: string;
+}) {
+  if (!data.name?.trim())  throw new AppError('Name is required', 400);
+  if (!data.block?.trim()) throw new AppError('Block is required', 400);
+
+  return prisma.chore.create({
+    data: {
+      icon:        data.icon?.trim()        || '🧹',
+      name:        data.name.trim(),
+      description: data.description?.trim() || '',
+      frequency:   data.frequency?.trim()   || 'Weekly',
+      block:       data.block.trim().toUpperCase(),
+      residenceId: data.residenceId ?? null,
+      active:      true,
+    },
+  });
+}
+
+export async function updateChore(id: string, data: Partial<{
+  icon: string; name: string; description: string;
+  frequency: string; block: string; active: boolean;
+}>) {
+  const existing = await prisma.chore.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Chore not found', 404);
+  return prisma.chore.update({
+    where: { id },
+    data: {
+      ...(data.icon        !== undefined && { icon: data.icon.trim() || '🧹' }),
+      ...(data.name        !== undefined && { name: data.name.trim() }),
+      ...(data.description !== undefined && { description: data.description.trim() }),
+      ...(data.frequency   !== undefined && { frequency: data.frequency.trim() }),
+      ...(data.block       !== undefined && { block: data.block.trim().toUpperCase() }),
+      ...(data.active      !== undefined && { active: data.active }),
+    },
+  });
+}
+
+/** Hard-delete a chore + its logs. Refuses if there's a pending proof
+ *  (admin should approve/reject first to keep the audit trail). */
+export async function deleteChore(id: string) {
+  const chore = await prisma.chore.findUnique({ where: { id } });
+  if (!chore) throw new AppError('Chore not found', 404);
+  if (chore.proofStatus === 'PENDING') {
+    throw new AppError('A pending proof exists — approve or reject it first.', 409);
+  }
+  await prisma.chore.delete({ where: { id } });
+  return { id, name: chore.name };
+}
+
+/* ── Admin: proof approvals ──────────────────────────────────── */
 
 export async function getPendingApprovals() {
   return prisma.chore.findMany({
