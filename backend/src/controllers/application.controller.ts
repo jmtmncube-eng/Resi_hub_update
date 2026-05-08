@@ -41,6 +41,28 @@ export async function submit(req: AuthRequest, res: Response, next: NextFunction
   }
 }
 
+// ── Compliance docs — any authenticated student ────────────────
+export async function getMyDocs(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await service.getMyApplicationDocs(req.user!.userId) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadDoc(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { type, fileUrl } = req.body as { type?: string; fileUrl?: string };
+    if (!type || !fileUrl) {
+      res.status(400).json({ success: false, error: 'type + fileUrl required' });
+      return;
+    }
+    res.status(201).json({ success: true, data: await service.uploadApplicationDoc(req.user!.userId, type, fileUrl) });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Admin: list submitted applications ─────────────────────────
 export async function listSubmitted(_req: AuthRequest, res: Response, next: NextFunction) {
   try {

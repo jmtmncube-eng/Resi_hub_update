@@ -20,7 +20,7 @@ const studentNav = [
   { to: ROUTES.MAINTENANCE, label: 'Maintenance',  icon: Wrench          },
   { to: ROUTES.UPDATES,     label: 'Updates',      icon: Newspaper       },
   { to: ROUTES.VISITORS,    label: 'Visitors',     icon: QrCode          },
-  { to: ROUTES.HOUSEMATES,  label: 'Housemates & Chores', icon: Users     },
+  { to: ROUTES.HOUSEMATES,  label: 'Housemates',   icon: Users           },
   { to: ROUTES.WALLET,      label: 'Wallet',       icon: Wallet          },
   { to: ROUTES.DOCUMENTS,   label: 'Documents & Invoices', icon: FileText  },
   { to: ROUTES.PROFILE,     label: 'Profile',      icon: User            },
@@ -217,9 +217,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           zIndex: 100,
           boxShadow: '0 1px 14px var(--shadow)',
         }}>
-          {/* Mobile-only hamburger. Brand never shows here — the sidebar (which
-              the hamburger opens) already carries it, and a duplicate in the
-              top bar is wasted real estate. */}
+          {/* Mobile-only hamburger + brand. Sidebar is hidden on phones,
+              so the topbar carries the brand mark + wordmark instead so
+              users always know where they are. */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
@@ -232,6 +232,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
+          {/* Mobile brand — logo + wordmark, only on small screens */}
+          <span className="md:hidden" style={{ display: 'inline-flex' }}>
+            <Brand size="sm" />
+          </span>
           {/* Flex spacer so UserMenu always pins to the right */}
           <div style={{ flex: 1 }} />
           <UserMenu />

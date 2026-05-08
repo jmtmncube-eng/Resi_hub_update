@@ -44,6 +44,7 @@ export async function rejectChoreProof(id: string, adminNote?: string): Promise<
 export interface AdminChore extends Chore {
   active:        boolean;
   residenceId:   string | null;
+  creditReward:  number;
   claimedByName: string | null;
   doneByName:    string | null;
 }
@@ -56,6 +57,7 @@ export async function listAllChores(residenceId?: string): Promise<AdminChore[]>
 export async function createChore(body: {
   icon?: string; name: string; description?: string;
   frequency?: string; block: string; residenceId?: string;
+  creditReward?: number;
 }): Promise<AdminChore> {
   const res = await api.post<ApiResponse<AdminChore>>('/chores/admin', body);
   return res.data.data;
@@ -64,6 +66,7 @@ export async function createChore(body: {
 export async function updateChore(id: string, body: Partial<{
   icon: string; name: string; description: string;
   frequency: string; block: string; active: boolean;
+  creditReward: number;
 }>): Promise<AdminChore> {
   const res = await api.patch<ApiResponse<AdminChore>>(`/chores/admin/${id}`, body);
   return res.data.data;

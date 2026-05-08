@@ -5,9 +5,10 @@ import prisma from '../config/database';
 
 export async function getChores(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    // Default to user's block, or query param
-    const block = (req.query.block as string) || await getUserBlock(req.user!.userId);
-    res.json({ success: true, data: await svc.getChores(block) });
+    // Service resolves the student's residence + block from their allocation;
+    // the optional ?block= query is a manual override (admin viewing any block).
+    const block = (req.query.block as string) || undefined;
+    res.json({ success: true, data: await svc.getChores(req.user!.userId, block) });
   } catch (err) { next(err); }
 }
 
@@ -75,10 +76,7 @@ export async function deleteChore(req: AuthRequest, res: Response, next: NextFun
   } catch (err) { next(err); }
 }
 
-async function getUserBlock(userId: string): Promise<string> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { allocation: { include: { room: true } } },
-  });
-  return user?.allocation?.room?.block ?? 'Block A';
-}
+// Note: block / residence resolution moved into chore.service.getChores
+// — we no longer need the local helper since the service does it.
+void prisma; // keeps the import alive in case it's used by other handlers
+

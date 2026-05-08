@@ -304,3 +304,282 @@ export function downloadContractPdf(data: ContractData): void {
   footer(doc);
   doc.save(`Lease-${data.user.name.split(' ')[0]}.pdf`);
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Residence Health Report PDF — admin-only
+// Multi-page: snapshot, financials, occupancy, ops, contractors,
+// late payers, tickets summary. Designed to be printable + emailable.
+// ─────────────────────────────────────────────────────────────────
+
+export interface HealthReportData {
+  residenceName: string;
+  generatedAt:   Date;
+  stats: {
+    students:      { total: number; pending: number };
+    rooms:         { total: number; occupied: number; vacant: number; totalSlots: number; filledSlots: number; slotOccupancyRate: number };
+    maintenance:   { open: number; urgent: number };
+    visitors:      { total: number; today: number };
+    vouchers:      { active: number };
+    monthlyRevenue:        number;
+    monthlyOpsCost:        number;
+    monthlyContractorCost: number;
+    monthlyTotalCost:      number;
+    netMonthly:            number;
+    occupancyRate:         number;
+  };
+  ops: {
+    monthlyOpsCost: number;
+    spend30: Array<{ type: string; total: number; count: number }>;
+    solarKwhLast30: number;
+    stock: Array<{ label: string; quantity: number; unit: string; threshold: number | null; low: boolean }>;
+    reminders: Array<{ severity: 'urgent' | 'warn' | 'info'; title: string; body: string }>;
+    cadence: Array<{ type: string; lastDate: string | null; daysSinceLast: number | null; isOverdue: boolean }>;
+  };
+  revenue: {
+    projectedMonthly: number;
+    monthlyBreakdown: Array<{ period: string; expected: number; cleared: number; submitted: number; pending: number }>;
+    latePayers: Array<{ user: { name: string; email: string }; period: string; amount: string | null; status: string | null }>;
+    totalActiveStudents: number;
+  };
+  contractors: Array<{ name: string; type: string; rate: string; rateUnit: string; active: boolean; paymentType: string; pendingInvoiceCount: number; pendingInvoiceTotal: number }>;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  POOL_CLEAN: 'Pool cleaning',  POOL_CHEMICAL: 'Pool chemicals',
+  GAS_REFILL: 'Gas refill',     GRASS_CUT: 'Grass cut',
+  ELECTRICITY_PURCHASE: 'Electricity', SOLAR_TELEMETRY: 'Solar reading',
+  OTHER: 'Other',
+  CLEANER: 'Cleaner', GROUNDSKEEPER: 'Grounds-keeper',
+  GARDENER: 'Gardener',
+};
+const prettyType = (t: string) => TYPE_LABELS[t] ?? t.toLowerCase().replace(/_/g, ' ');
+
+function ensureSpace(doc: jsPDF, y: number, lines = 20): number {
+  const h = doc.internal.pageSize.getHeight();
+  if (y + lines > h - 25) {
+    doc.addPage();
+    return 24;
+  }
+  return y;
+}
+
+function sectionHeader(doc: jsPDF, label: string, y: number): number {
+  y = ensureSpace(doc, y, 14);
+  doc.setFillColor(CYAN);
+  doc.rect(14, y - 4, 2, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(INK);
+  doc.text(label, 19, y + 2);
+  doc.setDrawColor(225);
+  doc.line(14, y + 6, doc.internal.pageSize.getWidth() - 14, y + 6);
+  return y + 12;
+}
+
+function kpiRow(doc: jsPDF, items: Array<{ label: string; value: string; tone?: 'good' | 'warn' | 'bad' | 'mute' }>, y: number): number {
+  const w = doc.internal.pageSize.getWidth();
+  const cellW = (w - 28) / items.length;
+  items.forEach((it, i) => {
+    const x = 14 + i * cellW;
+    doc.setDrawColor(230);
+    doc.roundedRect(x, y, cellW - 4, 18, 2, 2);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(MUTE);
+    doc.text(it.label.toUpperCase(), x + 3, y + 5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    const tone = it.tone ?? 'mute';
+    doc.setTextColor(
+      tone === 'good' ? '#16a34a'
+      : tone === 'bad'  ? ROSE
+      : tone === 'warn' ? '#ea580c'
+      : INK,
+    );
+    doc.text(it.value, x + 3, y + 13);
+  });
+  return y + 22;
+}
+
+export function downloadHealthReportPdf(data: HealthReportData): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const w = doc.internal.pageSize.getWidth();
+  header(doc, 'HEALTH REPORT', data.residenceName);
+
+  let y = 32;
+
+  // ── Generated note ───────────────────────────────────────────
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(MUTE);
+  doc.text(
+    `Generated ${data.generatedAt.toLocaleString('en-ZA', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })}`,
+    14, y,
+  );
+  y += 10;
+
+  // ── Financial snapshot ───────────────────────────────────────
+  y = sectionHeader(doc, 'Financial snapshot · last 30 days', y);
+  y = kpiRow(doc, [
+    { label: 'Monthly revenue (expected)', value: formatRand(data.stats.monthlyRevenue),                tone: 'good' },
+    { label: 'Total cost',                  value: formatRand(data.stats.monthlyTotalCost),              tone: 'warn' },
+    { label: 'Net (rev − cost)',            value: formatRand(data.stats.netMonthly), tone: data.stats.netMonthly < 0 ? 'bad' : 'good' },
+  ], y);
+  y = kpiRow(doc, [
+    { label: 'Ops cost',         value: formatRand(data.stats.monthlyOpsCost) },
+    { label: 'Contractor cost',  value: formatRand(data.stats.monthlyContractorCost) },
+    { label: 'Active students',  value: String(data.stats.students.total) },
+  ], y);
+
+  // ── Occupancy ────────────────────────────────────────────────
+  y = sectionHeader(doc, 'Occupancy', y);
+  y = kpiRow(doc, [
+    { label: 'Bed-slot occupancy', value: `${data.stats.rooms.slotOccupancyRate}%`, tone: data.stats.rooms.slotOccupancyRate < 70 ? 'warn' : 'good' },
+    { label: 'Filled / total slots', value: `${data.stats.rooms.filledSlots} / ${data.stats.rooms.totalSlots}` },
+    { label: 'Pending applicants',  value: String(data.stats.students.pending), tone: data.stats.students.pending > 0 ? 'warn' : 'mute' },
+  ], y);
+
+  // ── Maintenance ──────────────────────────────────────────────
+  y = sectionHeader(doc, 'Maintenance', y);
+  y = kpiRow(doc, [
+    { label: 'Open tickets',   value: String(data.stats.maintenance.open) },
+    { label: 'Urgent / high',  value: String(data.stats.maintenance.urgent), tone: data.stats.maintenance.urgent > 0 ? 'bad' : 'good' },
+    { label: "Today's visitors", value: String(data.stats.visitors.today) },
+  ], y);
+
+  // ── Ops spend by type ────────────────────────────────────────
+  y = sectionHeader(doc, 'Operations spend · last 30 days', y);
+  const opsRows = data.ops.spend30
+    .filter(s => s.count > 0)
+    .map(s => [prettyType(s.type), String(s.count), formatRand(s.total)]);
+  if (opsRows.length === 0) opsRows.push(['No ops entries logged in the last 30 days', '', '']);
+  autoTable(doc, {
+    startY: y,
+    head: [['Service', 'Entries', 'Spent']],
+    body: opsRows,
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: CYAN, textColor: '#FFFFFF', fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+  // ── Stock alerts ─────────────────────────────────────────────
+  if (data.ops.stock.length > 0) {
+    y = sectionHeader(doc, 'Stock levels', y);
+    autoTable(doc, {
+      startY: y,
+      head: [['Item', 'On hand', 'Threshold', 'Status']],
+      body: data.ops.stock.map(s => [
+        s.label,
+        `${s.quantity} ${s.unit}`,
+        s.threshold != null ? `${s.threshold} ${s.unit}` : '—',
+        s.low ? 'LOW' : 'OK',
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: CYAN, textColor: '#FFFFFF', fontStyle: 'bold' },
+      didParseCell: (cell) => {
+        if (cell.section === 'body' && cell.column.index === 3 && cell.row.raw[3] === 'LOW') {
+          cell.cell.styles.textColor = ROSE; cell.cell.styles.fontStyle = 'bold';
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  }
+
+  // ── Action items / reminders ─────────────────────────────────
+  if (data.ops.reminders.length > 0) {
+    y = sectionHeader(doc, 'Action items', y);
+    data.ops.reminders.slice(0, 8).forEach(r => {
+      y = ensureSpace(doc, y, 12);
+      const dot = r.severity === 'urgent' ? ROSE : '#ea580c';
+      doc.setFillColor(dot); doc.circle(16, y - 1, 1.2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(INK);
+      doc.text(r.title, 20, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(MUTE);
+      const lines = doc.splitTextToSize(r.body, w - 34);
+      doc.text(lines, 20, y + 4);
+      y += 4 + lines.length * 4 + 3;
+    });
+    y += 4;
+  }
+
+  // ── Late payers ──────────────────────────────────────────────
+  y = sectionHeader(doc, 'Outstanding rent · late payers', y);
+  const lateRows = data.revenue.latePayers.length === 0
+    ? [['All caught up — no overdue rent', '', '', '']]
+    : data.revenue.latePayers.slice(0, 12).map(lp => [
+        lp.user.name,
+        lp.user.email,
+        lp.period,
+        lp.amount ?? '—',
+      ]);
+  autoTable(doc, {
+    startY: y,
+    head: [['Tenant', 'Email', 'Period', 'Amount']],
+    body: lateRows,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: ROSE, textColor: '#FFFFFF', fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+  // ── Contractors ──────────────────────────────────────────────
+  if (data.contractors.length > 0) {
+    y = sectionHeader(doc, 'Contractors on file', y);
+    autoTable(doc, {
+      startY: y,
+      head: [['Name', 'Role', 'Rate', 'Type', 'Status', 'Pending']],
+      body: data.contractors.map(c => [
+        c.name,
+        prettyType(c.type),
+        `${formatRand(c.rate)} / ${c.rateUnit}`,
+        c.paymentType,
+        c.active ? 'Active' : 'Ended',
+        c.pendingInvoiceCount > 0 ? `${c.pendingInvoiceCount} (${formatRand(c.pendingInvoiceTotal)})` : '—',
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: CYAN, textColor: '#FFFFFF', fontStyle: 'bold' },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  }
+
+  // ── Telemetry note ──────────────────────────────────────────
+  y = sectionHeader(doc, 'Live monitoring', y);
+  y = ensureSpace(doc, y, 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(INK);
+  doc.text(`Solar (manual entry only): ${data.ops.solarKwhLast30.toFixed(0)} kWh logged in last 30 days`, 14, y);
+  y += 5;
+  doc.setTextColor(MUTE);
+  doc.setFontSize(8);
+  doc.text('API integration pending for solar inverters and IP cameras. Once wired, live readings will replace manual logs.', 14, y);
+
+  // ── Footer on every page ────────────────────────────────────
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    footer(doc);
+    doc.setFontSize(7);
+    doc.setTextColor(MUTE);
+    doc.text(`Page ${i} of ${pageCount}`, w / 2, doc.internal.pageSize.getHeight() - 12, { align: 'center' });
+  }
+
+  const safeName = data.residenceName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  const stamp    = data.generatedAt.toISOString().slice(0, 10);
+  doc.save(`HealthReport-${safeName}-${stamp}.pdf`);
+}
+

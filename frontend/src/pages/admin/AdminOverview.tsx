@@ -1,20 +1,23 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCircle2, XCircle, Pin, Image as ImageIcon, Clock } from 'lucide-react';
+import { Bell, CheckCircle2, XCircle, Pin, Image as ImageIcon, Clock, FileDown, Loader2 } from 'lucide-react';
 import {
-  getAdminStats, AdminStats,
+  getAdminStats, AdminStats, getRevenueReport,
   getVoucherClaims, approveVoucherClaim, rejectVoucherClaim,
 } from '../../services/admin.service';
 import {
   getChorePendingApprovals, approveChoreProof, rejectChoreProof,
 } from '../../services/chore.service';
+import { getOpsInsights } from '../../services/ops.service';
+import { listContractors, listContractorInvoices } from '../../services/residence.service';
 import { getNews } from '../../services/news.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ResiMark } from '../../components/Brand';
 import { Modal } from '../../components/Modal';
 import { WeatherWidget } from '../../components/WeatherWidget';
 import { useResidence } from '../../contexts/ResidenceContext';
+import { downloadHealthReportPdf } from '../../utils/pdf';
 
 /** Pull a meaningful error message from an axios-or-other rejection. */
 function errMsg(e: unknown, fallback: string): string {
@@ -91,6 +94,50 @@ export default function AdminOverview() {
     onError: (e) => toast.error(errMsg(e, 'Failed to reject chore')),
   });
 
+  // ── Download full health report PDF ──────────────────────────
+  const reportMut = useMutation({
+    mutationFn: async () => {
+      // Pull the four data sources we don't already have on this page in
+      // parallel — stats is already loaded at this point.
+      const [ops, revenue, contractors, contractorInvoices] = await Promise.all([
+        getOpsInsights(residenceId ?? undefined),
+        getRevenueReport(residenceId ?? undefined),
+        listContractors(residenceId ?? undefined),
+        listContractorInvoices(),
+      ]);
+      const visibleInvoices = residenceId
+        ? contractorInvoices.filter(i => i.contractor?.residenceId === residenceId)
+        : contractorInvoices;
+
+      const contractorRows = contractors.map(c => {
+        const pending = visibleInvoices.filter(i => i.contractorId === c.id && i.status === 'Pending');
+        return {
+          name:                 c.name,
+          type:                 c.type,
+          rate:                 c.rate,
+          rateUnit:             c.rateUnit,
+          active:               c.active,
+          paymentType:          c.paymentType,
+          pendingInvoiceCount:  pending.length,
+          pendingInvoiceTotal:  pending.reduce((s, i) => s + Number(i.amount), 0),
+        };
+      });
+
+      downloadHealthReportPdf({
+        residenceName: residenceId
+          ? (contractors[0]?.residence?.name ?? 'Selected residence')
+          : 'All residences (portfolio)',
+        generatedAt:   new Date(),
+        stats:         stats!,
+        ops,
+        revenue,
+        contractors:   contractorRows,
+      });
+    },
+    onSuccess: () => toast.success('Health report downloaded'),
+    onError:   (e) => toast.error(errMsg(e, 'Failed to build report')),
+  });
+
   if (isError) return (
     <p style={{ color: 'var(--rose)', fontSize: 13, padding: 24 }}>Failed to load stats. Is the backend running?</p>
   );
@@ -106,10 +153,17 @@ export default function AdminOverview() {
   // Revenue / financial KPIs come FIRST so admin's eye lands there.
   // Student / operational KPIs sit in their own visual group below.
   type CardTone = 'cyan' | 'rose';
+  // Slot-level occupancy reflects shared-room utilisation accurately
+  // (a half-filled DOUBLE shows up as 50% rather than 0%).
+  const occRate = stats.rooms.slotOccupancyRate ?? stats.occupancyRate;
+  const occHint = stats.rooms.totalSlots > 0
+    ? `${stats.rooms.filledSlots} / ${stats.rooms.totalSlots} bed-slots`
+    : `${stats.rooms.vacant} vacant`;
   const revenueCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
-    { label: 'Monthly Revenue',  value: `R${stats.monthlyRevenue.toLocaleString()}`, note: `${stats.rooms.occupied} occupied`, color: 'cyan', icon: '💰' },
-    { label: 'Occupancy Rate',   value: `${stats.occupancyRate}%`,         note: `${stats.rooms.vacant} vacant`,         color: 'cyan', icon: '🏠' },
-    { label: 'Active Vouchers',  value: stats.vouchers.active,             note: 'in reward shop',                       color: 'cyan', icon: '🎁' },
+    { label: 'Monthly Revenue',  value: `R${stats.monthlyRevenue.toLocaleString()}`, note: `expected from active leases`, color: 'cyan', icon: '💰' },
+    { label: 'Net (Rev − Cost)', value: `R${stats.netMonthly.toLocaleString()}`,     note: `cost R${stats.monthlyTotalCost.toLocaleString()} (ops + contractors)`, color: stats.netMonthly < 0 ? 'rose' : 'cyan', icon: '📈' },
+    { label: 'Occupancy',        value: `${occRate}%`,                                note: occHint,                       color: 'cyan', icon: '🏠' },
+    { label: 'Active Vouchers',  value: stats.vouchers.active,                        note: 'in reward shop',              color: 'cyan', icon: '🎁' },
   ];
   const operationalCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
     { label: 'Active Students',  value: stats.students.total,              note: `${stats.students.pending} pending`,    color: 'cyan', icon: '🎓' },
@@ -131,12 +185,22 @@ export default function AdminOverview() {
             <p className="page-sub">Real-time residence statistics</p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {(pendingClaims.length + pendingChores.length) > 0 && (
             <span className="badge badge-fill-rose" style={{ fontSize: 11, padding: '6px 12px' }}>
               {pendingClaims.length + pendingChores.length} pending approval{(pendingClaims.length + pendingChores.length) === 1 ? '' : 's'}
             </span>
           )}
+          <button
+            onClick={() => reportMut.mutate()}
+            disabled={reportMut.isPending}
+            className="btn-primary press-soft"
+            title="Download a full health report PDF for this residence"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12 }}
+          >
+            {reportMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+            {reportMut.isPending ? 'Building…' : 'Download report'}
+          </button>
           <LiveClock />
         </div>
       </div>
@@ -420,16 +484,16 @@ export default function AdminOverview() {
       {/* Occupancy progress bar */}
       <div className="card" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <p className="micro-label" style={{ margin: 0 }}>Room Occupancy</p>
+          <p className="micro-label" style={{ margin: 0 }}>Bed-slot Occupancy</p>
           <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
-            {stats.rooms.occupied}/{stats.rooms.total}
+            {stats.rooms.filledSlots}/{stats.rooms.totalSlots} slots
           </span>
         </div>
         <div style={{ width: '100%', background: 'var(--bg3)', borderRadius: 6, height: 10, overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 6,
             background: 'linear-gradient(90deg, var(--cyan), rgba(0,204,204,.5))',
-            width: `${stats.occupancyRate}%`, transition: 'width .5s ease',
+            width: `${stats.rooms.slotOccupancyRate ?? stats.occupancyRate}%`, transition: 'width .5s ease',
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
@@ -465,8 +529,12 @@ function LiveClock() {
     return () => clearInterval(id);
   }, []);
 
+  // Responsive: drop the weather row + shrink minWidth on narrow screens.
+  // The wrapper sits inside a flex-wrap header — keeping minWidth low lets
+  // it sit next to the title at desktop widths, and float to its own row
+  // on phones without forcing horizontal overflow.
   return (
-    <div style={{
+    <div className="rh-live-clock" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
       padding: '8px 14px',
       borderRadius: 10,
@@ -474,26 +542,32 @@ function LiveClock() {
       border: '1px solid var(--border)',
       lineHeight: 1.1,
       gap: 4,
-      minWidth: 200,
+      flexShrink: 0,
     }}>
-      {/* Big time — HH:MM:SS */}
-      <span style={{
+      <style>{`
+        .rh-live-clock                 { min-width: 200px; }
+        @media (max-width: 640px) {
+          .rh-live-clock               { min-width: 0; padding: 6px 10px; }
+          .rh-live-clock .clock-date   { display: none; }
+          .rh-live-clock .clock-weather{ display: none; }
+          .rh-live-clock .clock-time   { font-size: 14px; }
+        }
+      `}</style>
+      <span className="clock-time" style={{
         fontFamily: "'IBM Plex Mono', monospace",
         fontSize: 18, fontWeight: 700,
         color: 'var(--cyan)', letterSpacing: '.02em',
       }}>
         {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
       </span>
-      {/* Date */}
-      <span style={{
+      <span className="clock-date" style={{
         fontFamily: "'IBM Plex Mono', monospace",
         fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
         textTransform: 'uppercase',
       }}>
         {now.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
       </span>
-      {/* Weather just below the date */}
-      <span style={{ paddingTop: 4, borderTop: '1px solid var(--border)', width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+      <span className="clock-weather" style={{ paddingTop: 4, borderTop: '1px solid var(--border)', width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
         <WeatherWidget />
       </span>
     </div>

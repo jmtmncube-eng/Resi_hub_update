@@ -3,13 +3,29 @@ import { AppError } from '../middleware/error.middleware';
 import { earnCredits } from './wallet.service';
 import { sendEmail } from './email.service';
 
-const COMPLETE_REWARD = 20;
 const APPROVAL_WINDOW_HOURS = 24;
 
-export async function getChores(block: string) {
+/** Student-facing chore list. Filters by residence + (optionally) block,
+ *  resolving the student's residence from their allocation when not given. */
+export async function getChores(userId: string, block?: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { allocation: { include: { room: { select: { residenceId: true, block: true } } } } },
+  });
+  const residenceId = user?.allocation?.room?.residenceId ?? null;
+  const studentBlock = block ?? user?.allocation?.room?.block;
+
   return prisma.chore.findMany({
-    // Students only see ACTIVE chores — paused/archived ones stay admin-only.
-    where: { block, active: true },
+    // Students only see ACTIVE chores in their residence (or portfolio-wide
+    // chores with residenceId null). Block filter is optional — when omitted
+    // they see every active chore in their residence.
+    where: {
+      active: true,
+      ...(studentBlock ? { block: studentBlock } : {}),
+      ...(residenceId
+        ? { OR: [{ residenceId }, { residenceId: null }] }
+        : {}),
+    },
     include: {
       logs: {
         orderBy: { createdAt: 'desc' },
@@ -141,19 +157,23 @@ export async function createChore(data: {
   icon?: string; name: string; description?: string;
   frequency?: string; block: string;
   residenceId?: string;
+  creditReward?: number;
 }) {
   if (!data.name?.trim())  throw new AppError('Name is required', 400);
   if (!data.block?.trim()) throw new AppError('Block is required', 400);
+  const reward = data.creditReward ?? 20;
+  if (reward < 0 || reward > 1000) throw new AppError('Credit reward must be between 0 and 1000', 400);
 
   return prisma.chore.create({
     data: {
-      icon:        data.icon?.trim()        || '🧹',
-      name:        data.name.trim(),
-      description: data.description?.trim() || '',
-      frequency:   data.frequency?.trim()   || 'Weekly',
-      block:       data.block.trim().toUpperCase(),
-      residenceId: data.residenceId ?? null,
-      active:      true,
+      icon:         data.icon?.trim()        || '🧹',
+      name:         data.name.trim(),
+      description:  data.description?.trim() || '',
+      frequency:    data.frequency?.trim()   || 'Weekly',
+      block:        data.block.trim().toUpperCase(),
+      residenceId:  data.residenceId ?? null,
+      creditReward: reward,
+      active:       true,
     },
   });
 }
@@ -161,18 +181,23 @@ export async function createChore(data: {
 export async function updateChore(id: string, data: Partial<{
   icon: string; name: string; description: string;
   frequency: string; block: string; active: boolean;
+  creditReward: number;
 }>) {
   const existing = await prisma.chore.findUnique({ where: { id } });
   if (!existing) throw new AppError('Chore not found', 404);
+  if (data.creditReward !== undefined && (data.creditReward < 0 || data.creditReward > 1000)) {
+    throw new AppError('Credit reward must be between 0 and 1000', 400);
+  }
   return prisma.chore.update({
     where: { id },
     data: {
-      ...(data.icon        !== undefined && { icon: data.icon.trim() || '🧹' }),
-      ...(data.name        !== undefined && { name: data.name.trim() }),
-      ...(data.description !== undefined && { description: data.description.trim() }),
-      ...(data.frequency   !== undefined && { frequency: data.frequency.trim() }),
-      ...(data.block       !== undefined && { block: data.block.trim().toUpperCase() }),
-      ...(data.active      !== undefined && { active: data.active }),
+      ...(data.icon         !== undefined && { icon: data.icon.trim() || '🧹' }),
+      ...(data.name         !== undefined && { name: data.name.trim() }),
+      ...(data.description  !== undefined && { description: data.description.trim() }),
+      ...(data.frequency    !== undefined && { frequency: data.frequency.trim() }),
+      ...(data.block        !== undefined && { block: data.block.trim().toUpperCase() }),
+      ...(data.active       !== undefined && { active: data.active }),
+      ...(data.creditReward !== undefined && { creditReward: data.creditReward }),
     },
   });
 }
@@ -226,8 +251,10 @@ export async function approveChoreProof(choreId: string, adminId: string) {
       },
     }),
   ]);
-  // Award credits OUTSIDE the same tx so wallet helpers stay decoupled
-  await earnCredits(studentId, COMPLETE_REWARD, `Chore approved: ${chore.name}`);
+  // Award credits OUTSIDE the same tx so wallet helpers stay decoupled.
+  // Reward amount is per-chore — admin sets it on create/edit (default 20).
+  const reward = chore.creditReward ?? 20;
+  await earnCredits(studentId, reward, `Chore approved: ${chore.name}`);
 
   // Best-effort email
   const student = await prisma.user.findUnique({ where: { id: studentId } });
@@ -235,7 +262,7 @@ export async function approveChoreProof(choreId: string, adminId: string) {
     sendEmail({
       to: student.email,
       template: 'choreApproved',
-      data: { name: student.name, choreName: chore.name, credits: COMPLETE_REWARD },
+      data: { name: student.name, choreName: chore.name, credits: reward },
     }).catch(() => { /* logged inside */ });
   }
 

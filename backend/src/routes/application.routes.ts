@@ -12,6 +12,10 @@ router.get('/status',       ctrl.getStatus);
 router.get('/rooms',        ctrl.getRooms);
 router.post('/select-room', ctrl.selectRoom);
 router.post('/submit',      ctrl.submit);
+// Compliance docs — works for active + pending; lets students append
+// missing application docs at any time (re-upload single doc).
+router.get('/my-docs',      ctrl.getMyDocs);
+router.post('/upload-doc',  ctrl.uploadDoc);
 
 // Admin review
 router.get ('/admin/list',       requireRole('ADMIN'), ctrl.listSubmitted);

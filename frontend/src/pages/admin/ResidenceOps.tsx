@@ -17,6 +17,7 @@ import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { format } from 'date-fns';
+import TelemetryStatusCard from '../../components/TelemetryStatusCard';
 
 // ─────────────────────────────────────────────────────────────────
 // Static config — drives the section grid
@@ -147,15 +148,23 @@ export default function ResidenceOps() {
           </div>
           {/* Solar kWh */}
           <div className="card-sm" style={{ padding: '16px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <Sun size={16} style={{ color: '#f472b6' }} />
-              <span className="micro-label">Solar — last 30 days</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Sun size={16} style={{ color: '#f472b6' }} />
+                <span className="micro-label">Solar — last 30 days</span>
+              </div>
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+                background: 'rgba(251,146,60,.10)', color: '#fb923c',
+                border: '1px solid rgba(251,146,60,.3)',
+                fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em',
+              }}>Manual</span>
             </div>
             <p style={{ fontSize: 28, fontWeight: 700, color: '#f472b6', lineHeight: 1, fontFamily: "'Space Grotesk', sans-serif" }}>
               {insights.solarKwhLast30.toFixed(0)} <span style={{ fontSize: 16, color: 'var(--text3)' }}>kWh</span>
             </p>
             <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, fontFamily: "'IBM Plex Mono', monospace" }}>
-              From logged solar readings
+              From manually-logged readings · API pending
             </p>
           </div>
           {/* Active reminders */}
@@ -172,6 +181,11 @@ export default function ResidenceOps() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Live monitoring placeholder — solar inverter + cameras (API pending) */}
+      {insights && (
+        <TelemetryStatusCard solarKwh30={insights.solarKwhLast30} />
       )}
 
       {/* Reminders list */}

@@ -116,3 +116,19 @@ export async function decideApplication(userId: string, decision: 'APPROVED' | '
   const res = await api.post<ApiResponse<unknown>>(`/application/admin/${userId}/decide`, { decision, note });
   return res.data.data;
 }
+
+// ── Compliance docs (re-upload) ────────────────────────────────
+
+export type MyDocsByType = Record<ApplicationDocType, ApplicationDocument | null>;
+
+/** Returns the user's 4 application docs grouped by type — null for any missing. */
+export async function getMyApplicationDocs(): Promise<MyDocsByType> {
+  const res = await api.get<ApiResponse<MyDocsByType>>('/application/my-docs');
+  return res.data.data;
+}
+
+/** Upsert a single application doc (admin / student) — replaces prior version of that type. */
+export async function uploadApplicationDoc(type: ApplicationDocType, fileUrl: string): Promise<ApplicationDocument> {
+  const res = await api.post<ApiResponse<ApplicationDocument>>('/application/upload-doc', { type, fileUrl });
+  return res.data.data;
+}

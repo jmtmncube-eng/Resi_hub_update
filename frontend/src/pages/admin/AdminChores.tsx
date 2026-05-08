@@ -194,7 +194,7 @@ function ChoreRow({ chore, onEdit, onToggle, onDelete }: {
             )}
           </p>
           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
-            Block {chore.block} · {chore.frequency}
+            Block {chore.block} · {chore.frequency} · <span style={{ color: 'var(--cyan)' }}>{chore.creditReward} 🪙</span>
             {chore.claimedByName && ` · claimed by ${chore.claimedByName}`}
           </p>
           {chore.description && (
@@ -251,16 +251,17 @@ function ChoreFormModal({ chore, residenceId, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const editing = !!chore;
-  const [icon,        setIcon]        = useState(chore?.icon        ?? '🧹');
-  const [name,        setName]        = useState(chore?.name        ?? '');
-  const [description, setDescription] = useState(chore?.description ?? '');
-  const [frequency,   setFrequency]   = useState(chore?.frequency   ?? 'Weekly · Mondays');
-  const [block,       setBlock]       = useState(chore?.block       ?? 'A');
+  const [icon,         setIcon]         = useState(chore?.icon         ?? '🧹');
+  const [name,         setName]         = useState(chore?.name         ?? '');
+  const [description,  setDescription]  = useState(chore?.description  ?? '');
+  const [frequency,    setFrequency]    = useState(chore?.frequency    ?? 'Weekly · Mondays');
+  const [block,        setBlock]        = useState(chore?.block        ?? 'A');
+  const [creditReward, setCreditReward] = useState(chore?.creditReward ?? 20);
 
   const save = useMutation({
     mutationFn: () => editing
-      ? updateChore(chore!.id, { icon, name, description, frequency, block })
-      : createChore({ icon, name, description, frequency, block, residenceId: residenceId ?? undefined }),
+      ? updateChore(chore!.id, { icon, name, description, frequency, block, creditReward })
+      : createChore({ icon, name, description, frequency, block, creditReward, residenceId: residenceId ?? undefined }),
     onSuccess: () => {
       toast.success(editing ? 'Chore updated' : 'Chore created');
       onSaved();
@@ -326,6 +327,31 @@ function ChoreFormModal({ chore, residenceId, onClose, onSaved }: {
           <select value={frequency} onChange={e => setFrequency(e.target.value)} className="input-base">
             {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="field-label">
+            Credits awarded on approval
+            <span style={{ color: 'var(--text3)', marginLeft: 6, fontWeight: 400 }}>(0 – 1000)</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="number" min={0} max={1000} step={5}
+              value={creditReward}
+              onChange={e => setCreditReward(Math.max(0, Math.min(1000, parseInt(e.target.value) || 0)))}
+              className="input-base"
+              style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace" }}
+            />
+            <span style={{
+              fontSize: 16, fontWeight: 700, color: 'var(--cyan)',
+              fontFamily: "'Space Grotesk', sans-serif",
+              whiteSpace: 'nowrap',
+            }}>
+              {creditReward} 🪙
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, fontFamily: "'IBM Plex Mono', monospace" }}>
+            Student earns this many credits when admin approves their proof.
+          </p>
         </div>
       </div>
 

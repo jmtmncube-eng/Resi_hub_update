@@ -121,6 +121,53 @@ export async function submitApplication(userId: string, payload: {
   return getApplicationStatus(userId);
 }
 
+// ── Compliance docs (re-upload) ────────────────────────────────
+// Active students can append missing ID / proof-of-registration / etc
+// AFTER they're already approved — useful for landlord audits or when
+// admin asks for a fresh copy. Pending students can also use this to
+// update individual docs without re-running the full submitApplication
+// flow.
+
+const APPLICATION_DOC_TYPES = ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] as const;
+type ApplicationDocType = typeof APPLICATION_DOC_TYPES[number];
+
+export async function getMyApplicationDocs(userId: string) {
+  const docs = await prisma.document.findMany({
+    where: { userId, type: { in: APPLICATION_DOC_TYPES as unknown as ApplicationDocType[] } },
+    select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  // Group by type so the frontend can quickly see which are missing
+  const byType: Record<ApplicationDocType, typeof docs[number] | null> = {
+    ID_DOC: null, PROOF_REGISTRATION: null, PROOF_FUNDING: null, SIGNATURE: null,
+  };
+  for (const d of docs) {
+    const t = d.type as ApplicationDocType;
+    if (!byType[t]) byType[t] = d;        // newest one wins (orderBy desc)
+  }
+  return byType;
+}
+
+export async function uploadApplicationDoc(userId: string, type: string, fileUrl: string) {
+  if (!APPLICATION_DOC_TYPES.includes(type as ApplicationDocType)) {
+    throw new AppError(`Unknown document type: ${type}`, 400);
+  }
+  if (!fileUrl || typeof fileUrl !== 'string' || !fileUrl.startsWith('data:')) {
+    throw new AppError('fileUrl must be a data URL', 400);
+  }
+  if (fileUrl.length > 6_500_000) {
+    throw new AppError('File is too large (max 5 MB).', 400);
+  }
+
+  // Upsert: replace any prior doc of this type, keep history light.
+  await prisma.document.deleteMany({ where: { userId, type: type as ApplicationDocType } });
+  const period = `Compliance ${new Date().getFullYear()}`;
+  return prisma.document.create({
+    data: { userId, type: type as ApplicationDocType, period, status: 'Submitted', fileUrl },
+    select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
+  });
+}
+
 // ── Admin: review applications ─────────────────────────────────
 export async function listSubmittedApplications() {
   return prisma.user.findMany({

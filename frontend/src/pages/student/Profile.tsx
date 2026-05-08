@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { updateProfile, uploadAvatar } from '../../services/profile.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import ComplianceDocsCard from '../../components/ComplianceDocsCard';
 
 const ACCEPTED_AVATAR = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -101,8 +102,11 @@ export default function Profile() {
     <div className="space-y-5 appear" style={{ maxWidth: 680 }}>
       <div>
         <h1 className="page-title">Profile</h1>
-        <p className="page-sub">Your personal details and bio</p>
+        <p className="page-sub">Your personal details, bio and compliance documents</p>
       </div>
+
+      {/* Compliance docs — only relevant to students; admins skip this card */}
+      {!isAdmin && <ComplianceDocsCard />}
 
       {/* Avatar section */}
       <div className="card" style={{ padding: '20px 24px' }}>

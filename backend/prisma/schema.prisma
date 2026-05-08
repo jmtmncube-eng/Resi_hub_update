@@ -263,6 +263,7 @@ model Chore {
   frequency       String                           // Free-text, e.g. "Weekly · Tuesdays"
   block           String
   active          Boolean   @default(true)         // Admin can deactivate without deleting (preserves history)
+  creditReward    Int       @default(20)           // Credits awarded on admin approval — per-chore tunable
   claimedById     String?
   doneById        String?
   doneAt          DateTime?

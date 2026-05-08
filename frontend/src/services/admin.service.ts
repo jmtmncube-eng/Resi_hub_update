@@ -263,11 +263,29 @@ export const getAdminVisitors = async (search?: string) => {
 // ── Shared Admin Types ────────────────────────────────────────
 export interface AdminStats {
   students:      { total: number; pending: number };
-  rooms:         { total: number; occupied: number; vacant: number };
+  rooms: {
+    total: number; occupied: number; vacant: number;
+    /** Total bed-slots across all rooms (sum of capacities). */
+    totalSlots: number;
+    /** Active allocations — i.e. slots actually filled. */
+    filledSlots: number;
+    /** filledSlots / totalSlots × 100. More accurate than room-level for shared rooms. */
+    slotOccupancyRate: number;
+  };
   maintenance:   { open: number; urgent: number };
   visitors:      { total: number; today: number };
   vouchers:      { active: number };
+  /** Sum of all active rents — what the residence WOULD collect if everyone paid. */
   monthlyRevenue: number;
+  /** OpsService entries logged in the last 30 days (pool, gas, electricity, etc). */
+  monthlyOpsCost: number;
+  /** ContractorInvoice paid in the last 30 days — gardener, cleaner, etc. */
+  monthlyContractorCost: number;
+  /** Sum of the two above. */
+  monthlyTotalCost: number;
+  /** monthlyRevenue − monthlyTotalCost (projected, not realised). */
+  netMonthly: number;
+  /** Legacy room-level rate. Prefer rooms.slotOccupancyRate. */
   occupancyRate: number;
 }
 

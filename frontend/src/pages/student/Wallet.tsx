@@ -14,6 +14,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { format } from 'date-fns';
 import type { Voucher } from '../../types/domain.types';
 import ConfirmModal from '../../components/ConfirmModal';
+import ChoresSection from '../../components/ChoresSection';
 
 const TX_ICON: Record<string, string>   = { EARN: '⬆', REDEEM: '🎟', ADJUST: '⚙' };
 const TX_COLOR: Record<string, string>  = { EARN: '#4ade80', REDEEM: 'var(--rose)', ADJUST: 'var(--cyan)' };
@@ -309,8 +310,12 @@ export default function Wallet() {
       {/* Page header */}
       <div>
         <h1 className="page-title">Wallet & Credits</h1>
-        <p className="page-sub">Earn credits, redeem vouchers, climb the leaderboard</p>
+        <p className="page-sub">Earn credits from chores + tasks, redeem vouchers, climb the leaderboard</p>
       </div>
+
+      {/* Chores — collapsible, sits above the voucher catalog so students
+          see their earn-options first when they land on this page. */}
+      <ChoresSection />
 
       {/* Balance hero */}
       {!wLoading && wallet && (

@@ -30,6 +30,10 @@ import {
  * Rooms / occupancy / tickets / revenue / students all narrow correctly.
  */
 export async function getAdminStats(residenceId?: string) {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = new Date(now - 30 * day);
+
   const [
     totalStudents,
     pendingStudents,
@@ -72,26 +76,73 @@ export async function getAdminStats(residenceId?: string) {
     prisma.voucher.count({ where: { isActive: true } }),
   ]);
 
-  // Revenue estimate from active allocations (scoped via the room → residence FK)
-  const allocations = await prisma.allocation.findMany({
-    where: {
-      status: 'ACTIVE',
-      ...(residenceId ? { room: { residenceId } } : {}),
-    },
-    select: { rent: true },
-  });
-  const monthlyRevenue = allocations.reduce(
-    (sum, a) => sum + Number(a.rent),
-    0,
-  );
+  // Revenue + slot-level occupancy. Rooms with capacity > 1 (e.g. DOUBLE,
+  // TRIPLE) only flip to OCCUPIED when ALL slots are filled, so room-level
+  // occupancy under-counts utilisation. We compute slot occupancy here too.
+  const [allocations, allRooms] = await Promise.all([
+    prisma.allocation.findMany({
+      where: {
+        status: 'ACTIVE',
+        ...(residenceId ? { room: { residenceId } } : {}),
+      },
+      select: { rent: true, room: { select: { capacity: true, type: true } } },
+    }),
+    prisma.room.findMany({
+      where:  residenceId ? { residenceId } : undefined,
+      select: { capacity: true, type: true },
+    }),
+  ]);
+  const monthlyRevenue = allocations.reduce((sum, a) => sum + Number(a.rent), 0);
+
+  // Slot maths — capacity falls back to 1 if not set
+  const totalSlots  = allRooms.reduce((s, r) => s + (r.capacity || TYPE_CAPACITY[r.type] || 1), 0);
+  const filledSlots = allocations.length;
+  const slotOccupancyRate = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+
+  // ── 30-day cost tracking — ops + contractor invoices ──────────
+  // Both feed into "monthly cost". Contractor invoices: count what was
+  // PAID in the last 30 days (paidAt window), not what was generated.
+  const [opsRecent, contractorPaid] = await Promise.all([
+    prisma.opsService.findMany({
+      where: {
+        date: { gte: thirtyDaysAgo },
+        ...(residenceId ? { residenceId } : {}),
+      },
+      select: { amount: true },
+    }),
+    prisma.contractorInvoice.findMany({
+      where: {
+        status: 'Paid',
+        paidAt: { gte: thirtyDaysAgo },
+        ...(residenceId ? { contractor: { residenceId } } : {}),
+      },
+      select: { amount: true },
+    }),
+  ]);
+  const monthlyOpsCost        = opsRecent.reduce((s, x) => s + Number(x.amount ?? 0), 0);
+  const monthlyContractorCost = contractorPaid.reduce((s, x) => s + Number(x.amount ?? 0), 0);
+  const monthlyTotalCost      = monthlyOpsCost + monthlyContractorCost;
+
+  // Net = revenue projected (full active rent) - actual paid costs.
+  // Caveat: revenue is "expected if all rents collected"; not "received".
+  // For "received this month" use getRevenueReport's cleared figure.
+  const netMonthly = monthlyRevenue - monthlyTotalCost;
 
   return {
     students:      { total: totalStudents, pending: pendingStudents },
-    rooms:         { total: totalRooms, occupied: occupiedRooms, vacant: totalRooms - occupiedRooms },
+    rooms:         {
+      total: totalRooms, occupied: occupiedRooms, vacant: totalRooms - occupiedRooms,
+      totalSlots, filledSlots, slotOccupancyRate,
+    },
     maintenance:   { open: openTickets, urgent: urgentTickets },
     visitors:      { total: totalVisitors, today: todayVisitors },
     vouchers:      { active: totalVouchers },
     monthlyRevenue,
+    monthlyOpsCost,
+    monthlyContractorCost,
+    monthlyTotalCost,
+    netMonthly,
+    /** Legacy room-level rate (kept for any existing UI). Prefer slotOccupancyRate. */
     occupancyRate: totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0,
   };
 }
