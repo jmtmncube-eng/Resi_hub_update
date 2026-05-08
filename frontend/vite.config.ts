@@ -20,6 +20,10 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Required for Docker
+    // Allow any Host header — required when running behind nginx on a real
+    // domain (otherwise Vite 5+ rejects requests with the production hostname).
+    // We're locked down at the nginx layer, so this isn't a security regression.
+    allowedHosts: true,
     watch: {
       usePolling: true, // Required on Windows + Docker (inotify doesn't cross the boundary)
     },
