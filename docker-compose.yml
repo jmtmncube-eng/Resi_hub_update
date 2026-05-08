@@ -55,10 +55,13 @@ services:
     container_name: resihub-frontend
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: http://localhost:5000/api
+      # FRONTEND_PORT lets each environment pick a port that isn't taken
+      # (the VPS already has athera-app holding :3000, so we expose :3010 there).
+      # Locally you can keep .env empty and it defaults to 3000.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5000/api}
       VITE_APP_NAME: ResiHub
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
