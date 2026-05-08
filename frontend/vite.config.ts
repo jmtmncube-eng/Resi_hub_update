@@ -24,6 +24,14 @@ export default defineConfig({
     // domain (otherwise Vite 5+ rejects requests with the production hostname).
     // We're locked down at the nginx layer, so this isn't a security regression.
     allowedHosts: true,
+    // HMR over wss:// when behind nginx + TLS — tells the browser to connect
+    // back through the public domain on port 443 (the path the production
+    // certificate covers), instead of trying ws://localhost:3000 which fails
+    // for visitors not on the same machine.
+    hmr: {
+      clientPort: 443,
+      protocol:   'wss',
+    },
     watch: {
       usePolling: true, // Required on Windows + Docker (inotify doesn't cross the boundary)
     },
