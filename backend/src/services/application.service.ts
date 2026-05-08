@@ -7,18 +7,25 @@ const TYPE_CAPACITY: Record<string, number> = {
 
 // ── Application Status ─────────────────────────────────────────
 // Returns the pending student's allocation with room details (or null)
+// PLUS application metadata + uploaded application docs.
 export async function getApplicationStatus(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      id:         true,
-      name:       true,
-      email:      true,
-      role:       true,
-      university: true,
-      program:    true,
-      year:       true,
-      createdAt:  true,
+      id:                     true,
+      name:                   true,
+      email:                  true,
+      role:                   true,
+      university:             true,
+      program:                true,
+      year:                   true,
+      idNumber:               true,
+      applicationStatus:      true,
+      applicationSubmittedAt: true,
+      applicationApprovedAt:  true,
+      applicationRejectedAt:  true,
+      applicationAdminNote:   true,
+      createdAt:              true,
       allocation: {
         select: {
           id:        true,
@@ -37,12 +44,151 @@ export async function getApplicationStatus(userId: string) {
           },
         },
       },
+      documents: {
+        where: { type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] } },
+        select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
 
   if (!user) return null;
 
   return user;
+}
+
+// ── Submit application ─────────────────────────────────────────
+// Pending student uploads ID + proof of registration + proof of funding
+// + signature. Stored as data URLs in the existing Document table.
+// Re-submission overwrites previous documents.
+export async function submitApplication(userId: string, payload: {
+  idNumber:        string;
+  idDocUrl:        string;
+  regProofUrl:     string;
+  fundingProofUrl: string;
+  signatureDataUrl:string;
+}) {
+  const { idNumber, idDocUrl, regProofUrl, fundingProofUrl, signatureDataUrl } = payload;
+
+  // ── Validation ────────────────────────────────────────────────
+  if (!/^\d{13}$/.test(idNumber)) {
+    throw new AppError('ID number must be exactly 13 digits.', 400);
+  }
+  for (const [field, val] of Object.entries({ idDocUrl, regProofUrl, fundingProofUrl, signatureDataUrl })) {
+    if (!val || typeof val !== 'string' || !val.startsWith('data:')) {
+      throw new AppError(`${field} is required and must be a data URL.`, 400);
+    }
+    // Cap at ~6.5 MB base64 (~5 MB raw)
+    if (val.length > 6_500_000) {
+      throw new AppError(`${field} is too large (max 5 MB).`, 400);
+    }
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user)                              throw new AppError('User not found', 404);
+  if (user.role !== 'PENDING_STUDENT')    throw new AppError('Only pending students can submit an application.', 403);
+  if (user.applicationStatus === 'APPROVED') {
+    throw new AppError('Your application is already approved.', 409);
+  }
+
+  // Replace any prior application documents (re-submit case)
+  await prisma.document.deleteMany({
+    where: {
+      userId,
+      type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] },
+    },
+  });
+
+  const period = `Application ${new Date().getFullYear()}`;
+
+  await prisma.$transaction([
+    prisma.document.create({ data: { userId, type: 'ID_DOC',             period, status: 'Submitted', fileUrl: idDocUrl } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_REGISTRATION', period, status: 'Submitted', fileUrl: regProofUrl } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_FUNDING',      period, status: 'Submitted', fileUrl: fundingProofUrl } }),
+    prisma.document.create({ data: { userId, type: 'SIGNATURE',          period, status: 'Submitted', fileUrl: signatureDataUrl } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        idNumber,
+        applicationStatus:      'SUBMITTED',
+        applicationSubmittedAt: new Date(),
+        applicationRejectedAt:  null,
+        applicationAdminNote:   null,
+      },
+    }),
+  ]);
+
+  return getApplicationStatus(userId);
+}
+
+// ── Admin: review applications ─────────────────────────────────
+export async function listSubmittedApplications() {
+  return prisma.user.findMany({
+    where: {
+      role: 'PENDING_STUDENT',
+      applicationStatus: { in: ['SUBMITTED', 'REJECTED'] },
+    },
+    select: {
+      id:                     true,
+      name:                   true,
+      email:                  true,
+      phone:                  true,
+      university:             true,
+      program:                true,
+      year:                   true,
+      idNumber:               true,
+      applicationStatus:      true,
+      applicationSubmittedAt: true,
+      applicationRejectedAt:  true,
+      applicationAdminNote:   true,
+      createdAt:              true,
+      documents: {
+        where: { type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] } },
+        select: { id: true, type: true, fileUrl: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+    orderBy: { applicationSubmittedAt: 'desc' },
+  });
+}
+
+export async function decideApplication(userId: string, decision: 'APPROVED' | 'REJECTED', note?: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { allocation: true },
+  });
+  if (!user) throw new AppError('Applicant not found', 404);
+  if (user.applicationStatus !== 'SUBMITTED') {
+    throw new AppError(`Cannot ${decision.toLowerCase()} — application is ${user.applicationStatus}.`, 400);
+  }
+
+  const now = new Date();
+
+  if (decision === 'REJECTED') {
+    return prisma.user.update({
+      where: { id: userId },
+      data:  { applicationStatus: 'REJECTED', applicationRejectedAt: now, applicationAdminNote: note?.trim() || null },
+    });
+  }
+
+  // APPROVED: also promote to ACTIVE_STUDENT in one step. If they already
+  // picked a room (RESERVED allocation), activate it. The lease contract
+  // + first rent invoice are provisioned by approveAccount() which is the
+  // canonical promote-to-active path; we mirror its behaviour here.
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      applicationStatus:    'APPROVED',
+      applicationApprovedAt: now,
+      applicationAdminNote: note?.trim() || null,
+      role:                 'ACTIVE_STUDENT',
+      ...(user.allocation && user.allocation.status === 'RESERVED' && {
+        allocation: {
+          update: { status: 'ACTIVE', moveIn: user.allocation.moveIn ?? now },
+        },
+      }),
+    },
+  });
 }
 
 // ── Browse Rooms ───────────────────────────────────────────────

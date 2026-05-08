@@ -158,6 +158,61 @@ export const deleteRoom = async (id: string) => {
   return res.data.data as { id: string; number: string };
 };
 
+/** Create a single room — for adding incrementally without re-running the bulk wizard. */
+export const createRoom = async (body: {
+  number: string; block: string; type: string;
+  capacity?: number; price: number; residenceId?: string;
+}) => {
+  const res = await api.post('/admin/rooms', body);
+  return res.data.data as AdminRoom;
+};
+
+// ── Account overview (drawer) ─────────────────────────────────
+export interface AccountOverview {
+  id: string; name: string; email: string; phone: string | null; role: string;
+  avatarUrl: string | null; isActive: boolean;
+  university: string | null; program: string | null; year: number | null; bio: string | null;
+  idNumber: string | null;
+  applicationStatus: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  applicationSubmittedAt: string | null;
+  applicationApprovedAt: string | null;
+  applicationRejectedAt: string | null;
+  applicationAdminNote: string | null;
+  onboardedAt: string | null;
+  createdAt: string;
+  wallet: { credits: number } | null;
+  allocation: {
+    id: string;
+    status: 'RESERVED' | 'ACTIVE' | 'ENDED';
+    moveIn: string | null;
+    rent: string;
+    balance: string;
+    createdAt: string;
+    room: {
+      id: string; number: string; block: string;
+      type: 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
+      capacity: number; price: string;
+      residence: { id: string; name: string } | null;
+    };
+  } | null;
+  documents: Array<{
+    id: string; type: 'INVOICE' | 'CONTRACT';
+    period: string; amount: string | null; status: string;
+    proofStatus: string | null; signedAt: string | null; clearedAt: string | null;
+    createdAt: string;
+  }>;
+  stats: {
+    openTickets: number; totalTickets: number;
+    upcomingPasses: number; totalPasses: number;
+    monthsUnpaid: number; monthsPaid: number;
+  };
+}
+
+export const getAccountOverview = async (id: string) => {
+  const res = await api.get(`/admin/accounts/${id}/overview`);
+  return res.data.data as AccountOverview;
+};
+
 /** Mixed-type generation — pass an array of slices: e.g. 5 SINGLE + 4 DOUBLE + 2 QUAD. */
 export const setupRoomsMixed = async (body: {
   blocks: number;

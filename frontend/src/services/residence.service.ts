@@ -18,6 +18,7 @@ export interface ResidenceSummary {
 }
 
 export type ContractorType = 'CLEANER' | 'GROUNDSKEEPER' | 'GARDENER' | 'OTHER';
+export type ContractorPaymentType = 'FIXED' | 'VARIABLE';
 
 export interface Contractor {
   id: string;
@@ -28,6 +29,7 @@ export interface Contractor {
   email: string | null;
   rate: string;
   rateUnit: string;
+  paymentType: ContractorPaymentType;
   startDate: string;
   endDate: string | null;
   active: boolean;
@@ -93,6 +95,7 @@ export async function createContractor(body: {
   residenceId: string; type: ContractorType; name: string;
   phone?: string; email?: string;
   rate: number; rateUnit?: string;
+  paymentType?: ContractorPaymentType;
   startDate: string; endDate?: string;
   notes?: string;
 }) {
@@ -128,9 +131,9 @@ export async function listContractorInvoices(contractorId?: string): Promise<Con
   return res.data.data;
 }
 
-export async function markContractorInvoicePaid(id: string, proofUrl?: string) {
+export async function markContractorInvoicePaid(id: string, proofUrl?: string, amount?: number) {
   const res = await api.post<{ success: boolean; data: ContractorInvoice }>(
-    `/admin/residences/contractor-invoices/${id}/paid`, { proofUrl },
+    `/admin/residences/contractor-invoices/${id}/paid`, { proofUrl, amount },
   );
   return res.data.data;
 }

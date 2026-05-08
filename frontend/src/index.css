@@ -591,6 +591,15 @@ html.light {
     background: #00CCCC;
   }
   .modal-card.rose::before { background: linear-gradient(90deg, #00CCCC, #E8197A); }
+
+  /* ── Responsive modal — phones get tighter padding + edge-to-edge feel ── */
+  @media (max-width: 540px) {
+    .modal-overlay { padding: 8px; }
+    .modal-card    { padding: 22px 18px; border-radius: 12px; max-height: calc(100vh - 16px); }
+    .chore-proof-actions { flex-direction: column-reverse; }
+    .chore-proof-actions > button { width: 100%; }
+  }
+
   .modal-title {
     font-size:      18px;
     font-weight:    700;

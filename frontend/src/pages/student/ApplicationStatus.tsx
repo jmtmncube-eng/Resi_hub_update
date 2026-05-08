@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { getApplicationStatus, ApplicationStatus as TApplicationStatus } from '../../services/application.service';
 import { ROUTES } from '../../constants/routes';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import OnboardingWizard from '../../components/OnboardingWizard';
+import ApplicationSubmitForm from '../../components/ApplicationSubmitForm';
 
 const STEPS = [
   { key: 'submitted', label: 'Application Submitted',  desc: 'Your application is in the system.' },
@@ -16,7 +18,8 @@ function getStep(data: TApplicationStatus): number {
   if (data.role === 'ACTIVE_STUDENT') return 4;
   if (data.allocation?.moveIn)        return 3;
   if (data.allocation)                return 2;
-  return 1;
+  // Step 1 (Submitted) only counts once they've actually submitted application docs
+  return data.applicationStatus === 'DRAFT' ? 0 : 1;
 }
 
 const typeLabel: Record<string, string> = {
@@ -125,6 +128,90 @@ export default function ApplicationStatus() {
         </div>
       </div>
 
+      {/* Application docs — show form (DRAFT/REJECTED) or status banner (SUBMITTED/APPROVED) */}
+      {(data.applicationStatus === 'DRAFT' || data.applicationStatus === 'REJECTED') && data.role === 'PENDING_STUDENT' && (
+        <ApplicationSubmitForm status={data} />
+      )}
+
+      {data.applicationStatus === 'SUBMITTED' && (
+        <div className="bg-white/4 border border-white/8 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Clock size={18} style={{ color: '#f59e0b' }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-semibold">Application under review</p>
+              <p className="text-white/40 text-sm mt-1">
+                Submitted {data.applicationSubmittedAt && new Date(data.applicationSubmittedAt).toLocaleDateString()}.
+                Admin will review your documents within 1–2 business days.
+              </p>
+              <ul className="mt-3 space-y-1">
+                {(['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] as const).map(t => {
+                  const has = data.documents.some(d => d.type === t);
+                  const label = ({
+                    ID_DOC: 'ID document',
+                    PROOF_REGISTRATION: 'Proof of registration',
+                    PROOF_FUNDING: 'Proof of funding',
+                    SIGNATURE: 'Signature',
+                  } as const)[t];
+                  return (
+                    <li key={t} className="flex items-center gap-2 text-xs text-white/60">
+                      <CheckCircle2 size={12} style={{ color: has ? '#4ade80' : 'var(--text3)' }} />
+                      {label}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {data.applicationStatus === 'APPROVED' && data.role === 'PENDING_STUDENT' && (
+        <div className="bg-white/4 border border-white/8 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(74,222,128,.12)', border: '1px solid rgba(74,222,128,.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CheckCircle2 size={18} style={{ color: '#4ade80' }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-semibold">Application approved</p>
+              <p className="text-white/40 text-sm mt-1">
+                {data.allocation
+                  ? 'Your room is reserved below — admin will confirm your move-in date soon.'
+                  : 'Pick a room from the catalogue to reserve your spot.'}
+              </p>
+              {data.applicationAdminNote && (
+                <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>
+                  <strong>Note from admin:</strong> {data.applicationAdminNote}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {data.applicationStatus === 'REJECTED' && (
+        <div className="bg-white/4 border border-white/8 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} style={{ color: 'var(--rose)', flexShrink: 0, marginTop: 2 }} />
+            <div className="flex-1">
+              <p className="text-white font-semibold">Application needs changes</p>
+              <p className="text-white/40 text-sm mt-1">
+                Re-upload using the form above and resubmit.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Room card — shown when a room is reserved */}
       {data.allocation ? (
         <div className="bg-white/4 border border-white/8 rounded-xl p-5">
@@ -155,12 +242,12 @@ export default function ApplicationStatus() {
             </div>
           </div>
         </div>
-      ) : (
-        /* No allocation yet — nudge to browse rooms */
+      ) : data.applicationStatus === 'APPROVED' ? (
+        /* Approved but no room yet — nudge to browse rooms */
         <div className="bg-white/4 border border-white/8 rounded-xl p-5 text-center">
           <p className="text-3xl mb-3">🔍</p>
           <p className="text-white font-semibold">No room assigned yet</p>
-          <p className="text-white/40 text-sm mt-1 mb-4">Browse available rooms while you wait for an admin to assign yours.</p>
+          <p className="text-white/40 text-sm mt-1 mb-4">Browse available rooms to reserve your spot.</p>
           <Link
             to={ROUTES.ROOMS}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rh-cyan/10 border border-rh-cyan/30 text-rh-cyan text-sm font-semibold hover:bg-rh-cyan/20 transition-colors"
@@ -168,7 +255,7 @@ export default function ApplicationStatus() {
             Browse Rooms →
           </Link>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

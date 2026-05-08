@@ -18,11 +18,11 @@ export async function createPass(userId: string, data: CreateVisitorInput) {
   });
   if (!user?.allocation) throw new AppError('You must have an active room to invite visitors', 400);
 
-  const room    = user.allocation.room;
-  const dateStr = data.date.replace(/-/g, '');
-  // The qrCode field stores the unique credential. The frontend QRCodeSVG
-  // wraps it as a deep-link URL so phone cameras open the gate page directly.
-  const qrCode  = `QR-${room.number}-${dateStr}-${randomUUID().slice(0, 6).toUpperCase()}`;
+  const room = user.allocation.room;
+  // Short, human-readable code: <room>-<5 char nonce>, e.g. "A101-K7M2X"
+  // Easy to type / read out over the phone if needed, ~10 chars total.
+  const nonce = randomUUID().replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 5);
+  const qrCode = `${room.number}-${nonce}`;
 
   return prisma.visitorPass.create({
     data: {

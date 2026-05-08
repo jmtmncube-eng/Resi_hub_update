@@ -112,12 +112,26 @@ async function main() {
     },
   });
 
+  // Additional admins — Alistair, Sharyne, Marcia, Glad
+  // Passcodes are derived from first name + 2026 (simple but unique).
+  const adminPwAlistair = await bcrypt.hash('alistair2026', SALT_ROUNDS);
+  const adminPwSharyne  = await bcrypt.hash('sharyne2026',  SALT_ROUNDS);
+  const adminPwMarcia   = await bcrypt.hash('marcia2026',   SALT_ROUNDS);
+  const adminPwGlad     = await bcrypt.hash('glad2026',     SALT_ROUNDS);
+  await Promise.all([
+    prisma.user.create({ data: { email: 'alistair@resihub.co', passwordHash: adminPwAlistair, role: Role.ADMIN, name: 'Alistair Mokoena', phone: '+27 82 000 0002', onboardedAt: new Date() } }),
+    prisma.user.create({ data: { email: 'sharyne@resihub.co',  passwordHash: adminPwSharyne,  role: Role.ADMIN, name: 'Sharyne Naidoo',   phone: '+27 82 000 0003', onboardedAt: new Date() } }),
+    prisma.user.create({ data: { email: 'marcia@resihub.co',   passwordHash: adminPwMarcia,   role: Role.ADMIN, name: 'Marcia van Staden', phone: '+27 82 000 0004', onboardedAt: new Date() } }),
+    prisma.user.create({ data: { email: 'glad@resihub.co',     passwordHash: adminPwGlad,     role: Role.ADMIN, name: 'Glad Mthembu',     phone: '+27 82 000 0005', onboardedAt: new Date() } }),
+  ]);
+
   // 8 active students in Great Den, 3 in Lions Den, 2 pending, 1 inactive
   const [
     sarah, marcus, leah, david, zoe, kabelo, naledi, riaan,
     thandi, jason, mia,
     aisha, lebo,
     inactive,
+    nomvula, brendan, fatima,
   ] = await Promise.all([
     // Great Den actives
     prisma.user.create({ data: { email: 'sarah@campus.edu',  passwordHash: studentPass, role: Role.ACTIVE_STUDENT, name: 'Sarah Johnson',   university: 'University of Cape Town', program: 'BSc Computer Science', year: 3, phone: '+27 71 234 5678', bio: 'Tech + sustainability.', onboardedAt: new Date() } }),
@@ -136,12 +150,24 @@ async function main() {
 
     // Pendings
     prisma.user.create({ data: { email: 'aisha@campus.edu',  passwordHash: studentPass, role: Role.PENDING_STUDENT, name: 'Aisha Patel',     university: 'UNISA',                    program: 'BCom Accounting',       year: 1, phone: '+27 73 456 7890' } }),
-    prisma.user.create({ data: { email: 'lebo@campus.edu',   passwordHash: studentPass, role: Role.PENDING_STUDENT, name: 'Lebo Mahlangu',   university: 'University of Cape Town', program: 'BSc Biology',           year: 1, phone: '+27 73 456 7891' } }),
+    // Lebo has SUBMITTED their application → admin can review them
+    prisma.user.create({ data: {
+      email: 'lebo@campus.edu', passwordHash: studentPass, role: Role.PENDING_STUDENT,
+      name: 'Lebo Mahlangu',    university: 'University of Cape Town', program: 'BSc Biology', year: 1, phone: '+27 73 456 7891',
+      idNumber: '0501185800089',
+      applicationStatus: 'SUBMITTED',
+      applicationSubmittedAt: daysFromNow(-1),
+    } }),
 
     // Inactive (admin disabled)
     prisma.user.create({ data: { email: 'inactive@campus.edu', passwordHash: studentPass, role: Role.ACTIVE_STUDENT, name: 'Sipho Old',     university: 'UCT',                       program: 'BSc Maths',             year: 4, isActive: false, onboardedAt: new Date() } }),
+
+    // 3 more active students — fresh intake
+    prisma.user.create({ data: { email: 'nomvula@campus.edu', passwordHash: studentPass, role: Role.ACTIVE_STUDENT, name: 'Nomvula Sithole', university: 'University of Cape Town', program: 'BSc Microbiology',   year: 2, phone: '+27 71 234 5686', onboardedAt: new Date() } }),
+    prisma.user.create({ data: { email: 'brendan@campus.edu', passwordHash: studentPass, role: Role.ACTIVE_STUDENT, name: 'Brendan O\'Connor', university: 'UNISA',                  program: 'BCom Economics',     year: 3, phone: '+27 73 100 0004', onboardedAt: new Date() } }),
+    prisma.user.create({ data: { email: 'fatima@campus.edu',  passwordHash: studentPass, role: Role.ACTIVE_STUDENT, name: 'Fatima Adams',    university: 'University of Cape Town', program: 'LLB Law',            year: 1, phone: '+27 71 234 5687', onboardedAt: new Date() } }),
   ]);
-  console.log('  users: 1 admin + 11 active + 2 pending + 1 disabled');
+  console.log('  users: 5 admins + 14 active + 2 pending + 1 disabled');
 
   // ═════════════════════════════════════════════════════════════
   // ROOMS — 12 in Great Den, 6 in Lions Den
@@ -150,13 +176,13 @@ async function main() {
     prisma.room.create({ data: { number: 'A101', block: 'A', type: RoomType.SINGLE, capacity: 1, price: 4500, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'A102', block: 'A', type: RoomType.SINGLE, capacity: 1, price: 4500, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'A103', block: 'A', type: RoomType.DOUBLE, capacity: 2, price: 5200, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
-    prisma.room.create({ data: { number: 'A104', block: 'A', type: RoomType.SINGLE, capacity: 1, price: 4500, status: RoomStatus.VACANT,   residenceId: greatDen.id } }),
+    prisma.room.create({ data: { number: 'A104', block: 'A', type: RoomType.SINGLE, capacity: 1, price: 4500, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'B101', block: 'B', type: RoomType.SINGLE, capacity: 1, price: 4200, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'B102', block: 'B', type: RoomType.DOUBLE, capacity: 2, price: 5000, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'B103', block: 'B', type: RoomType.SINGLE, capacity: 1, price: 4200, status: RoomStatus.RESERVED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'B104', block: 'B', type: RoomType.DOUBLE, capacity: 2, price: 5000, status: RoomStatus.VACANT,   residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'C101', block: 'C', type: RoomType.STUDIO, capacity: 1, price: 6500, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
-    prisma.room.create({ data: { number: 'C102', block: 'C', type: RoomType.STUDIO, capacity: 1, price: 6500, status: RoomStatus.VACANT,   residenceId: greatDen.id } }),
+    prisma.room.create({ data: { number: 'C102', block: 'C', type: RoomType.STUDIO, capacity: 1, price: 6500, status: RoomStatus.OCCUPIED, residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'C103', block: 'C', type: RoomType.TRIPLE, capacity: 3, price: 6800, status: RoomStatus.VACANT,   residenceId: greatDen.id } }),
     prisma.room.create({ data: { number: 'C104', block: 'C', type: RoomType.QUAD,   capacity: 4, price: 7200, status: RoomStatus.VACANT,   residenceId: greatDen.id } }),
   ]);
@@ -164,7 +190,7 @@ async function main() {
     prisma.room.create({ data: { number: 'L01', block: 'Main', type: RoomType.SINGLE, capacity: 1, price: 3800, status: RoomStatus.OCCUPIED, residenceId: lionsDen.id } }),
     prisma.room.create({ data: { number: 'L02', block: 'Main', type: RoomType.SINGLE, capacity: 1, price: 3800, status: RoomStatus.OCCUPIED, residenceId: lionsDen.id } }),
     prisma.room.create({ data: { number: 'L03', block: 'Main', type: RoomType.DOUBLE, capacity: 2, price: 4600, status: RoomStatus.OCCUPIED, residenceId: lionsDen.id } }),
-    prisma.room.create({ data: { number: 'L04', block: 'Main', type: RoomType.SINGLE, capacity: 1, price: 3800, status: RoomStatus.VACANT,   residenceId: lionsDen.id } }),
+    prisma.room.create({ data: { number: 'L04', block: 'Main', type: RoomType.SINGLE, capacity: 1, price: 3800, status: RoomStatus.OCCUPIED, residenceId: lionsDen.id } }),
     prisma.room.create({ data: { number: 'L05', block: 'Main', type: RoomType.STUDIO, capacity: 1, price: 5500, status: RoomStatus.VACANT,   residenceId: lionsDen.id } }),
     prisma.room.create({ data: { number: 'L06', block: 'Main', type: RoomType.SINGLE, capacity: 1, price: 3800, status: RoomStatus.VACANT,   residenceId: lionsDen.id } }),
   ]);
@@ -192,8 +218,13 @@ async function main() {
 
     // Reserved (still pending)
     prisma.allocation.create({ data: { userId: inactive.id, roomId: greatRooms[6].id, status: AllocationStatus.RESERVED, rent: 4200, balance: 0 } }),
+
+    // Fresh intake — 3 new students
+    prisma.allocation.create({ data: { userId: nomvula.id, roomId: greatRooms[3].id, status: AllocationStatus.ACTIVE, moveIn, rent: 4500, balance: 0    } }), // A104
+    prisma.allocation.create({ data: { userId: fatima.id,  roomId: greatRooms[9].id, status: AllocationStatus.ACTIVE, moveIn, rent: 6500, balance: 6500 } }), // C102 (owes May)
+    prisma.allocation.create({ data: { userId: brendan.id, roomId: lionsRooms[3].id, status: AllocationStatus.ACTIVE, moveIn, rent: 3800, balance: 0    } }), // L04
   ]);
-  console.log('  allocations: 11 active + 1 reserved');
+  console.log('  allocations: 14 active + 1 reserved');
 
   // ═════════════════════════════════════════════════════════════
   // CONTRACTORS — pool guy, gardener, cleaner, grounds
@@ -202,17 +233,21 @@ async function main() {
     prisma.serviceContractor.create({ data: {
       residenceId: greatDen.id, type: ContractorType.OTHER, name: "John's Pool Service",
       phone: '+27 82 100 0001', email: 'john@pools.co.za', rate: 1200, rateUnit: 'month',
+      paymentType: 'FIXED',
       startDate: D('2025-01-01'), notes: 'Visits Tuesday + Friday. Brings own chemicals.',
     }}),
     prisma.serviceContractor.create({ data: {
       residenceId: greatDen.id, type: ContractorType.GARDENER, name: 'GreenThumb Co',
       phone: '+27 82 100 0002', email: 'hello@greenthumb.co.za', rate: 800, rateUnit: 'month',
+      paymentType: 'FIXED',
       startDate: D('2025-03-01'),
     }}),
+    // Variable contractor — Mama Florence is per-visit, hours vary
     prisma.serviceContractor.create({ data: {
       residenceId: lionsDen.id, type: ContractorType.CLEANER, name: 'Mama Florence',
       phone: '+27 82 100 0003', rate: 350, rateUnit: 'visit',
-      startDate: D('2025-06-01'), notes: 'Weekly deep clean of common areas.',
+      paymentType: 'VARIABLE',
+      startDate: D('2025-06-01'), notes: 'Weekly deep clean — hours vary each visit.',
     }}),
   ]);
 
@@ -221,8 +256,9 @@ async function main() {
     prisma.contractorInvoice.create({ data: { contractorId: poolGuy.id,  period: '2026-05', amount: 1200, status: 'Pending'  } }),
     prisma.contractorInvoice.create({ data: { contractorId: gardener.id, period: '2026-04', amount:  800, status: 'Paid',    paidAt: D('2026-05-03') } }),
     prisma.contractorInvoice.create({ data: { contractorId: gardener.id, period: '2026-05', amount:  800, status: 'Pending'  } }),
+    // Variable contractor — April was paid (admin entered actual hours), May is still TBC (amount=0)
     prisma.contractorInvoice.create({ data: { contractorId: cleaner.id,  period: '2026-04', amount: 1400, status: 'Paid',    paidAt: D('2026-05-01') } }),
-    prisma.contractorInvoice.create({ data: { contractorId: cleaner.id,  period: '2026-05', amount: 1400, status: 'Pending'  } }),
+    prisma.contractorInvoice.create({ data: { contractorId: cleaner.id,  period: '2026-05', amount: 0,    status: 'Pending'  } }),
   ]);
   console.log('  contractors: 3 (with paid + pending invoices)');
 
@@ -285,7 +321,7 @@ async function main() {
       date: daysFromNow(1), timeFrom: '14:00', timeTo: '18:00',
       purpose: 'Study group',
       status: PassStatus.UPCOMING,
-      qrCode: `QR-${Date.now()}-SARAH-1`,
+      qrCode: 'A101-DEMO1',
     }}),
     // Marcus already has visitor inside
     prisma.visitorPass.create({ data: {
@@ -294,7 +330,7 @@ async function main() {
       purpose: 'Food delivery',
       status: PassStatus.ACTIVE,
       checkedIn: true, checkedInAt: new Date(today.getTime() - 5 * 60 * 1000),
-      qrCode: `QR-${Date.now()}-MARCUS-1`,
+      qrCode: 'A102-DEMO2',
     }}),
     // Leah's visitor came + left earlier
     prisma.visitorPass.create({ data: {
@@ -303,7 +339,7 @@ async function main() {
       purpose: 'Visit',
       status: PassStatus.EXPIRED,
       checkedIn: true, checkedInAt: D('2026-05-07'),
-      qrCode: `QR-${Date.now()}-LEAH-1`,
+      qrCode: 'A103-DEMO3',
     }}),
     // Thandi has upcoming pass
     prisma.visitorPass.create({ data: {
@@ -311,7 +347,7 @@ async function main() {
       date: daysFromNow(2), timeFrom: '16:00', timeTo: '20:00',
       purpose: 'Drop off textbooks',
       status: PassStatus.UPCOMING,
-      qrCode: `QR-${Date.now()}-THANDI-1`,
+      qrCode: 'L01-DEMO4',
     }}),
     // Cancelled
     prisma.visitorPass.create({ data: {
@@ -319,7 +355,7 @@ async function main() {
       date: daysFromNow(3), timeFrom: '15:00', timeTo: '17:00',
       purpose: 'Tutoring session',
       status: PassStatus.CANCELLED,
-      qrCode: `QR-${Date.now()}-ZOE-1`,
+      qrCode: 'B101-DEMO5',
     }}),
   ]);
   console.log('  visitor passes: 5 (1 UPCOMING + 1 ACTIVE + 1 EXPIRED + 1 future + 1 CANCELLED)');
@@ -404,6 +440,9 @@ async function main() {
     prisma.wallet.create({ data: { userId: mia.id,    credits: 5  } }),
     prisma.wallet.create({ data: { userId: aisha.id,  credits: 0  } }),
     prisma.wallet.create({ data: { userId: lebo.id,   credits: 0  } }),
+    prisma.wallet.create({ data: { userId: nomvula.id, credits: 25 } }),
+    prisma.wallet.create({ data: { userId: brendan.id, credits: 25 } }),
+    prisma.wallet.create({ data: { userId: fatima.id,  credits: 25 } }),
   ]);
   await Promise.all([
     prisma.walletTransaction.create({ data: { walletId: wallets[0].id, type: TransactionType.EARN,   amount: 25, note: 'Bonus: Move-in welcome credits' } }),
@@ -434,14 +473,19 @@ async function main() {
   // DOCUMENTS — invoices + contracts for each active student
   // ═════════════════════════════════════════════════════════════
   const docPromises: Promise<unknown>[] = [];
-  const activeStudents = [sarah, marcus, leah, david, zoe, kabelo, naledi, riaan, thandi, jason, mia];
+  const activeStudents = [
+    sarah, marcus, leah, david, zoe, kabelo, naledi, riaan,
+    thandi, jason, mia,
+    nomvula, brendan, fatima,
+  ];
   for (const s of activeStudents) {
-    // Contract — signed for everyone except Sarah (she still needs to sign)
+    // Contract — signed for everyone except Sarah + the 3 new students (they still need to sign)
+    const unsigned = s.id === sarah.id || s.id === nomvula.id || s.id === brendan.id || s.id === fatima.id;
     docPromises.push(prisma.document.create({ data: {
       userId: s.id, type: DocumentType.CONTRACT, period: 'Feb 2026', amount: '—',
-      status: s.id === sarah.id ? 'Unsigned' : 'Signed',
-      signedAt: s.id === sarah.id ? null : D('2026-02-01'),
-      signedByName: s.id === sarah.id ? null : s.name,
+      status: unsigned ? 'Unsigned' : 'Signed',
+      signedAt: unsigned ? null : D('2026-02-01'),
+      signedByName: unsigned ? null : s.name,
     }}));
     // April invoice — paid
     docPromises.push(prisma.document.create({ data: {
@@ -450,7 +494,7 @@ async function main() {
       proofStatus: 'CLEARED', clearedAt: D('2026-05-02'), clearedBy: admin.id,
     }}));
     // May invoice — outstanding for some
-    const owesMay = ['Sarah Johnson', 'David Chen', 'Thandi Khumalo'].includes(s.name);
+    const owesMay = ['Sarah Johnson', 'David Chen', 'Thandi Khumalo', 'Fatima Adams'].includes(s.name);
     docPromises.push(prisma.document.create({ data: {
       userId: s.id, type: DocumentType.INVOICE, period: 'May 2026',
       amount: 'R4,500', status: owesMay ? 'Unpaid' : 'Paid',
@@ -470,6 +514,20 @@ async function main() {
   console.log('  documents: contract + April invoice + May invoice + letter for each of 11 active students');
 
   // ═════════════════════════════════════════════════════════════
+  // APPLICATION DOCS — Lebo has submitted (placeholder 1×1 PNGs)
+  // ═════════════════════════════════════════════════════════════
+  // 1×1 transparent PNG so the admin review modal renders something
+  const placeholderPng =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=';
+  await Promise.all([
+    prisma.document.create({ data: { userId: lebo.id, type: DocumentType.ID_DOC,             period: 'Application 2026', status: 'Submitted', fileUrl: placeholderPng } }),
+    prisma.document.create({ data: { userId: lebo.id, type: DocumentType.PROOF_REGISTRATION, period: 'Application 2026', status: 'Submitted', fileUrl: placeholderPng } }),
+    prisma.document.create({ data: { userId: lebo.id, type: DocumentType.PROOF_FUNDING,      period: 'Application 2026', status: 'Submitted', fileUrl: placeholderPng } }),
+    prisma.document.create({ data: { userId: lebo.id, type: DocumentType.SIGNATURE,          period: 'Application 2026', status: 'Submitted', fileUrl: placeholderPng } }),
+  ]);
+  console.log('  application: Lebo submitted (4 placeholder docs) — admin can review');
+
+  // ═════════════════════════════════════════════════════════════
   // AUDIT LOG (sample admin actions)
   // ═════════════════════════════════════════════════════════════
   await Promise.all([
@@ -486,7 +544,14 @@ async function main() {
   console.log('\nSeed complete.\n');
   console.log('  Login credentials');
   console.log('  ──────────────────────────────────────────────────────────');
-  console.log('  admin@resihub.co       / admin123  (Admin — both residences)');
+  console.log('  ADMINS');
+  console.log('  admin@resihub.co       / admin123       (Jordan Steele)');
+  console.log('  alistair@resihub.co    / alistair2026   (Alistair Mokoena)');
+  console.log('  sharyne@resihub.co     / sharyne2026    (Sharyne Naidoo)');
+  console.log('  marcia@resihub.co      / marcia2026     (Marcia van Staden)');
+  console.log('  glad@resihub.co        / glad2026       (Glad Mthembu)');
+  console.log('');
+  console.log('  STUDENTS  (all use pass123)');
   console.log('  sarah@campus.edu       / pass123   (Active · Great Den · A101 · 75 credits · owes May rent · contract unsigned)');
   console.log('  marcus@campus.edu      / pass123   (Active · Great Den · A102)');
   console.log('  leah@campus.edu        / pass123   (Active · Great Den · A103 · 120 credits)');
@@ -498,8 +563,11 @@ async function main() {
   console.log('  thandi@campus.edu      / pass123   (Active · Lions Den · L01 · owes May rent)');
   console.log('  jason@campus.edu       / pass123   (Active · Lions Den · L02)');
   console.log('  mia@campus.edu         / pass123   (Active · Lions Den · L03)');
+  console.log('  nomvula@campus.edu     / pass123   (Active · Great Den · A104 · contract unsigned · NEW)');
+  console.log('  brendan@campus.edu     / pass123   (Active · Lions Den · L04 · contract unsigned · NEW)');
+  console.log('  fatima@campus.edu      / pass123   (Active · Great Den · C102 · owes May rent · contract unsigned · NEW)');
   console.log('  aisha@campus.edu       / pass123   (Pending — onboarding flow)');
-  console.log('  lebo@campus.edu        / pass123   (Pending — onboarding flow)');
+  console.log('  lebo@campus.edu        / pass123   (Pending — has SUBMITTED application docs)');
   console.log('  inactive@campus.edu    / pass123   (Disabled — login should fail)');
   console.log('  ──────────────────────────────────────────────────────────\n');
 }

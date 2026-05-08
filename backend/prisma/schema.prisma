@@ -56,6 +56,14 @@ enum ContractorType {
   OTHER
 }
 
+/// FIXED  — rate is the invoice amount each period (e.g. monthly retainer).
+/// VARIABLE — rate is just a budget hint; admin enters the actual amount when
+///            marking the invoice paid (e.g. per-visit cleaners, hourly work).
+enum ContractorPaymentType {
+  FIXED
+  VARIABLE
+}
+
 /// Type of operational service / expense logged by admin.
 /// Each type drives its own widget on the Operations tab.
 enum OpsServiceType {
@@ -98,6 +106,18 @@ enum DocumentType {
   INVOICE
   CONTRACT
   LETTER
+  // Application documents — submitted by pending students at signup
+  ID_DOC
+  PROOF_REGISTRATION
+  PROOF_FUNDING
+  SIGNATURE
+}
+
+enum ApplicationStatus {
+  DRAFT       // not yet submitted (no docs uploaded)
+  SUBMITTED   // student has uploaded all required docs
+  APPROVED    // admin approved
+  REJECTED    // admin rejected (with note)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -118,6 +138,15 @@ model User {
   bio          String?
   onboardedAt  DateTime?  // null = first-time user, show welcome tour
   isActive     Boolean   @default(true)  // admin-toggleable; false blocks login
+
+  // ── Application fields (pending students only) ────────────────
+  idNumber               String?            // SA ID number (13 digits)
+  applicationStatus      ApplicationStatus  @default(DRAFT)
+  applicationSubmittedAt DateTime?
+  applicationApprovedAt  DateTime?
+  applicationRejectedAt  DateTime?
+  applicationAdminNote   String?            // reviewer's note on approve/reject
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -516,20 +545,21 @@ model Residence {
 /// Paid service workers — pool guy, cleaner, gardener, grounds-keeper.
 /// Generates a recurring invoice each period that admin can mark paid.
 model ServiceContractor {
-  id          String         @id @default(cuid())
+  id          String                 @id @default(cuid())
   residenceId String
   type        ContractorType
   name        String
   phone       String?
   email       String?
-  rate        Decimal        @db.Decimal(10, 2)
-  rateUnit    String         @default("month")    // month | week | visit
+  rate        Decimal                @db.Decimal(10, 2)
+  rateUnit    String                 @default("month")    // month | week | visit
+  paymentType ContractorPaymentType  @default(FIXED)      // FIXED = rate IS the invoice; VARIABLE = admin enters actual at pay-time
   startDate   DateTime
   endDate     DateTime?
-  active      Boolean        @default(true)
+  active      Boolean                @default(true)
   notes       String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
   residence Residence            @relation(fields: [residenceId], references: [id], onDelete: Cascade)
   invoices  ContractorInvoice[]

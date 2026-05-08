@@ -57,7 +57,7 @@ export async function listInvoices(req: AuthRequest, res: Response, next: NextFu
 
 export async function markPaid(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { proofUrl } = req.body as { proofUrl?: string };
-    res.json({ success: true, data: await svc.markContractorInvoicePaid(req.params.id, proofUrl) });
+    const { proofUrl, amount } = req.body as { proofUrl?: string; amount?: number };
+    res.json({ success: true, data: await svc.markContractorInvoicePaid(req.params.id, proofUrl, amount) });
   } catch (e) { next(e); }
 }

@@ -494,6 +494,111 @@ export async function updateAccount(id: string, data: UpdateAccountInput) {
 }
 
 /**
+ * Single-call overview for the admin "view student" drawer:
+ * profile, allocation, room, residence, recent invoices/payments,
+ * wallet, ticket + visitor counts, application status. Everything
+ * the admin needs to triage a student in one place.
+ */
+export async function getAccountOverview(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true, name: true, email: true, phone: true, role: true,
+      avatarUrl: true, isActive: true,
+      university: true, program: true, year: true, bio: true,
+      idNumber: true, applicationStatus: true,
+      applicationSubmittedAt: true, applicationApprovedAt: true,
+      applicationRejectedAt: true, applicationAdminNote: true,
+      onboardedAt: true, createdAt: true,
+      wallet: { select: { credits: true } },
+      allocation: {
+        select: {
+          id: true, status: true, moveIn: true, rent: true, balance: true, createdAt: true,
+          room: {
+            select: {
+              id: true, number: true, block: true, type: true, capacity: true, price: true,
+              residence: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+      documents: {
+        where: { type: { in: ['INVOICE', 'CONTRACT'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: {
+          id: true, type: true, period: true, amount: true, status: true,
+          proofStatus: true, signedAt: true, clearedAt: true, createdAt: true,
+        },
+      },
+    },
+  });
+  if (!user) throw new AppError('User not found', 404);
+
+  const [openTickets, totalTickets, upcomingPasses, totalPasses] = await Promise.all([
+    prisma.maintenanceTicket.count({ where: { studentId: id, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+    prisma.maintenanceTicket.count({ where: { studentId: id } }),
+    prisma.visitorPass.count({ where: { hostId: id, status: 'UPCOMING' } }),
+    prisma.visitorPass.count({ where: { hostId: id } }),
+  ]);
+
+  // Quick-summary: months unpaid, total paid year-to-date
+  const invoices = user.documents.filter(d => d.type === 'INVOICE');
+  const monthsUnpaid = invoices.filter(i => i.status !== 'Paid').length;
+  const monthsPaid   = invoices.filter(i => i.status === 'Paid').length;
+
+  return {
+    ...user,
+    stats: {
+      openTickets,
+      totalTickets,
+      upcomingPasses,
+      totalPasses,
+      monthsUnpaid,
+      monthsPaid,
+    },
+  };
+}
+
+/**
+ * Create a single room. Lets admin add rooms one-at-a-time without
+ * having to re-run the bulk generator (which nukes vacant rooms).
+ * Validates uniqueness on the room number within the residence.
+ */
+export async function createSingleRoom(data: {
+  number: string; block: string; type: string;
+  capacity?: number; price: number; residenceId?: string;
+}) {
+  const number = data.number.trim().toUpperCase();
+  const block  = data.block.trim().toUpperCase();
+  if (!number) throw new AppError('Room number is required', 400);
+  if (!block)  throw new AppError('Block is required', 400);
+  if (!['SINGLE','DOUBLE','TRIPLE','QUAD','STUDIO'].includes(data.type)) {
+    throw new AppError('Invalid room type', 400);
+  }
+  if (data.price < 0) throw new AppError('Price must be ≥ 0', 400);
+
+  // Uniqueness — schema enforces global uniqueness on number, so just check.
+  const existing = await prisma.room.findUnique({ where: { number } });
+  if (existing) {
+    throw new AppError(`Room ${number} already exists`, 409);
+  }
+
+  const capacity = data.capacity ?? (TYPE_CAPACITY[data.type as RoomTypeStr] ?? 1);
+
+  return prisma.room.create({
+    data: {
+      number, block,
+      type: data.type as RoomTypeStr,
+      price: data.price,
+      capacity,
+      status: 'VACANT',
+      residenceId: data.residenceId ?? null,
+    },
+  });
+}
+
+/**
  * Hard-delete a single room. Refuses if it has any allocations of any
  * status — admins must end/move the tenants first. Recomputes nothing
  * because the room is gone after this.

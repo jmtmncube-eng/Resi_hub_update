@@ -9,7 +9,7 @@ import {
   getSettings, updateSettings, getOccupancy,
   setupRooms, setupRoomsMixed, ResidenceSettings,
   AdminRoom, getAccounts, createAllocation, removeAllocation, moveAllocation,
-  deleteRoom,
+  deleteRoom, createRoom,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
@@ -120,6 +120,23 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
 
   // ── Add-tenant flow state ───────────────────────────────────
   const [addTenantRoom, setAddTenantRoom] = useState<AdminRoom | null>(null);
+  // ── Add-single-room flow ────────────────────────────────────
+  const [addingRoom, setAddingRoom] = useState(false);
+
+  const addRoomMut = useMutation({
+    mutationFn: (vars: { number: string; block: string; type: SharingType | 'STUDIO'; capacity: number; price: number }) =>
+      createRoom({ ...vars, residenceId: residenceId ?? undefined }),
+    onSuccess: (room) => {
+      qc.invalidateQueries({ queryKey: ['admin-occupancy'] });
+      qc.invalidateQueries({ queryKey: ['admin-occupancy-rooms'] });
+      toast.success(`Room ${room.number} added`);
+      setAddingRoom(false);
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to add room');
+    },
+  });
 
   const { data: accountsList = [] } = useQuery({
     queryKey: ['admin-accounts-unallocated'],
@@ -610,20 +627,33 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                       ))}
                     </div>
 
-                    {/* Reconfigure toggle */}
+                    {/* Toolbar — Add single room + Reconfigure */}
                     {!showSetupForm && (
-                      <button
-                        onClick={() => setShowSetupForm(true)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                          background: 'var(--hover)', border: '1px solid var(--border)',
-                          color: 'var(--text3)', cursor: 'pointer',
-                          fontFamily: "'Space Grotesk', sans-serif",
-                        }}
-                      >
-                        <RefreshCw size={12} /> Reconfigure Rooms
-                      </button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setAddingRoom(true)}
+                          className="btn-primary press-soft"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          <Plus size={12} /> Add room
+                        </button>
+                        <button
+                          onClick={() => setShowSetupForm(true)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                            background: 'var(--hover)', border: '1px solid var(--border)',
+                            color: 'var(--text3)', cursor: 'pointer',
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          <RefreshCw size={12} /> Reconfigure
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -858,6 +888,16 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
         </>
       )}
 
+      {/* Add-room modal */}
+      {addingRoom && (
+        <AddRoomModal
+          existingRooms={rooms}
+          loading={addRoomMut.isPending}
+          onClose={() => setAddingRoom(false)}
+          onSubmit={(vars) => addRoomMut.mutate(vars)}
+        />
+      )}
+
       {/* Add-tenant modal */}
       {addTenantRoom && (
         <AddTenantModal
@@ -880,6 +920,118 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
         />
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AddRoomModal — admin types a single new room and saves it
+// ─────────────────────────────────────────────────────────────────
+
+function AddRoomModal({ existingRooms, loading, onClose, onSubmit }: {
+  existingRooms: AdminRoom[];
+  loading:       boolean;
+  onClose:       () => void;
+  onSubmit:      (v: { number: string; block: string; type: SharingType | 'STUDIO'; capacity: number; price: number }) => void;
+}) {
+  // Suggest the next room number for the most recently used block
+  const lastBlock = existingRooms[0]?.block ?? 'A';
+  const blockRooms = existingRooms.filter(r => r.block === lastBlock);
+  const nextNum = blockRooms.reduce((max, r) => {
+    const tail = parseInt(r.number.replace(/^[A-Z]+/, ''), 10);
+    return Number.isFinite(tail) && tail > max ? tail : max;
+  }, 100) + 1;
+
+  const [block,  setBlock]  = useState(lastBlock);
+  const [number, setNumber] = useState(`${lastBlock}${nextNum}`);
+  const [type,   setType]   = useState<SharingType | 'STUDIO'>('SINGLE');
+  const [price,  setPrice]  = useState(4000);
+  const [customNumber, setCustomNumber] = useState(false);
+
+  // Auto-update suggested number when block changes (unless user typed their own)
+  useEffect(() => {
+    if (customNumber) return;
+    const inBlock = existingRooms.filter(r => r.block === block);
+    const next = inBlock.reduce((max, r) => {
+      const tail = parseInt(r.number.replace(/^[A-Z]+/, ''), 10);
+      return Number.isFinite(tail) && tail > max ? tail : max;
+    }, 100) + 1;
+    setNumber(`${block}${next}`);
+  }, [block, existingRooms, customNumber]);
+
+  const capacity = type === 'SINGLE' || type === 'STUDIO' ? 1
+                 : type === 'DOUBLE' ? 2
+                 : type === 'TRIPLE' ? 3 : 4;
+
+  const TYPES: Array<{ value: SharingType | 'STUDIO'; label: string }> = [
+    { value: 'SINGLE', label: 'Single' },
+    { value: 'DOUBLE', label: 'Double' },
+    { value: 'TRIPLE', label: 'Triple' },
+    { value: 'QUAD',   label: 'Quad'   },
+    { value: 'STUDIO', label: 'Studio' },
+  ];
+
+  const valid = number.trim().length > 0 && block.trim().length > 0 && price >= 0;
+
+  return (
+    <Modal open={true} onClose={onClose} maxWidth={460}>
+      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Add a room</p>
+      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 18 }}>
+        Adds a single room to the residence. Stays VACANT until a tenant is assigned.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label className="field-label">Block</label>
+          <input value={block} onChange={e => setBlock(e.target.value.toUpperCase())} maxLength={3} className="input-base"
+            style={{ fontFamily: "'IBM Plex Mono', monospace" }} />
+        </div>
+        <div>
+          <label className="field-label">Room number</label>
+          <input value={number}
+                 onChange={e => { setNumber(e.target.value.toUpperCase()); setCustomNumber(true); }}
+                 className="input-base"
+                 style={{ fontFamily: "'IBM Plex Mono', monospace" }} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="field-label">Type ({capacity} {capacity === 1 ? 'tenant' : 'tenants'})</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+            {TYPES.map(t => {
+              const active = type === t.value;
+              return (
+                <button key={t.value} type="button" onClick={() => setType(t.value)}
+                  className="press-soft"
+                  style={{
+                    padding: '8px 6px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                    background: active ? 'rgba(0,204,204,.12)' : 'var(--bg3)',
+                    color: active ? 'var(--cyan)' : 'var(--text3)',
+                    border: `1px solid ${active ? 'var(--cyan)' : 'var(--border)'}`,
+                    cursor: 'pointer',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}>{t.label}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="field-label">Price (R / month)</label>
+          <input type="number" min={0} step={100} value={price}
+                 onChange={e => setPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                 className="input-base"
+                 style={{ fontFamily: "'IBM Plex Mono', monospace" }} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+        <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>Cancel</button>
+        <button onClick={() => onSubmit({ number, block, type, capacity, price })}
+                disabled={!valid || loading}
+                className="btn-primary press-soft"
+                style={{ flex: 2, padding: '10px 0', fontSize: 13, justifyContent: 'center' }}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          {loading ? 'Saving…' : 'Save room'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

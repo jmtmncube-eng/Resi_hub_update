@@ -10,7 +10,7 @@ import {
   listContractors, createContractor, endContractor,
   generateContractorInvoiceBulk, listContractorInvoices,
   markContractorInvoicePaid,
-  Contractor, ContractorType,
+  Contractor, ContractorType, ContractorPaymentType,
 } from '../../services/residence.service';
 import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
@@ -30,6 +30,7 @@ export default function ResidenceContractors() {
   const confirm = useConfirm();
   const [adding, setAdding] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [payVarTarget, setPayVarTarget] = useState<{ id: string; name: string; period: string; rate: string } | null>(null);
 
   const { data: contractors = [] } = useQuery({
     queryKey: ['contractors', selectedId],
@@ -55,13 +56,18 @@ export default function ResidenceContractors() {
   });
 
   const payMut = useMutation({
-    mutationFn: (id: string) => markContractorInvoicePaid(id),
+    mutationFn: ({ id, amount }: { id: string; amount?: number }) =>
+      markContractorInvoicePaid(id, undefined, amount),
     onSuccess:  () => {
       qc.invalidateQueries({ queryKey: ['contractor-invoices'] });
       qc.invalidateQueries({ queryKey: ['contractors'] });
       toast.success('Invoice marked Paid');
+      setPayVarTarget(null);
     },
-    onError: () => toast.error('Failed to mark paid'),
+    onError: (err: unknown) => {
+      const msg = err instanceof AxiosError ? err.response?.data?.error : null;
+      toast.error(msg ?? 'Failed to mark paid');
+    },
   });
 
   // Top stats
@@ -130,8 +136,20 @@ export default function ResidenceContractors() {
                 });
                 if (ok) endMut.mutate(c.id);
               }}
-              onPay={(id) => payMut.mutate(id)}
-              payingId={payMut.isPending ? payMut.variables : undefined}
+              onPay={(invoiceId) => {
+                if (c.paymentType === 'VARIABLE') {
+                  const inv = invoices.find(i => i.id === invoiceId);
+                  setPayVarTarget({
+                    id: invoiceId,
+                    name: c.name,
+                    period: inv?.period ?? '',
+                    rate: c.rate,
+                  });
+                } else {
+                  payMut.mutate({ id: invoiceId });
+                }
+              }}
+              payingId={payMut.isPending ? payMut.variables?.id : undefined}
             />
           ))}
         </div>
@@ -158,6 +176,15 @@ export default function ResidenceContractors() {
           }}
         />
       )}
+
+      {payVarTarget && (
+        <PayVariableModal
+          target={payVarTarget}
+          loading={payMut.isPending}
+          onClose={() => setPayVarTarget(null)}
+          onSubmit={(amount) => payMut.mutate({ id: payVarTarget.id, amount })}
+        />
+      )}
     </div>
   );
 }
@@ -181,7 +208,7 @@ function ContractorCard({ contractor: c, invoices, onEnd, onPay, payingId }: {
   contractor: Contractor;
   invoices: Contractor['invoices'];
   onEnd: () => void;
-  onPay: (id: string) => void;
+  onPay: (invoiceId: string) => void;
   payingId?: string;
 }) {
   const meta = TYPE_META[c.type];
@@ -211,9 +238,22 @@ function ContractorCard({ contractor: c, invoices, onEnd, onPay, payingId }: {
             }}>
               {c.active ? 'Active' : 'Ended'}
             </span>
+            <span style={{
+              padding: '2px 8px', borderRadius: 999,
+              fontSize: 10, fontWeight: 600,
+              background: c.paymentType === 'FIXED' ? 'rgba(0,204,204,.10)' : 'rgba(251,146,60,.10)',
+              color:      c.paymentType === 'FIXED' ? 'var(--cyan)' : '#fb923c',
+              border: `1px solid ${c.paymentType === 'FIXED' ? 'rgba(0,204,204,.25)' : 'rgba(251,146,60,.25)'}`,
+              fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em',
+            }} title={c.paymentType === 'FIXED'
+              ? 'Same amount every period'
+              : 'Amount entered when each invoice is paid'}>
+              {c.paymentType}
+            </span>
           </p>
           <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>
             {meta.label} · {formatRand(c.rate)} / {c.rateUnit}
+            {c.paymentType === 'VARIABLE' && ' (budget)'}
             {c.phone && ` · ${c.phone}`}
             {c.residence && ` · ${c.residence.name}`}
           </p>
@@ -254,7 +294,9 @@ function ContractorCard({ contractor: c, invoices, onEnd, onPay, payingId }: {
                   {formatPeriod(i.period)}
                 </span>
                 <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: i.status === 'Paid' ? '#4ade80' : 'var(--rose)', fontWeight: 700 }}>
-                  {formatRand(i.amount)}
+                  {c.paymentType === 'VARIABLE' && i.status === 'Pending' && Number(i.amount) === 0
+                    ? '— TBC'
+                    : formatRand(i.amount)}
                 </span>
                 {i.status === 'Pending' ? (
                   <button onClick={() => onPay(i.id)} disabled={payingId === i.id}
@@ -268,7 +310,7 @@ function ContractorCard({ contractor: c, invoices, onEnd, onPay, payingId }: {
                             display: 'flex', alignItems: 'center', gap: 4,
                           }}>
                     {payingId === i.id ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-                    Mark paid
+                    {c.paymentType === 'VARIABLE' ? 'Enter & pay' : 'Mark paid'}
                   </button>
                 ) : (
                   <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: '#4ade80', fontWeight: 600 }}>
@@ -292,20 +334,21 @@ function AddContractorModal({ residenceId, onClose, onAdded }: {
   residenceId: string; onClose: () => void; onAdded: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [type,      setType]      = useState<ContractorType>('CLEANER');
-  const [name,      setName]      = useState('');
-  const [phone,     setPhone]     = useState('');
-  const [email,     setEmail]     = useState('');
-  const [rate,      setRate]      = useState('');
-  const [rateUnit,  setRateUnit]  = useState<'month' | 'week' | 'visit'>('month');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate,   setEndDate]   = useState('');
-  const [notes,     setNotes]     = useState('');
+  const [type,        setType]        = useState<ContractorType>('CLEANER');
+  const [name,        setName]        = useState('');
+  const [phone,       setPhone]       = useState('');
+  const [email,       setEmail]       = useState('');
+  const [rate,        setRate]        = useState('');
+  const [rateUnit,    setRateUnit]    = useState<'month' | 'week' | 'visit'>('month');
+  const [paymentType, setPaymentType] = useState<ContractorPaymentType>('FIXED');
+  const [startDate,   setStartDate]   = useState(today);
+  const [endDate,     setEndDate]     = useState('');
+  const [notes,       setNotes]       = useState('');
 
   const create = useMutation({
     mutationFn: () => createContractor({
       residenceId, type, name, phone, email,
-      rate: Number(rate), rateUnit,
+      rate: Number(rate), rateUnit, paymentType,
       startDate, endDate: endDate || undefined,
       notes,
     }),
@@ -375,6 +418,32 @@ function AddContractorModal({ residenceId, onClose, onAdded }: {
             <option value="week">week</option>
             <option value="visit">visit</option>
           </select>
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="field-label">Payment type</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {(['FIXED', 'VARIABLE'] as ContractorPaymentType[]).map(pt => {
+              const active = paymentType === pt;
+              const color  = pt === 'FIXED' ? 'var(--cyan)' : '#fb923c';
+              return (
+                <button key={pt} type="button" onClick={() => setPaymentType(pt)} className="press-soft"
+                  style={{
+                    padding: '10px 12px', borderRadius: 8,
+                    border: `1px solid ${active ? color : 'var(--border)'}`,
+                    background: active ? `${color}14` : 'var(--bg3)',
+                    color: active ? 'var(--text)' : 'var(--text2)',
+                    fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+                  }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color, letterSpacing: '.05em' }}>{pt}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 400 }}>
+                    {pt === 'FIXED' ? 'Same amount every period' : 'Enter actual at pay-time'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label className="field-label">Start date</label>
@@ -470,6 +539,57 @@ function BulkInvoiceModal({ residenceId, onClose, onDone }: {
                 style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
           {run.isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
           Generate
+        </button>
+        <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Pay-variable modal — admin enters actual amount before marking paid
+// ─────────────────────────────────────────────────────────────────
+
+function PayVariableModal({ target, loading, onClose, onSubmit }: {
+  target: { id: string; name: string; period: string; rate: string };
+  loading: boolean;
+  onClose: () => void;
+  onSubmit: (amount: number) => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const num = Number(amount);
+  const valid = num > 0 && Number.isFinite(num);
+
+  return (
+    <Modal open={true} onClose={onClose} maxWidth={420}>
+      <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+        Pay {target.name}
+      </p>
+      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 16 }}>
+        {formatPeriod(target.period)} · variable rate (budget {formatRand(target.rate)})
+      </p>
+
+      <label className="field-label">Actual amount paid (R)</label>
+      <input
+        type="number" min={0} step={50} autoFocus
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
+        placeholder={target.rate}
+        className="input-base"
+        onKeyDown={e => { if (e.key === 'Enter' && valid) onSubmit(num); }}
+      />
+      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 6 }}>
+        This becomes the invoice amount and the invoice is marked Paid.
+      </p>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+        <button onClick={() => onSubmit(num)} disabled={!valid || loading}
+                className="btn-primary press-soft"
+                style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          {loading ? 'Saving…' : 'Pay & mark paid'}
         </button>
         <button onClick={onClose} className="btn-ghost" style={{ flex: 1, padding: '10px 0', fontSize: 13 }}>
           Cancel

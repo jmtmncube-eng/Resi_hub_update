@@ -21,10 +21,19 @@ export async function listContractors(residenceId?: string) {
   });
 }
 
+const PAYMENT_TYPES = ['FIXED', 'VARIABLE'] as const;
+type PaymentType = typeof PAYMENT_TYPES[number];
+function assertPaymentType(t: string): asserts t is PaymentType {
+  if (!PAYMENT_TYPES.includes(t as PaymentType)) {
+    throw new AppError(`Invalid payment type: ${t}. Use FIXED or VARIABLE.`, 400);
+  }
+}
+
 export async function createContractor(data: {
   residenceId: string; type: string; name: string;
   phone?: string; email?: string;
   rate: number; rateUnit?: string;
+  paymentType?: string;
   startDate: string; endDate?: string;
   notes?: string;
 }) {
@@ -32,6 +41,7 @@ export async function createContractor(data: {
   if (!data.name?.trim()) throw new AppError('Name is required', 400);
   if (!data.residenceId)  throw new AppError('residenceId is required', 400);
   if (!data.rate || data.rate <= 0) throw new AppError('Rate must be positive', 400);
+  if (data.paymentType) assertPaymentType(data.paymentType);
 
   const residence = await prisma.residence.findUnique({ where: { id: data.residenceId } });
   if (!residence) throw new AppError('Residence not found', 404);
@@ -50,6 +60,7 @@ export async function createContractor(data: {
       email:       data.email?.trim() || null,
       rate:        data.rate,
       rateUnit:    data.rateUnit ?? 'month',
+      paymentType: (data.paymentType as PaymentType | undefined) ?? 'FIXED',
       startDate:   start,
       endDate:     end,
       notes:       data.notes?.trim() || null,
@@ -60,22 +71,24 @@ export async function createContractor(data: {
 
 export async function updateContractor(id: string, data: Partial<{
   name: string; phone: string; email: string;
-  rate: number; rateUnit: string;
+  rate: number; rateUnit: string; paymentType: string;
   endDate: string; active: boolean; notes: string;
 }>) {
   const existing = await prisma.serviceContractor.findUnique({ where: { id } });
   if (!existing) throw new AppError('Contractor not found', 404);
+  if (data.paymentType !== undefined) assertPaymentType(data.paymentType);
   return prisma.serviceContractor.update({
     where: { id },
     data: {
-      ...(data.name     !== undefined && { name: data.name.trim() }),
-      ...(data.phone    !== undefined && { phone: data.phone?.trim() || null }),
-      ...(data.email    !== undefined && { email: data.email?.trim() || null }),
-      ...(data.rate     !== undefined && { rate: data.rate }),
-      ...(data.rateUnit !== undefined && { rateUnit: data.rateUnit }),
-      ...(data.endDate  !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
-      ...(data.active   !== undefined && { active: data.active }),
-      ...(data.notes    !== undefined && { notes: data.notes?.trim() || null }),
+      ...(data.name        !== undefined && { name: data.name.trim() }),
+      ...(data.phone       !== undefined && { phone: data.phone?.trim() || null }),
+      ...(data.email       !== undefined && { email: data.email?.trim() || null }),
+      ...(data.rate        !== undefined && { rate: data.rate }),
+      ...(data.rateUnit    !== undefined && { rateUnit: data.rateUnit }),
+      ...(data.paymentType !== undefined && { paymentType: data.paymentType as PaymentType }),
+      ...(data.endDate     !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
+      ...(data.active      !== undefined && { active: data.active }),
+      ...(data.notes       !== undefined && { notes: data.notes?.trim() || null }),
     },
   });
 }
@@ -99,7 +112,9 @@ function assertValidPeriod(period: string): void {
   }
 }
 
-/** Generate (or fetch) the invoice for a single contractor for a given month. */
+/** Generate (or fetch) the invoice for a single contractor for a given month.
+ *  FIXED contractors: invoice amount = rate.
+ *  VARIABLE contractors: invoice amount = 0 (admin enters actual at pay-time). */
 export async function generateContractorInvoice(contractorId: string, period: string) {
   assertValidPeriod(period);
   const c = await prisma.serviceContractor.findUnique({ where: { id: contractorId } });
@@ -115,7 +130,7 @@ export async function generateContractorInvoice(contractorId: string, period: st
     data: {
       contractorId,
       period,
-      amount: Number(c.rate),
+      amount: c.paymentType === 'VARIABLE' ? 0 : Number(c.rate),
       status: 'Pending',
     },
   });
@@ -136,7 +151,12 @@ export async function generateAllContractorInvoices(period: string, residenceId?
     });
     if (exists) { skipped++; continue; }
     const inv = await prisma.contractorInvoice.create({
-      data: { contractorId: c.id, period, amount: Number(c.rate), status: 'Pending' },
+      data: {
+        contractorId: c.id,
+        period,
+        amount: c.paymentType === 'VARIABLE' ? 0 : Number(c.rate),
+        status: 'Pending',
+      },
     });
     created.push({ id: inv.id, contractorId: c.id, period, amount: String(inv.amount) });
   }
@@ -151,11 +171,43 @@ export async function listContractorInvoices(contractorId?: string) {
   });
 }
 
-export async function markContractorInvoicePaid(id: string, proofUrl?: string) {
-  const inv = await prisma.contractorInvoice.findUnique({ where: { id } });
+/** Mark a contractor invoice paid. For VARIABLE contractors the caller MUST
+ *  pass the actual amount (the invoice is created with amount=0). For FIXED
+ *  contractors the amount can be omitted (invoice was already pre-filled). */
+export async function markContractorInvoicePaid(
+  id: string,
+  proofUrl?: string,
+  amount?: number,
+) {
+  const inv = await prisma.contractorInvoice.findUnique({
+    where: { id },
+    include: { contractor: true },
+  });
   if (!inv) throw new AppError('Invoice not found', 404);
+
+  // For variable contractors, an amount must be provided (either now or
+  // already saved on the invoice). 0 means "still needs entering."
+  const needsAmount =
+    inv.contractor.paymentType === 'VARIABLE' &&
+    Number(inv.amount) === 0 &&
+    (amount === undefined || amount <= 0);
+  if (needsAmount) {
+    throw new AppError(
+      'This contractor is on a variable rate — enter the actual amount paid before marking the invoice paid.',
+      400,
+    );
+  }
+  if (amount !== undefined && amount < 0) {
+    throw new AppError('Amount must be positive', 400);
+  }
+
   return prisma.contractorInvoice.update({
     where: { id },
-    data:  { status: 'Paid', paidAt: new Date(), ...(proofUrl && { proofUrl }) },
+    data: {
+      status: 'Paid',
+      paidAt: new Date(),
+      ...(amount !== undefined && amount > 0 && { amount }),
+      ...(proofUrl && { proofUrl }),
+    },
   });
 }

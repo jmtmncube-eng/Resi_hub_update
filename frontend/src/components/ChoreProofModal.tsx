@@ -1,9 +1,10 @@
-import { X, Upload, Loader2, Camera, AlertCircle } from 'lucide-react';
+import { X, Upload, Loader2, Camera, ImagePlus, AlertCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Chore } from '../types/domain.types';
 import { completeChore } from '../services/chore.service';
+import { Modal } from './Modal';
 
 interface Props {
   chore: Chore | null;
@@ -12,7 +13,8 @@ interface Props {
 
 export default function ChoreProofModal({ chore, onClose }: Props) {
   const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [note,    setNote]    = useState('');
 
@@ -34,6 +36,9 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
 
   if (!chore) return null;
 
+  function takePhoto() {
+    cameraInputRef.current?.click();
+  }
   function pickFile() {
     fileInputRef.current?.click();
   }
@@ -58,8 +63,7 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card rose" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+    <Modal open={true} onClose={onClose} maxWidth={480}>
         <button onClick={onClose} aria-label="Close" style={{
           position: 'absolute', top: 14, right: 14, background: 'transparent',
           border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4,
@@ -90,32 +94,42 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
           </p>
         </div>
 
-        {/* Photo picker */}
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileSelected} style={{ display: 'none' }} />
+        {/* Photo pickers — separate inputs so camera vs gallery are explicit on mobile */}
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={onFileSelected} style={{ display: 'none' }} />
+        <input ref={fileInputRef}   type="file" accept="image/*"                       onChange={onFileSelected} style={{ display: 'none' }} />
 
         {!preview ? (
-          <button onClick={pickFile} type="button" style={{
-            width: '100%', padding: '28px 20px', borderRadius: 12,
-            background: 'rgba(255,255,255,.02)',
-            border: '1.5px dashed rgba(232,25,122,.35)',
-            color: 'var(--text2)', cursor: 'pointer',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-            transition: 'all .22s cubic-bezier(.4,0,.2,1)',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--rose)';
-            e.currentTarget.style.background = 'rgba(232,25,122,.05)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(232,25,122,.35)';
-            e.currentTarget.style.background = 'rgba(255,255,255,.02)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}>
-            <Camera size={26} style={{ color: 'var(--rose)' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Add photo of completed work</span>
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>JPG, PNG · max 5 MB</span>
-          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <button onClick={takePhoto} type="button" style={{
+              padding: '24px 12px', borderRadius: 12,
+              background: 'rgba(232,25,122,.06)',
+              border: '1.5px dashed rgba(232,25,122,.45)',
+              color: 'var(--text)', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              transition: 'all .2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--rose)'; e.currentTarget.style.background = 'rgba(232,25,122,.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(232,25,122,.45)'; e.currentTarget.style.background = 'rgba(232,25,122,.06)'; }}>
+              <Camera size={24} style={{ color: 'var(--rose)' }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Take photo</span>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>On-site capture</span>
+            </button>
+
+            <button onClick={pickFile} type="button" style={{
+              padding: '24px 12px', borderRadius: 12,
+              background: 'rgba(0,204,204,.06)',
+              border: '1.5px dashed rgba(0,204,204,.4)',
+              color: 'var(--text)', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              transition: 'all .2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--cyan)'; e.currentTarget.style.background = 'rgba(0,204,204,.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,204,204,.4)';  e.currentTarget.style.background = 'rgba(0,204,204,.06)'; }}>
+              <ImagePlus size={24} style={{ color: 'var(--cyan)' }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Upload</span>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>From gallery · max 5 MB</span>
+            </button>
+          </div>
         ) : (
           <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border2)' }}>
             <img src={preview} alt="Proof preview" style={{ width: '100%', maxHeight: 280, objectFit: 'cover', display: 'block' }} />
@@ -143,8 +157,8 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
           />
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        {/* Actions — stack on phones, row on desktop */}
+        <div className="chore-proof-actions" style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button onClick={onClose} type="button" className="btn-ghost">Cancel</button>
           <button
             onClick={handleSubmit}
@@ -156,7 +170,6 @@ export default function ChoreProofModal({ chore, onClose }: Props) {
             {submit.isPending ? 'Submitting…' : 'Submit proof'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

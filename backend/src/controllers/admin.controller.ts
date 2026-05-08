@@ -126,6 +126,20 @@ export async function deleteRoom(req: Request, res: Response, next: NextFunction
   } catch (e) { next(e); }
 }
 
+export async function createRoom(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.createSingleRoom(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
+export async function getAccountOverview(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await adminService.getAccountOverview(req.params.id);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 export async function moveAllocation(req: Request, res: Response, next: NextFunction) {
   try {
     const { userId, targetRoomId, rent, status } = req.body as {

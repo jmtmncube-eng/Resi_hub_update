@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck, AlertTriangle } from 'lucide-react';
+import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck, AlertTriangle, FileSearch, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAccounts, updateAccount, approveAccount, setAccountActive, AdminAccount } from '../../services/admin.service';
+import { listSubmittedApplications } from '../../services/application.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
+import ApplicationReviewModal from '../../components/ApplicationReviewModal';
+import AccountOverviewDrawer from '../../components/AccountOverviewDrawer';
 import { UserX as UserXIcon } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────
@@ -57,6 +60,18 @@ export default function AdminAccounts() {
   const [filter, setFilter]     = useState<RoleFilter>('all');
   const [editing, setEditing]   = useState<AdminAccount | null>(null);
   const [promoting, setPromoting] = useState<AdminAccount | null>(null);
+  const [reviewing, setReviewing] = useState<AdminAccount | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+
+  // Pre-fetch submitted apps so we know which pending students have docs ready
+  const { data: submittedApps = [] } = useQuery({
+    queryKey: ['admin-applications'],
+    queryFn:  listSubmittedApplications,
+  });
+  const submittedIds = useMemo(
+    () => new Set(submittedApps.filter(a => a.applicationStatus === 'SUBMITTED').map(a => a.id)),
+    [submittedApps],
+  );
 
   const { data: accounts = [], isLoading, isError } = useQuery<AdminAccount[]>({
     queryKey: ['admin-accounts', search],
@@ -269,25 +284,44 @@ export default function AdminAccounts() {
                     <td>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         {a.role === 'PENDING_STUDENT' && (
-                          <button
-                            onClick={() => approveMut.mutate(a.id)}
-                            disabled={approveMut.isPending && approveMut.variables === a.id}
-                            className="press-soft"
-                            title="Approve as Active student"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 5,
-                              padding: '5px 11px', borderRadius: 7,
-                              fontSize: 12, fontWeight: 600,
-                              background: 'rgba(74,222,128,.12)',
-                              color: '#4ade80',
-                              border: '1px solid rgba(74,222,128,.3)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {approveMut.isPending && approveMut.variables === a.id
-                              ? <Loader2 size={11} className="animate-spin" />
-                              : <Check size={11} />} Approve
-                          </button>
+                          submittedIds.has(a.id) ? (
+                            <button
+                              onClick={() => setReviewing(a)}
+                              className="press-soft"
+                              title="Review submitted application docs"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px', borderRadius: 7,
+                                fontSize: 12, fontWeight: 600,
+                                background: 'rgba(0,204,204,.12)',
+                                color: 'var(--cyan)',
+                                border: '1px solid rgba(0,204,204,.3)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <FileSearch size={11} /> Review
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => approveMut.mutate(a.id)}
+                              disabled={approveMut.isPending && approveMut.variables === a.id}
+                              className="press-soft"
+                              title="No application submitted — approve directly (legacy bypass)"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '5px 11px', borderRadius: 7,
+                                fontSize: 12, fontWeight: 600,
+                                background: 'rgba(74,222,128,.12)',
+                                color: '#4ade80',
+                                border: '1px solid rgba(74,222,128,.3)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {approveMut.isPending && approveMut.variables === a.id
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <Check size={11} />} Approve
+                            </button>
+                          )
                         )}
                         {a.role === 'ACTIVE_STUDENT' && (
                           <button
@@ -302,6 +336,14 @@ export default function AdminAccounts() {
                             <ShieldCheck size={11} /> Promote
                           </button>
                         )}
+                        <button
+                          onClick={() => setViewingId(a.id)}
+                          className="btn-ghost press-soft"
+                          title="Open overview"
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 12 }}
+                        >
+                          <Eye size={11} /> View
+                        </button>
                         <button
                           onClick={() => setEditing(a)}
                           className="btn-ghost press-soft"
@@ -374,6 +416,10 @@ export default function AdminAccounts() {
       )}
 
       {editing && <EditAccountModal account={editing} onClose={() => setEditing(null)} />}
+
+      {reviewing && <ApplicationReviewModal applicantId={reviewing.id} onClose={() => setReviewing(null)} />}
+
+      <AccountOverviewDrawer accountId={viewingId} onClose={() => setViewingId(null)} />
 
       {/* Promote-to-admin confirmation — replaces the native browser confirm */}
       <PromoteModal

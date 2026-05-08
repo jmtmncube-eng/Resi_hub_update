@@ -23,15 +23,36 @@ export default function Gate() {
   const [result,   setResult]   = useState<GateScanResult | null>(null);
   const [error,    setError]    = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [prefilled,  setPrefilled]  = useState(false);
 
-  // ── Auto-process the ?code= query string (deep-linked from QR scan) ──
+  // ── Hydrate from sessionStorage so the result card survives a page refresh.
+  //    Without this, refreshing would show the input form again with the QR
+  //    code still pre-filled in the URL — risking an accidental double-scan
+  //    that checks the visitor right back OUT.
+  //    TTL 5 min — long enough for a guard to glance away, short enough that
+  //    the next visitor doesn't see a stranger's pass.
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('gate.lastResult');
+      if (raw) {
+        const { result: r, ts } = JSON.parse(raw) as { result: GateScanResult; ts: number };
+        if (Date.now() - ts < 5 * 60 * 1000) {
+          setResult(r);
+          return; // skip pre-fill: we're showing the result
+        }
+        sessionStorage.removeItem('gate.lastResult');
+      }
+    } catch { /* corrupted storage — ignore */ }
+
+    // Pre-fill ?code= from URL (deep-linked from QR scan) but DON'T auto-process.
+    // The gate guard / visitor must explicitly tap "Verify" to confirm.
     const code = params.get('code');
-    if (code && !scanning && !result && !error) {
-      runScan(code);
+    if (code) {
+      setManualCode(code.toUpperCase());
+      setPrefilled(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, []);
 
   async function runScan(rawCode: string) {
     const code = rawCode.trim();
@@ -42,6 +63,10 @@ export default function Gate() {
     try {
       const r = await gateScan(code);
       setResult(r);
+      // Persist so a refresh doesn't dump us back to the input form
+      try {
+        sessionStorage.setItem('gate.lastResult', JSON.stringify({ result: r, ts: Date.now() }));
+      } catch { /* quota / private mode — non-fatal */ }
     } catch (e) {
       const ax = e as { response?: { data?: { error?: string } } };
       setError(ax.response?.data?.error ?? 'Could not process this code. Try again.');
@@ -54,7 +79,9 @@ export default function Gate() {
     setResult(null);
     setError(null);
     setManualCode('');
-    // Clear ?code= so a refresh doesn't re-trigger the same scan
+    setPrefilled(false);
+    sessionStorage.removeItem('gate.lastResult');
+    // Clear ?code= so a refresh doesn't re-prefill the same code
     if (params.has('code')) {
       const next = new URLSearchParams(params);
       next.delete('code');
@@ -90,7 +117,7 @@ export default function Gate() {
         ) : error ? (
           <ErrorCard message={error} onReset={reset} />
         ) : (
-          <ScannerHome onSubmit={(code) => runScan(code)} manualCode={manualCode} setManualCode={setManualCode} />
+          <ScannerHome onSubmit={(code) => runScan(code)} manualCode={manualCode} setManualCode={setManualCode} prefilled={prefilled} />
         )}
 
         {/* Footer */}
@@ -245,27 +272,32 @@ function ErrorCard({ message, onReset }: { message: string; onReset: () => void 
 }
 
 function ScannerHome({
-  onSubmit, manualCode, setManualCode,
+  onSubmit, manualCode, setManualCode, prefilled,
 }: {
   onSubmit: (code: string) => void;
   manualCode: string;
   setManualCode: (v: string) => void;
+  prefilled?: boolean;
 }) {
   return (
     <div className="card appear" style={{ padding: '28px 24px' }}>
       <div style={{
         width: 56, height: 56, borderRadius: 14, margin: '0 auto 14px',
-        background: 'rgba(0,204,204,.14)',
-        border: '1px solid rgba(0,204,204,.3)',
+        background: prefilled ? 'rgba(74,222,128,.14)' : 'rgba(0,204,204,.14)',
+        border: `1px solid ${prefilled ? 'rgba(74,222,128,.3)' : 'rgba(0,204,204,.3)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Camera size={26} style={{ color: 'var(--cyan)' }} />
+        {prefilled
+          ? <ShieldCheck size={26} style={{ color: '#4ade80' }} />
+          : <Camera      size={26} style={{ color: 'var(--cyan)' }} />}
       </div>
       <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', textAlign: 'center' }}>
-        Visitor pass scan
+        {prefilled ? 'Code ready to verify' : 'Visitor pass scan'}
       </p>
       <p style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', marginTop: 4, lineHeight: 1.55 }}>
-        Point the visitor's QR at this device's camera, or paste the code below.
+        {prefilled
+          ? 'Confirm the code below matches the QR, then tap Verify.'
+          : "Point the visitor's QR at this device's camera, or paste the code below."}
       </p>
 
       <div style={{ marginTop: 22 }}>
@@ -276,9 +308,14 @@ function ScannerHome({
           value={manualCode}
           onChange={e => setManualCode(e.target.value.toUpperCase())}
           onKeyDown={e => { if (e.key === 'Enter' && manualCode.trim()) onSubmit(manualCode); }}
-          placeholder="QR-A101-20261225-XXXXXX"
+          placeholder="A101-K7M2X"
           className="input-base"
-          style={{ fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '.05em' }}
+          style={{
+            fontFamily: "'IBM Plex Mono', monospace",
+            letterSpacing: '.08em',
+            fontSize: 16,
+            ...(prefilled ? { borderColor: 'rgba(74,222,128,.5)' } : {}),
+          }}
         />
       </div>
 
@@ -287,11 +324,11 @@ function ScannerHome({
         disabled={!manualCode.trim()}
         className="btn-primary press-soft"
         style={{
-          width: '100%', padding: '11px 0', fontSize: 13, marginTop: 14,
+          width: '100%', padding: '13px 0', fontSize: 14, marginTop: 14, fontWeight: 700,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}
       >
-        <ShieldCheck size={13} /> Verify
+        <ShieldCheck size={14} /> Verify {prefilled ? '& confirm entry' : ''}
       </button>
 
       <p style={{
