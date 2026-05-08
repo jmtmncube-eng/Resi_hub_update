@@ -52,6 +52,6 @@
     "typescript": "^5.3.3"
   },
   "prisma": {
-    "seed": "npx --yes -p ts-node@10 -p typescript@5 ts-node prisma/seed.ts"
+    "seed": "npx --yes -p ts-node@10 -p typescript@5 ts-node --transpile-only --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }
