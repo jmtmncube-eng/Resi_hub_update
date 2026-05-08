@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Home, Wallet, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_HOME, ROUTES } from '../../constants/routes';
 import { AxiosError } from 'axios';
@@ -54,11 +54,14 @@ export default function Login() {
       <style>{`
         @media (max-width: 767px) {
           .rh-scene-panel  { display: none !important; }
-          .rh-form-panel   { align-items: flex-start !important; padding-top: 28px !important; }
         }
         @media (min-width: 768px) {
           .rh-scene-panel  { display: flex !important; }
-          .rh-mobile-brand { display: none !important; }
+          .rh-feature-row  { display: grid !important; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%      { opacity: .55; transform: scale(.85); }
         }
       `}</style>
 
@@ -91,15 +94,17 @@ export default function Login() {
       <div className="rh-form-panel" style={{
         flexShrink: 0,
         width: '100%',
-        maxWidth: 480,
+        maxWidth: 520,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '32px 20px',
+        padding: '40px 24px 28px',
         background: 'linear-gradient(160deg, #08101a 0%, #0d0a1a 35%, #150a18 70%, #100912 100%)',
         position: 'relative',
         overflow: 'hidden',
         borderLeft: '1px solid rgba(0,204,204,.05)',
+        gap: 18,
       }}>
         {/* Seam blend — soft cyan→rose vertical fade along the left edge */}
         <div style={{
@@ -138,38 +143,38 @@ export default function Login() {
         {/* Rising sparks */}
         <SparkParticles color="#E8197A" rate={0.14} />
 
+        {/* ── MIDDLE: Form card (taller, more premium) ───────── */}
         <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }} className="appear">
 
-          {/* Mobile-only brand header */}
-          <div className="rh-mobile-brand" style={{ textAlign: 'center', marginBottom: 22 }}>
-            <h1 style={{
-              fontSize: 34, fontWeight: 800,
-              background: 'linear-gradient(90deg, var(--cyan) 0%, var(--rose) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              letterSpacing: '-.03em', fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 6,
-            }}>
-              ResiHub
-            </h1>
-            <p style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: 10, color: 'var(--text3)', letterSpacing: '.08em',
-            }}>
-              STUDENT ACCOMMODATION PLATFORM
-            </p>
-          </div>
-
           {/* Login card */}
-          <div className="glass-card" style={{ marginBottom: 12, padding: '28px 32px', position: 'relative', overflow: 'hidden' }}>
+          <div className="glass-card" style={{ padding: '36px 36px 32px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, var(--cyan), var(--rose))' }}/>
 
+            {/* Welcome hero strip */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              marginBottom: 20, paddingBottom: 16,
+              borderBottom: '1px solid var(--border)',
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#4ade80', boxShadow: '0 0 10px rgba(74,222,128,.7)',
+                animation: 'pulse 2s ease-in-out infinite',
+              }} />
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                color: 'var(--text3)', letterSpacing: '.08em', textTransform: 'uppercase',
+              }}>
+                Welcome back · session ready
+              </span>
+            </div>
+
             {/* Card header */}
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 26 }}>
               <h2 style={{
-                fontSize: 22, fontWeight: 700,
+                fontSize: 24, fontWeight: 700,
                 letterSpacing: '-.02em', color: 'var(--text)',
-                marginBottom: 6,
+                marginBottom: 8, lineHeight: 1.15,
               }}>
                 Sign in to your account
               </h2>
@@ -259,52 +264,75 @@ export default function Login() {
               </button>
             </form>
           </div>
+        </div>
 
-          {/* Legal links — wraps cleanly on narrow widths */}
-          <p style={{
-            marginTop: 16, textAlign: 'center',
-            fontSize: 11, lineHeight: 1.7,
-            color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace",
-            wordBreak: 'normal', overflowWrap: 'break-word',
-            maxWidth: '100%',
-          }}>
-            By signing in you agree to our{' '}
-            <Link to={ROUTES.TERMS} style={{
-              color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
-              borderBottom: '1px solid rgba(0,204,204,.4)',
-              whiteSpace: 'nowrap',
-            }}>
-              Terms of Use
-            </Link>
-            {' '}and{' '}
-            <Link to={ROUTES.PRIVACY} style={{
-              color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
-              borderBottom: '1px solid rgba(0,204,204,.4)',
-              whiteSpace: 'nowrap',
-            }}>
-              Privacy Policy
-            </Link>.
-            <br />
-            <span style={{ color: 'var(--text4)', fontSize: 10 }}>(POPIA-compliant)</span>
-          </p>
+        {/* ── BOTTOM: feature pillars + legal + Athera ─────────── */}
+        <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Athera signature */}
-          <div style={{
-            marginTop: 14, textAlign: 'center',
-            fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 10, color: 'var(--text3)', letterSpacing: '.05em',
+          {/* Feature pillars — desktop only */}
+          <div className="rh-feature-row" style={{
+            display: 'none',
+            gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
           }}>
-            Built by{' '}
-            <span style={{
-              color: 'var(--cyan)', fontWeight: 700, letterSpacing: '0',
-              fontFamily: "'Space Grotesk', sans-serif", fontSize: 11,
-            }}>
-              Athera
-            </span>
-            {' '}· © {new Date().getFullYear()}
+            {[
+              { icon: Home,         label: 'Rooms',    hint: 'Browse · book' },
+              { icon: Wallet,       label: 'Payments', hint: 'Rent · proof'  },
+              { icon: ShieldCheck,  label: 'Visitors', hint: 'QR gate'       },
+            ].map(({ icon: Icon, label, hint }) => (
+              <div key={label} style={{
+                padding: '10px 8px', borderRadius: 10,
+                background: 'rgba(255,255,255,.02)',
+                border: '1px solid rgba(0,204,204,.08)',
+                textAlign: 'center',
+              }}>
+                <Icon size={16} style={{ color: 'var(--cyan)', marginBottom: 4 }} />
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>{label}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: 'var(--text4)', marginTop: 1 }}>{hint}</p>
+              </div>
+            ))}
           </div>
 
+          {/* Legal + Athera (one tight block) */}
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{
+              fontSize: 11, lineHeight: 1.6,
+              color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace",
+            }}>
+              By signing in you agree to our{' '}
+              <Link to={ROUTES.TERMS} style={{
+                color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
+                borderBottom: '1px solid rgba(0,204,204,.4)',
+                whiteSpace: 'nowrap',
+              }}>
+                Terms of Use
+              </Link>
+              {' '}and{' '}
+              <Link to={ROUTES.PRIVACY} style={{
+                color: 'var(--text2)', textDecoration: 'none', fontWeight: 600,
+                borderBottom: '1px solid rgba(0,204,204,.4)',
+                whiteSpace: 'nowrap',
+              }}>
+                Privacy Policy
+              </Link>
+              <span style={{ color: 'var(--text4)' }}>{' '}· POPIA</span>
+            </p>
+
+            <div style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 10, color: 'var(--text4)', letterSpacing: '.05em',
+            }}>
+              Built by{' '}
+              <span style={{
+                color: 'var(--cyan)', fontWeight: 700, letterSpacing: '0',
+                fontFamily: "'Space Grotesk', sans-serif", fontSize: 11,
+              }}>
+                Athera
+              </span>
+              {' '}· © {new Date().getFullYear()}
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   );
