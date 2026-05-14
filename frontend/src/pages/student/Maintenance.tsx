@@ -221,8 +221,10 @@ export default function Maintenance() {
                                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{t.location}</p>
                               </div>
                             </div>
-                            <span className={`badge ${s.badge}`} style={{ flexShrink: 0 }}>
-                              {t.status.replace('_',' ')}
+                            {/* Prefixed with "Ticket status:" so it reads as a
+                                state label, not a clickable button. */}
+                            <span className={`badge ${s.badge}`} style={{ flexShrink: 0, textTransform: 'none' }}>
+                              Ticket status: {t.status.replace('_',' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())}
                             </span>
                           </div>
 
