@@ -24,3 +24,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+// ── PWA service worker ─────────────────────────────────────────
+// Production only — registering it in dev would shadow Vite's HMR.
+// public/sw.js makes the app installable and gives an offline shell.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* SW registration is best-effort — the app works fine without it */
+    });
+  });
+}

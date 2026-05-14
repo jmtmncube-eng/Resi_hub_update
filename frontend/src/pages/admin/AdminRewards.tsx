@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getAdminVouchers, createVoucher, updateVoucher, deleteVoucher,
@@ -9,6 +9,7 @@ import {
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import ConfirmModal from '../../components/ConfirmModal';
+import { EmptyState } from '../../components/EmptyState';
 
 const BLANK_V = { name: '', description: '', cost: '', stock: '', icon: '🎁' };
 const BLANK_A = { userId: '', amount: '', note: '' };
@@ -208,7 +209,12 @@ export default function AdminRewards() {
             ))}
           </div>
           {vouchers.length === 0 && (
-            <p style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text3)', fontSize: 13 }}>No vouchers yet</p>
+            <EmptyState
+              icon={Gift}
+              title="No vouchers yet"
+              message="Create your first credit-redeemable voucher and residents can spend their chore credits on it."
+              action={{ label: 'Create a voucher', onClick: () => setShowVForm(true) }}
+            />
           )}
         </div>
       )}

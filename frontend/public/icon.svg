@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Solid background — fills the full canvas so the icon works as a
+       maskable PWA icon (the house glyph sits well inside the safe zone). -->
+  <rect width="512" height="512" rx="96" fill="#0f0f12"/>
+  <rect x="96" y="96" width="320" height="320" rx="64" fill="rgba(0,204,204,.12)" stroke="rgba(0,204,204,.4)" stroke-width="6"/>
+  <g transform="translate(116,116) scale(8.75)">
+    <path d="M6.5 15 L16 7 L25.5 15 L25.5 24 A1.5 1.5 0 0 1 24 25.5 L8 25.5 A1.5 1.5 0 0 1 6.5 24 Z" fill="none" stroke="#00CCCC" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M6.5 15 L16 7 L25.5 15" fill="none" stroke="#E8197A" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="13.5" y="17.5" width="5" height="8" rx="1" fill="#00CCCC"/>
+  </g>
+</svg>

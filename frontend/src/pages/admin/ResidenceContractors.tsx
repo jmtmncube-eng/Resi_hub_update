@@ -363,7 +363,7 @@ function AddContractorModal({ residenceId, onClose, onAdded }: {
     <Modal open={true} onClose={onClose} maxWidth={500}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Onboard a contractor</p>
-        <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }}>
+        <button onClick={onClose} className="btn-ghost" aria-label="Close" style={{ padding: 6, borderRadius: 8 }}>
           <X size={14} />
         </button>
       </div>

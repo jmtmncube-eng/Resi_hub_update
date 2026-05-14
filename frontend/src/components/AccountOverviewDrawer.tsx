@@ -74,7 +74,7 @@ export default function AccountOverviewDrawer({ accountId, onClose }: Props) {
               {isLoading ? 'Loading…' : data?.name ?? 'Unknown'}
             </p>
           </div>
-          <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }}>
+          <button onClick={onClose} className="btn-ghost" aria-label="Close" style={{ padding: 6, borderRadius: 8 }}>
             <X size={14} />
           </button>
         </div>

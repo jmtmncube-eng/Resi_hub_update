@@ -490,12 +490,26 @@
   (management only). GET /admin/export/:type streams RFC-4180 CSV;
   Export buttons on the Accounts, Payments and Maintenance pages.
 
+**Batch G**
+- #17 Accessibility: global `:focus-visible` ring, `.sr-only` utility,
+  a skip-to-content link, `prefers-reduced-motion` support, a `<main>`
+  landmark id, and `aria-label`s on icon-only close buttons.
+- #18 PWA: `manifest.webmanifest` + maskable SVG icons + a minimal
+  `sw.js` service worker (network-first navigations, stale-while-
+  revalidate static, API never cached), registered in production only.
+  The app is now installable with an offline shell.
+- #19 Empty states: a reusable `EmptyState` component; the app already
+  had broad `.empty-state` coverage — upgraded the weakest bare-text
+  placeholder (vouchers) to the richer pattern.
+
 **Skipped** (need external infrastructure): #2 backups, #5 error monitoring,
 #7 password reset, #10 email reliability.
 
 **TypeScript**: 0 errors (frontend + backend) · **Tests**: 46 passing
 
+All roadmap batches (A–G) complete bar the four externally-blocked items.
+
 ---
 
-**Document Version**: 2.3
+**Document Version**: 2.4
 **Last Updated**: 2026-05-14

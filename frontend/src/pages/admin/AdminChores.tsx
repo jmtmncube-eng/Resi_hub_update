@@ -280,7 +280,7 @@ function ChoreFormModal({ chore, residenceId, onClose, onSaved }: {
         <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
           {editing ? 'Edit chore' : 'New chore'}
         </p>
-        <button onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: 8 }}>
+        <button onClick={onClose} className="btn-ghost" aria-label="Close" style={{ padding: 6, borderRadius: 8 }}>
           <X size={14} />
         </button>
       </div>

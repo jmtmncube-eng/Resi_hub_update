@@ -195,6 +195,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+      {/* Skip-to-content — first focusable element for keyboard users */}
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* First-time welcome tour — renders only when user.onboardedAt is null */}
       <WelcomeTour />
       {/* Background polling notifier — toasts new news/invoices/chores */}
@@ -260,7 +262,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 28px', position: 'relative' }} className="appear">
+        <main id="main-content" style={{ flex: 1, overflowY: 'auto', padding: '28px 28px', position: 'relative' }} className="appear">
           {/* Liquid-glass ambient blobs */}
           <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
             <div style={{
