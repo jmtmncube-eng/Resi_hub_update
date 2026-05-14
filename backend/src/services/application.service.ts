@@ -144,8 +144,9 @@ const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB raw — matches the frontend limi
 /**
  * Validate a base64 data URL for a compliance document.
  * Returns the (trimmed) data URL unchanged on success; throws AppError otherwise.
+ * Exported for unit testing — it's the security-critical upload gate.
  */
-function validateDocDataUrl(field: string, raw: unknown): string {
+export function validateDocDataUrl(field: string, raw: unknown): string {
   if (typeof raw !== 'string' || raw.length === 0) {
     throw new AppError(`${field} is required.`, 400);
   }

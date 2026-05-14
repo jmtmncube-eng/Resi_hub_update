@@ -14,7 +14,9 @@
     "db:studio": "prisma studio",
     "generate": "prisma generate",
     "lint": "eslint src --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
@@ -49,7 +51,8 @@
     "prettier": "^3.2.5",
     "prisma": "^5.10.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.0"
   },
   "prisma": {
     "seed": "npx --yes -p ts-node@10 -p typescript@5 ts-node --transpile-only --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

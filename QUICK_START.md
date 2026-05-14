@@ -99,6 +99,12 @@ docker-compose exec backend npx prisma migrate dev --name your_migration_name
 
 # Re-seed data
 docker-compose exec backend npm run db:seed
+
+# Run the backend test suite (Vitest — pure unit tests, no DB)
+docker-compose exec backend npm test
+
+# Watch mode while developing
+docker-compose exec backend npm run test:watch
 ```
 
 ---
