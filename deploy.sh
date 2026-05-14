@@ -127,22 +127,42 @@ fi
 # Versioned migrations replaced `db push --accept-data-loss` — db push
 # silently drops a column the day a schema change isn't purely additive.
 #
-# An EXISTING database (from the old db-push era) already has every
-# table, so `migrate deploy` would error trying to re-create them. We
-# baseline it first: mark every migration as already-applied (resolve
-# --applied is harmless if it's genuinely already recorded — we swallow
-# that error). A FRESH empty database has no "User" table → we skip
-# baselining and `migrate deploy` builds the whole schema from scratch.
+# An EXISTING database (from the old db-push era) already has the tables
+# those early migrations describe, so `migrate deploy` would error trying
+# to re-create them. We baseline ONLY those db-push-era migrations: mark
+# them applied without running. `resolve --applied` on a migration that
+# is genuinely already recorded errors — we swallow that.
+#
+# CRITICAL: only the migrations BELOW are baselined. Every migration
+# created AFTER the reconcile point is real, new schema and MUST run via
+# `migrate deploy` — baselining those would mark new tables "applied"
+# without creating them, and the backend would crash at runtime. This
+# list is frozen history — NEVER add a new migration to it.
+#
+# A FRESH empty database has no "User" table → we skip baselining and
+# `migrate deploy` builds the whole schema from scratch.
 echo ""
 echo "[6/7] Applying database migrations…"
 HAS_USER=$(docker compose exec -T postgres psql -U resihub -d resihub_db -tAc \
   "SELECT to_regclass('public.\"User\"') IS NOT NULL;" 2>/dev/null | tr -d '[:space:]')
 if [ "$HAS_USER" = "t" ]; then
-  echo "      existing schema detected — baselining migration history…"
-  for m in $(docker compose exec -T backend sh -c 'ls prisma/migrations 2>/dev/null' | grep -E '^[0-9]' | tr -d '\r'); do
+  echo "      existing schema detected — baselining db-push-era migrations…"
+  for m in \
+    20260325094212_init \
+    20260430182006_add_contract_signing \
+    20260501043701_session8_payment_proof_voucher_claims_residence_settings \
+    20260501052241_add_triple_quad_room_types \
+    20260501095301_chore_proof_news_reads \
+    20260501110717_onboarding_and_account_polish \
+    20260501114525_account_active_flag \
+    20260501122027_multi_tenant_rooms \
+    20260501142340_ops_module \
+    20260501153205_multi_residence_contractors \
+    20260514170000_batch_a_reconcile \
+  ; do
     docker compose exec -T backend npx prisma migrate resolve --applied "$m" >/dev/null 2>&1 || true
   done
-  echo "      -> baselined"
+  echo "      -> baselined (post-reconcile migrations will run normally)"
 fi
 docker compose exec -T backend npx prisma migrate deploy
 # Regenerate the Prisma client in case the migrations advanced the schema.
