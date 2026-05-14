@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCircle2, XCircle, Pin, Image as ImageIcon, Clock, FileDown, Loader2 } from 'lucide-react';
 import {
   getAdminStats, AdminStats, getRevenueReport,
-  getVoucherClaims, approveVoucherClaim, rejectVoucherClaim,
 } from '../../services/admin.service';
 import {
   getChorePendingApprovals, approveChoreProof, rejectChoreProof,
@@ -38,12 +37,6 @@ export default function AdminOverview() {
     refetchInterval: 30_000,
   });
 
-  const { data: pendingClaims = [] } = useQuery({
-    queryKey: ['admin-claims', 'PENDING'],
-    queryFn: () => getVoucherClaims('PENDING'),
-    refetchInterval: 30_000,
-  });
-
   const { data: pendingChores = [] } = useQuery({
     queryKey: ['admin-chore-pending'],
     queryFn: getChorePendingApprovals,
@@ -53,25 +46,6 @@ export default function AdminOverview() {
   const { data: news = [] } = useQuery({
     queryKey: ['news', 'admin-overview'],
     queryFn: () => getNews(),
-  });
-
-  const approveMut = useMutation({
-    mutationFn: approveVoucherClaim,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-claims'] });
-      qc.invalidateQueries({ queryKey: ['admin-stats'] });
-      toast.success('Claim approved');
-    },
-    onError: (e) => toast.error(errMsg(e, 'Failed to approve')),
-  });
-
-  const rejectMut = useMutation({
-    mutationFn: (id: string) => rejectVoucherClaim(id, 'Rejected from overview'),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-claims'] });
-      toast.success('Claim rejected');
-    },
-    onError: (e) => toast.error(errMsg(e, 'Failed to reject')),
   });
 
   const approveChoreMut = useMutation({
@@ -186,9 +160,9 @@ export default function AdminOverview() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {(pendingClaims.length + pendingChores.length) > 0 && (
+          {pendingChores.length > 0 && (
             <span className="badge badge-fill-rose" style={{ fontSize: 11, padding: '6px 12px' }}>
-              {pendingClaims.length + pendingChores.length} pending approval{(pendingClaims.length + pendingChores.length) === 1 ? '' : 's'}
+              {pendingChores.length} pending approval{pendingChores.length === 1 ? '' : 's'}
             </span>
           )}
           <button
@@ -261,20 +235,20 @@ export default function AdminOverview() {
           <div className="card-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle2 size={14} style={{ color: 'var(--rose)' }} />
-              <span className="card-title">Pending Approvals</span>
+              <span className="card-title">Pending Chore Approvals</span>
             </div>
-            <Link to="/admin/rewards" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', textDecoration: 'none' }}>
-              Manage rewards →
+            <Link to="/admin/chores" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', textDecoration: 'none' }}>
+              Manage chores →
             </Link>
           </div>
-          {(pendingClaims.length + pendingChores.length) === 0 ? (
+          {pendingChores.length === 0 ? (
             <div className="empty-state" style={{ padding: '24px 0' }}>
               <p>Nothing pending — all caught up 🎉</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Chore proofs (urgent — 24h SLA) */}
-              {pendingChores.slice(0, 3).map(ch => {
+              {pendingChores.slice(0, 6).map(ch => {
                 const submittedBy = ch.logs?.[0]?.user?.name ?? 'Student';
                 const submittedAt = ch.proofSubmittedAt ? new Date(ch.proofSubmittedAt) : null;
                 const deadline    = ch.approvalDeadline ? new Date(ch.approvalDeadline) : null;
@@ -347,55 +321,9 @@ export default function AdminOverview() {
                 );
               })}
 
-              {/* Voucher claims */}
-              {pendingClaims.slice(0, 3).map(c => (
-                <div key={c.id} className="hover-lift" style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 12px', borderRadius: 10,
-                  background: 'rgba(0,204,204,.04)',
-                  border: '1px solid rgba(0,204,204,.18)',
-                }}>
-                  <span style={{ fontSize: 22 }}>{c.voucher.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.voucher.name}
-                    </p>
-                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
-                      {c.user.name} · {c.voucher.cost} 🪙
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => approveMut.mutate(c.id)}
-                      disabled={approveMut.isPending}
-                      title="Approve"
-                      style={{
-                        background: 'rgba(0,204,204,.12)', border: '1px solid rgba(0,204,204,.3)',
-                        color: 'var(--cyan)', borderRadius: 6, padding: '5px 8px',
-                        display: 'inline-flex', alignItems: 'center', cursor: 'pointer',
-                      }}
-                    >
-                      <CheckCircle2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => rejectMut.mutate(c.id)}
-                      disabled={rejectMut.isPending}
-                      title="Reject"
-                      style={{
-                        background: 'rgba(232,25,122,.10)', border: '1px solid rgba(232,25,122,.3)',
-                        color: 'var(--rose)', borderRadius: 6, padding: '5px 8px',
-                        display: 'inline-flex', alignItems: 'center', cursor: 'pointer',
-                      }}
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {(pendingChores.length + pendingClaims.length) > 6 && (
+              {pendingChores.length > 6 && (
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: 6 }}>
-                  +{(pendingChores.length + pendingClaims.length) - 6} more queued
+                  +{pendingChores.length - 6} more queued
                 </p>
               )}
             </div>

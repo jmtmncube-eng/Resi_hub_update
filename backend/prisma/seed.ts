@@ -477,17 +477,16 @@ async function main() {
   // ═════════════════════════════════════════════════════════════
   // VOUCHERS
   // ═════════════════════════════════════════════════════════════
+  // Vouchers are credit-redeemable rewards. (Task vouchers were retired —
+  // chores own the do-task-earn-reward loop now.)
   await Promise.all([
-    prisma.voucher.create({ data: { name: 'Free Laundry Load',          description: 'One free wash + dry cycle.',                               cost: 40, icon: '🧺', stock: 10 } }),
-    prisma.voucher.create({ data: { name: 'Gym Guest Pass',             description: 'Bring a friend for one free gym session.',                 cost: 30, icon: '💪', stock: 15 } }),
-    prisma.voucher.create({ data: { name: 'R50 Campus Café Voucher',    description: 'Redeem for R50 off at the campus café.',                   cost: 50, icon: '☕', stock: 20 } }),
-    prisma.voucher.create({ data: { name: 'Netflix Movie Night',        description: 'Reserve the lounge TV for an evening.',                    cost: 25, icon: '🎬', stock: 8  } }),
-    prisma.voucher.create({ data: { name: 'Late Checkout Pass',         description: 'Stay until 14:00 on move-out day.',                        cost: 60, icon: '🕑', stock: 5  } }),
-    // Task vouchers (no credit cost — must complete + upload proof)
-    prisma.voucher.create({ data: { name: 'Clean Common Area Bonus',    description: 'Spend 30 min cleaning the lounge — earn R75 voucher.',     cost: 0,  icon: '🧹', stock: 20, requiresProof: true, taskTitle: 'Clean lounge for 30 min', pin: 'CLEAN-2026-A1' } }),
-    prisma.voucher.create({ data: { name: 'Recycle Champion',           description: 'Sort all recycling for a week. R50 café credit.',          cost: 0,  icon: '♻️', stock: 12, requiresProof: true, taskTitle: 'Recycling sorted (week)', pin: 'ECO-2026-B2' } }),
+    prisma.voucher.create({ data: { name: 'Free Laundry Load',       description: 'One free wash + dry cycle.',                cost: 40, icon: '🧺', stock: 10 } }),
+    prisma.voucher.create({ data: { name: 'Gym Guest Pass',          description: 'Bring a friend for one free gym session.',  cost: 30, icon: '💪', stock: 15 } }),
+    prisma.voucher.create({ data: { name: 'R50 Campus Café Voucher', description: 'Redeem for R50 off at the campus café.',    cost: 50, icon: '☕', stock: 20 } }),
+    prisma.voucher.create({ data: { name: 'Netflix Movie Night',     description: 'Reserve the lounge TV for an evening.',     cost: 25, icon: '🎬', stock: 8  } }),
+    prisma.voucher.create({ data: { name: 'Late Checkout Pass',      description: 'Stay until 14:00 on move-out day.',         cost: 60, icon: '🕑', stock: 5  } }),
   ]);
-  console.log('  vouchers: 7 (5 credit-based + 2 task-based)');
+  console.log('  vouchers: 5 (all credit-redeemable)');
 
   // ═════════════════════════════════════════════════════════════
   // DOCUMENTS — invoices + contracts for each active student

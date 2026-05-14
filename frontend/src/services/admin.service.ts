@@ -82,7 +82,6 @@ export const getAdminVouchers = async () => {
 
 export const createVoucher = async (body: {
   name: string; description: string; cost: number; stock: number; icon: string;
-  requiresProof?: boolean; taskTitle?: string; pin?: string; imageUrl?: string;
 }) => {
   const res = await api.post('/admin/vouchers', body);
   return res.data.data;
@@ -90,7 +89,7 @@ export const createVoucher = async (body: {
 
 export const updateVoucher = async (id: string, body: Partial<{
   name: string; description: string; cost: number; stock: number; icon: string;
-  isActive: boolean; requiresProof: boolean; taskTitle: string; pin: string; imageUrl: string;
+  isActive: boolean;
 }>) => {
   const res = await api.patch(`/admin/vouchers/${id}`, body);
   return res.data.data;
@@ -104,22 +103,6 @@ export const awardCredits = async (body: {
   userId: string; amount: number; note: string;
 }) => {
   const res = await api.post('/admin/credits', body);
-  return res.data.data;
-};
-
-// ── Voucher Claims ────────────────────────────────────────────
-export const getVoucherClaims = async (status?: string) => {
-  const res = await api.get('/admin/claims', { params: status ? { status } : {} });
-  return res.data.data as AdminVoucherClaim[];
-};
-
-export const approveVoucherClaim = async (id: string) => {
-  const res = await api.post(`/admin/claims/${id}/approve`);
-  return res.data.data;
-};
-
-export const rejectVoucherClaim = async (id: string, adminNote?: string) => {
-  const res = await api.post(`/admin/claims/${id}/reject`, { adminNote });
   return res.data.data;
 };
 
@@ -332,16 +315,7 @@ export interface AdminAccount {
 export interface AdminVoucher {
   id: string; name: string; description: string;
   cost: number; stock: number; icon: string; isActive: boolean;
-  requiresProof: boolean; taskTitle: string | null;
-  pin: string | null; imageUrl: string | null;
   _count: { claims: number };
-}
-
-export interface AdminVoucherClaim {
-  id: string; status: string; proofUrl: string | null;
-  adminNote: string | null; approvedAt: string | null; createdAt: string;
-  voucher: { id: string; name: string; icon: string; cost: number; pin: string | null; imageUrl: string | null };
-  user: { id: string; name: string; email: string; avatarUrl: string | null };
 }
 
 export interface AdminVisitorPass {

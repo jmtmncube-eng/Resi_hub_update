@@ -107,25 +107,13 @@ export interface WalletData {
 }
 
 export interface Voucher {
-  id:            string;
-  name:          string;
-  description:   string;
-  cost:          number;
-  icon:          string;
-  stock:         number;
-  isActive:      boolean;
-  requiresProof: boolean;
-  taskTitle:     string | null;
-  pin:           string | null;   // revealed only after claim approved
-  imageUrl:      string | null;   // revealed only after claim approved
-  myClaim:       VoucherClaim | null;
-}
-
-export interface VoucherClaim {
-  id:        string;
-  status:    'PENDING' | 'APPROVED' | 'REJECTED';
-  proofUrl:  string | null;
-  createdAt: string;
+  id:          string;
+  name:        string;
+  description: string;
+  cost:        number;
+  icon:        string;
+  stock:       number;
+  isActive:    boolean;
 }
 
 export interface LeaderboardEntry {

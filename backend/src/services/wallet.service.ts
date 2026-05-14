@@ -12,50 +12,13 @@ export async function getWallet(userId: string) {
   return wallet;
 }
 
-export async function getVouchers(userId: string) {
-  const vouchers = await prisma.voucher.findMany({
+export async function getVouchers(_userId: string) {
+  // Vouchers are credit-redeemable rewards. (The old "task voucher" variant
+  // — do a task, upload proof, admin approves — was retired: chores already
+  // own the do-task-earn-reward loop, so two parallel systems was confusing.)
+  return prisma.voucher.findMany({
     where:   { isActive: true },
     orderBy: { cost: 'asc' },
-    include: {
-      claims: { where: { userId }, select: { id: true, status: true, proofUrl: true, createdAt: true } },
-    },
-  });
-  // Hide pin/imageUrl from task-vouchers unless the user's claim is APPROVED
-  return vouchers.map(v => {
-    const myClaim = v.claims[0] ?? null;
-    const revealed = myClaim?.status === 'APPROVED';
-    return {
-      ...v,
-      pin:      revealed ? v.pin      : null,
-      imageUrl: revealed ? v.imageUrl : null,
-      myClaim,
-    };
-  });
-}
-
-/** Student submits task proof for a task-based voucher */
-export async function submitTaskProof(userId: string, voucherId: string, proofUrl: string) {
-  const voucher = await prisma.voucher.findUnique({ where: { id: voucherId } });
-  if (!voucher)            throw new AppError('Voucher not found', 404);
-  if (!voucher.requiresProof) throw new AppError('This voucher does not require task proof', 400);
-
-  const existing = await prisma.voucherClaim.findUnique({
-    where: { voucherId_userId: { voucherId, userId } },
-  });
-  if (existing && existing.status !== 'REJECTED') {
-    throw new AppError('You have already submitted a claim for this voucher', 409);
-  }
-
-  if (existing && existing.status === 'REJECTED') {
-    // Re-submit
-    return prisma.voucherClaim.update({
-      where: { id: existing.id },
-      data:  { proofUrl, status: 'PENDING', approvedBy: null, approvedAt: null, adminNote: null },
-    });
-  }
-
-  return prisma.voucherClaim.create({
-    data: { voucherId, userId, proofUrl, status: 'PENDING' },
   });
 }
 
@@ -90,12 +53,6 @@ export async function redeemVoucher(userId: string, voucherId: string) {
   if (!voucher) throw new AppError('Voucher not found', 404);
   if (!voucher.isActive)  throw new AppError('Voucher is no longer available', 400);
   if (voucher.stock < 1)  throw new AppError('This voucher is out of stock', 400);
-  if (voucher.requiresProof) {
-    throw new AppError(
-      'This voucher requires task completion — go to the Tasks tab, complete the task, and upload proof.',
-      400,
-    );
-  }
   if (wallet.credits < voucher.cost) {
     throw new AppError(`Not enough credits — you need ${voucher.cost} 🪙 but have ${wallet.credits}`, 400);
   }

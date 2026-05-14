@@ -53,9 +53,4 @@ router.get('/visitors',       ctrl.getVisitorLog);
 // ── Revenue Report ────────────────────────────────────────────
 router.get('/revenue',        ctrl.getRevenueReport);
 
-// ── Voucher Claims ────────────────────────────────────────────
-router.get('/claims',         ctrl.getVoucherClaims);
-router.post('/claims/:id/approve', ctrl.approveVoucherClaim);
-router.post('/claims/:id/reject',  ctrl.rejectVoucherClaim);
-
 export default router;

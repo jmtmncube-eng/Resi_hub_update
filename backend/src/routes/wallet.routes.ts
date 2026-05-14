@@ -10,6 +10,5 @@ router.get('/',                           requireRole('ACTIVE_STUDENT'), ctrl.ge
 router.get('/vouchers',                   ctrl.getVouchers);
 router.get('/leaderboard',                ctrl.getLeaderboard);
 router.post('/redeem/:voucherId',         requireRole('ACTIVE_STUDENT'), ctrl.redeemVoucher);
-router.post('/task-proof/:voucherId',     requireRole('ACTIVE_STUDENT'), ctrl.submitTaskProof);
 
 export default router;

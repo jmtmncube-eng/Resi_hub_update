@@ -27,16 +27,15 @@ export const updateAccountSchema = z.object({
   bio:        z.string().max(500).optional().or(z.literal('')),
 });
 
+// Vouchers are credit-redeemable rewards. The task-voucher variant
+// (requiresProof / taskTitle / pin) was retired — chores own the
+// do-task-earn-reward loop now.
 export const createVoucherSchema = z.object({
   name:          z.string().min(2),
   description:   z.string().min(5),
   cost:          z.number().int().positive(),
   stock:         z.number().int().min(0),
   icon:          z.string().default('🎁'),
-  requiresProof: z.boolean().optional(),
-  taskTitle:     z.string().optional(),
-  pin:           z.string().optional(),
-  imageUrl:      z.string().optional(),
 });
 
 export const updateVoucherSchema = z.object({
@@ -46,10 +45,6 @@ export const updateVoucherSchema = z.object({
   stock:         z.number().int().min(0).optional(),
   icon:          z.string().optional(),
   isActive:      z.boolean().optional(),
-  requiresProof: z.boolean().optional(),
-  taskTitle:     z.string().optional(),
-  pin:           z.string().optional(),
-  imageUrl:      z.string().optional(),
 });
 
 export const awardCreditsSchema = z.object({

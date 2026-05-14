@@ -868,64 +868,6 @@ export async function awardCredits(data: AwardCreditsInput) {
   });
 }
 
-// ── Voucher Claims (task-based vouchers) ──────────────────────
-export async function getVoucherClaims(status?: string) {
-  return prisma.voucherClaim.findMany({
-    where: status ? { status } : undefined,
-    include: {
-      voucher: { select: { id: true, name: true, icon: true, cost: true, pin: true, imageUrl: true } },
-      user:    { select: { id: true, name: true, email: true, avatarUrl: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-}
-
-export async function approveVoucherClaim(claimId: string, adminId: string) {
-  const claim = await prisma.voucherClaim.findUnique({
-    where:   { id: claimId },
-    include: { voucher: true, user: { include: { wallet: true } } },
-  });
-  if (!claim)                    throw new AppError('Claim not found', 404);
-  if (claim.status !== 'PENDING') throw new AppError('Claim already processed', 409);
-
-  return prisma.$transaction(async (tx) => {
-    // Update claim status
-    await tx.voucherClaim.update({
-      where: { id: claimId },
-      data:  { status: 'APPROVED', approvedBy: adminId, approvedAt: new Date() },
-    });
-
-    // Award credits
-    let wallet = await tx.wallet.findUnique({ where: { userId: claim.userId } });
-    if (!wallet) wallet = await tx.wallet.create({ data: { userId: claim.userId, credits: 0 } });
-
-    await tx.wallet.update({
-      where: { userId: claim.userId },
-      data:  { credits: { increment: claim.voucher.cost } },
-    });
-
-    return tx.walletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        type:     'EARN',
-        amount:   claim.voucher.cost,
-        note:     `Task approved: ${claim.voucher.name}`,
-      },
-    });
-  });
-}
-
-export async function rejectVoucherClaim(claimId: string, adminNote?: string) {
-  const claim = await prisma.voucherClaim.findUnique({ where: { id: claimId } });
-  if (!claim)                    throw new AppError('Claim not found', 404);
-  if (claim.status !== 'PENDING') throw new AppError('Claim already processed', 409);
-
-  return prisma.voucherClaim.update({
-    where: { id: claimId },
-    data:  { status: 'REJECTED', adminNote: adminNote ?? null },
-  });
-}
-
 // ── Admin Visitor Log ─────────────────────────────────────────
 export async function getAdminVisitorLog(search?: string) {
   return prisma.visitorPass.findMany({
