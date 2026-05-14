@@ -26,9 +26,10 @@ export async function uploadAvatar(req: AuthRequest, res: Response, next: NextFu
       res.status(400).json({ success: false, error: 'No file uploaded' });
       return;
     }
-    // Store absolute URL so the SPA (different origin in dev) can render it directly.
-    const origin = `${req.protocol}://${req.get('host')}`;
-    const avatarUrl = `${origin}/uploads/${req.file.filename}`;
+    // Store a RELATIVE /api/uploads URL — resolves the same way in local dev
+    // (Vite proxy) and on the VPS (nginx /api/ proxy). An absolute origin
+    // URL would bake in localhost:5000 and break for every remote visitor.
+    const avatarUrl = `/api/uploads/${req.file.filename}`;
     res.json({ success: true, data: await svc.updateAvatar(req.user!.userId, avatarUrl) });
   } catch (err) { next(err); }
 }

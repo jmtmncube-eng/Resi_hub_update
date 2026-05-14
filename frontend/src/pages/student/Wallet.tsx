@@ -225,7 +225,7 @@ function TaskCard({
 
 /* ── Main component ──────────────────────────────────────────────── */
 export default function Wallet() {
-  usePageTitle('Wallet & Credits');
+  usePageTitle('Wallet & Rewards');
   const [tab, setTab] = useState<'balance' | 'shop' | 'tasks' | 'leaderboard'>('balance');
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -309,13 +309,30 @@ export default function Wallet() {
 
       {/* Page header */}
       <div>
-        <h1 className="page-title">Wallet & Credits</h1>
-        <p className="page-sub">Earn credits from chores + tasks, redeem vouchers, climb the leaderboard</p>
+        <h1 className="page-title">Wallet & Rewards</h1>
+        <p className="page-sub">Do chores to earn credits, then spend them in the reward shop</p>
       </div>
 
-      {/* Chores — collapsible, sits above the voucher catalog so students
-          see their earn-options first when they land on this page. */}
-      <ChoresSection />
+      {/* ── EARN — chores feed credits into the wallet ─────────────── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ width: 4, height: 14, background: 'var(--cyan)', borderRadius: 2 }} />
+          <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: "'IBM Plex Mono', monospace" }}>
+            Earn credits
+          </h2>
+        </div>
+        {/* Chores — collapsible; sits above the balance + reward shop so the
+            earn → spend flow reads top-to-bottom. */}
+        <ChoresSection />
+      </div>
+
+      {/* ── SPEND — balance + reward shop ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 4, height: 14, background: 'var(--rose)', borderRadius: 2 }} />
+        <h2 style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: "'IBM Plex Mono', monospace" }}>
+          Spend &amp; redeem
+        </h2>
+      </div>
 
       {/* Balance hero */}
       {!wLoading && wallet && (

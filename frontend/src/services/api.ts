@@ -7,11 +7,18 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ── Request interceptor — attach access token ──────────────────
+// ── Request interceptor — attach access token + fix FormData ───
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('accessToken');
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // The instance defaults to Content-Type: application/json. For FormData
+  // bodies (avatar, ticket photos) we must DELETE that header so the browser
+  // sets 'multipart/form-data; boundary=...' itself — without the boundary
+  // the server can't parse the upload.
+  if (config.data instanceof FormData && config.headers) {
+    delete config.headers['Content-Type'];
   }
   return config;
 });

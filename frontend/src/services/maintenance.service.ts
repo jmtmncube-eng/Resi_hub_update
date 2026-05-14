@@ -13,9 +13,10 @@ export async function getTicket(id: string): Promise<MaintenanceTicket> {
 }
 
 export async function createTicket(formData: FormData): Promise<MaintenanceTicket> {
-  const res = await api.post<ApiResponse<MaintenanceTicket>>('/maintenance', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // No manual Content-Type — axios sets 'multipart/form-data; boundary=...'
+  // automatically for FormData bodies. Hard-coding it without the boundary
+  // breaks multer parsing on the server (photos silently dropped / 400).
+  const res = await api.post<ApiResponse<MaintenanceTicket>>('/maintenance', formData);
   return res.data.data;
 }
 

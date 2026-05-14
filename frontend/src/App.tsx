@@ -100,9 +100,10 @@ function App() {
           {/* ── Admin ──────────────────────────────────────── */}
           <Route path={ROUTES.ADMIN}             element={<Page roles={ADMIN}><AdminOverview /></Page>} />
           <Route path={ROUTES.ADMIN_RESIDENCE}   element={<Page roles={ADMIN}><AdminResidence /></Page>} />
-          {/* Legacy admin URLs → redirect into the consolidated Residence hub */}
+          {/* Legacy admin URLs → redirect into the consolidated Residence hub.
+              Allocations was merged into the Rooms tab — both old URLs land there. */}
           <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
-          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=allocations`} replace />} />
+          <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
           <Route path={ROUTES.ADMIN_SETTINGS}    element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=info`} replace />} />
           <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={ADMIN}><AdminMaintenance /></Page>} />
           <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />

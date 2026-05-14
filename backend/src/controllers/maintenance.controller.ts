@@ -17,7 +17,9 @@ export async function getTicket(req: AuthRequest, res: Response, next: NextFunct
 
 export async function createTicket(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const mediaUrls = (req.files as Express.Multer.File[] | undefined)?.map(f => `/uploads/${f.filename}`) ?? [];
+    // Relative /api/uploads path — resolves via Vite proxy locally and the
+    // nginx /api/ proxy on the VPS. (/uploads alone hits the frontend container.)
+    const mediaUrls = (req.files as Express.Multer.File[] | undefined)?.map(f => `/api/uploads/${f.filename}`) ?? [];
     const ticket = await svc.createTicket(req.user!.userId, req.body, mediaUrls);
     res.status(201).json({ success: true, data: ticket });
   } catch (err) { next(err); }

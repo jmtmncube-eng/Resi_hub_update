@@ -8,7 +8,12 @@ import { toast } from 'sonner';
 import { getMyTickets, createTicket } from '../../services/maintenance.service';
 import { TicketStatus, TicketPriority } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { Modal } from '../../components/Modal';
 import { format } from 'date-fns';
+
+/** Open = needs work (OPEN, IN_PROGRESS). Closed = done (RESOLVED, CLOSED). */
+const OPEN_STATUSES   = ['OPEN', 'IN_PROGRESS'];
+type ListFilter = 'open' | 'closed';
 
 const CATEGORIES = ['WiFi / Internet','Plumbing','Electrical','Furniture','Appliance','Structural','Pest Control','Cleaning','Security','Other'];
 
@@ -38,6 +43,8 @@ export default function Maintenance() {
   usePageTitle('Maintenance');
   const [tab,   setTab]   = useState<'list'|'report'>('list');
   const [files, setFiles] = useState<File[]>([]);
+  const [listFilter, setListFilter] = useState<ListFilter>('open');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const { data: tickets = [], isLoading } = useQuery({
@@ -152,54 +159,124 @@ export default function Maintenance() {
       )}
 
       {/* Ticket list */}
-      {tab === 'list' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {isLoading
-            ? [...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 96, borderRadius: 10 }} />)
-            : tickets.length === 0
-              ? <EmptyTickets onReport={() => setTab('report')} />
-              : tickets.map(t => {
-                  const s = STATUS_STYLE[t.status];
-                  return (
-                    <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(0,204,204,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyan)', flexShrink: 0 }}>
-                            <Wrench size={16} />
-                          </div>
-                          <div>
-                            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.category}</p>
-                            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{t.location}</p>
-                          </div>
-                        </div>
-                        <span className={`badge ${s.badge}`} style={{ flexShrink: 0 }}>
-                          {t.status.replace('_',' ')}
-                        </span>
-                      </div>
+      {tab === 'list' && (() => {
+        const openTickets   = tickets.filter(t => OPEN_STATUSES.includes(t.status));
+        const closedTickets = tickets.filter(t => !OPEN_STATUSES.includes(t.status));
+        const shown = listFilter === 'open' ? openTickets : closedTickets;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Open / Closed tabs */}
+            <div style={{ display: 'inline-flex', background: 'var(--bg3)', borderRadius: 10, padding: 4, gap: 2, alignSelf: 'flex-start' }}>
+              {([
+                { key: 'open'   as ListFilter, label: 'Open',   count: openTickets.length },
+                { key: 'closed' as ListFilter, label: 'Closed', count: closedTickets.length },
+              ]).map(({ key, label, count }) => (
+                <button key={key} onClick={() => setListFilter(key)} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 7, fontSize: 13,
+                  fontWeight: listFilter === key ? 600 : 400,
+                  background: listFilter === key ? 'var(--bg2)' : 'transparent',
+                  color:      listFilter === key ? 'var(--text)' : 'var(--text3)',
+                  border: 'none', cursor: 'pointer', transition: 'all .18s',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}>
+                  {label}
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                    padding: '1px 6px', borderRadius: 999,
+                    background: listFilter === key ? 'rgba(0,204,204,.15)' : 'var(--bg2)',
+                    color: listFilter === key ? 'var(--cyan)' : 'var(--text4)',
+                  }}>{count}</span>
+                </button>
+              ))}
+            </div>
 
-                      <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 12, lineHeight: 1.6 }}>{t.description}</p>
-
-                      {t.adminNote && (
-                        <div style={{ marginTop: 10, background: 'rgba(0,204,204,.06)', border: '1px solid rgba(0,204,204,.15)', borderRadius: 8, padding: '8px 12px' }}>
-                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Admin note</p>
-                          <p style={{ fontSize: 12, color: 'var(--text2)' }}>{t.adminNote}</p>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: PRIORITY_COLOR[t.priority], fontWeight: 500 }}>
-                          {t.priority} priority
-                        </span>
-                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
-                          {format(new Date(t.createdAt), 'dd MMM yyyy')}
-                        </span>
-                      </div>
+            {isLoading
+              ? [...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 96, borderRadius: 10 }} />)
+              : tickets.length === 0
+                ? <EmptyTickets onReport={() => setTab('report')} />
+                : shown.length === 0
+                  ? (
+                    <div className="card empty-state">
+                      <Wrench size={26} style={{ color: 'var(--text4)', margin: '0 auto 10px' }} />
+                      <p style={{ fontWeight: 600, color: 'var(--text2)' }}>
+                        No {listFilter} tickets
+                      </p>
+                      <p style={{ fontSize: 12, color: 'var(--text3)' }}>
+                        {listFilter === 'open' ? 'Everything is resolved — nice.' : 'Nothing has been closed out yet.'}
+                      </p>
                     </div>
-                  );
-                })
-          }
-        </div>
-      )}
+                  )
+                  : shown.map(t => {
+                      const s = STATUS_STYLE[t.status];
+                      return (
+                        <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(0,204,204,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyan)', flexShrink: 0 }}>
+                                <Wrench size={16} />
+                              </div>
+                              <div>
+                                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.category}</p>
+                                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{t.location}</p>
+                              </div>
+                            </div>
+                            <span className={`badge ${s.badge}`} style={{ flexShrink: 0 }}>
+                              {t.status.replace('_',' ')}
+                            </span>
+                          </div>
+
+                          <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 12, lineHeight: 1.6 }}>{t.description}</p>
+
+                          {/* Attached photos — click to open full-size */}
+                          {t.mediaUrls && t.mediaUrls.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                              {t.mediaUrls.map((url, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => setPhotoPreview(url)}
+                                  style={{
+                                    width: 64, height: 64, borderRadius: 8, overflow: 'hidden',
+                                    border: '1px solid var(--border)', cursor: 'pointer', padding: 0,
+                                    background: 'var(--bg3)',
+                                  }}
+                                  title="Open photo"
+                                >
+                                  <img src={url} alt={`Attachment ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {t.adminNote && (
+                            <div style={{ marginTop: 10, background: 'rgba(0,204,204,.06)', border: '1px solid rgba(0,204,204,.15)', borderRadius: 8, padding: '8px 12px' }}>
+                              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Admin note</p>
+                              <p style={{ fontSize: 12, color: 'var(--text2)' }}>{t.adminNote}</p>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: PRIORITY_COLOR[t.priority], fontWeight: 500 }}>
+                              {t.priority} priority
+                            </span>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>
+                              {format(new Date(t.createdAt), 'dd MMM yyyy')}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+            }
+          </div>
+        );
+      })()}
+
+      {/* Full-size photo viewer */}
+      <Modal open={!!photoPreview} onClose={() => setPhotoPreview(null)} maxWidth={680}>
+        {photoPreview && (
+          <img src={photoPreview} alt="Attachment" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+        )}
+      </Modal>
     </div>
   );
 }

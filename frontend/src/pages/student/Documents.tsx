@@ -13,7 +13,6 @@ import { formatPeriod, formatRand } from '../../utils/period';
 import { ResidentDocument } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import InvoiceModal from '../../components/InvoiceModal';
-import ContractSignModal from '../../components/ContractSignModal';
 import { Modal } from '../../components/Modal';
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
@@ -50,13 +49,12 @@ function ProofBadge({ status }: { status?: string }) {
 }
 
 export default function Documents() {
-  usePageTitle('Documents & Invoices');
+  usePageTitle('Invoices');
   const qc = useQueryClient();
   const { user } = useAuth();
 
   // ── Modal state ──────────────────────────────────────────────
   const [invoiceDoc,  setInvoiceDoc]  = useState<ResidentDocument | null>(null);
-  const [contractDoc, setContractDoc] = useState<ResidentDocument | null>(null);
   const [payRentOpen, setPayRentOpen] = useState(false);
 
   // ── Payment proof state ──────────────────────────────────────
@@ -114,9 +112,9 @@ export default function Documents() {
   });
 
   // ── Grouping ─────────────────────────────────────────────────
+  // This page is invoices-only now. The lease/contract + official
+  // letters moved to the Profile page (grouped with personal docs).
   const invoices  = docs.filter(d => d.type === 'INVOICE');
-  const contracts = docs.filter(d => d.type === 'CONTRACT');
-  const letters   = docs.filter(d => d.type === 'LETTER');
 
   const needsPayment = invoices.filter(
     d => d.status !== 'Paid' && d.proofStatus !== 'CLEARED' && d.proofStatus !== 'SUBMITTED'
@@ -137,8 +135,8 @@ export default function Documents() {
 
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 className="page-title">Documents & Invoices</h1>
-          <p className="page-sub">Your invoices, contracts, and official letters</p>
+          <h1 className="page-title">Invoices</h1>
+          <p className="page-sub">Your rent invoices and proof-of-payment history</p>
         </div>
         {user?.allocation && (
           <button
@@ -185,20 +183,18 @@ export default function Documents() {
             ))}
           </div>
         )
-        : docs.length === 0
+        : invoices.length === 0
           ? (
             <div className="card empty-state">
               <FileText size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
-              <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No documents yet</p>
-              <p>Documents from management will appear here</p>
+              <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No invoices yet</p>
+              <p>Rent invoices from management will appear here</p>
             </div>
           )
           : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {[
                 { label: 'Invoices',  items: invoices,  note: 'Click row to view · Upload proof of payment on outstanding invoices.' },
-                { label: 'Contracts', items: contracts, note: 'Review and e-sign your lease agreement.' },
-                { label: 'Letters',   items: letters,   note: 'Official correspondence from management.' },
               ].filter(g => g.items.length > 0).map(group => (
                 <div key={group.label}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
@@ -220,8 +216,7 @@ export default function Documents() {
                             doc={doc}
                             isLast={isLastVisually}
                             onOpen={() => {
-                              if (doc.type === 'INVOICE')  setInvoiceDoc(doc);
-                              if (doc.type === 'CONTRACT') setContractDoc(doc);
+                              if (doc.type === 'INVOICE') setInvoiceDoc(doc);
                             }}
                             onExpandPay={() => expandPanel(doc.id)}
                             onCollapsePay={closePanel}
@@ -336,8 +331,7 @@ export default function Documents() {
       }
 
       {/* Modals */}
-      <InvoiceModal      doc={invoiceDoc}  onClose={() => setInvoiceDoc(null)}  />
-      <ContractSignModal doc={contractDoc} onClose={() => setContractDoc(null)} />
+      <InvoiceModal doc={invoiceDoc} onClose={() => setInvoiceDoc(null)} />
 
       {payRentOpen && (
         <PayRentModal

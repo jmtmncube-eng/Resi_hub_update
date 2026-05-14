@@ -22,7 +22,7 @@ const studentNav = [
   { to: ROUTES.VISITORS,    label: 'Visitors',     icon: QrCode          },
   { to: ROUTES.HOUSEMATES,  label: 'Housemates',   icon: Users           },
   { to: ROUTES.WALLET,      label: 'Wallet',       icon: Wallet          },
-  { to: ROUTES.DOCUMENTS,   label: 'Documents & Invoices', icon: FileText  },
+  { to: ROUTES.DOCUMENTS,   label: 'Invoices',     icon: FileText        },
   { to: ROUTES.PROFILE,     label: 'Profile',      icon: User            },
 ];
 

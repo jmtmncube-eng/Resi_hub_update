@@ -9,6 +9,7 @@ import { updateProfile, uploadAvatar } from '../../services/profile.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import ComplianceDocsCard from '../../components/ComplianceDocsCard';
+import LeaseDocsCard from '../../components/LeaseDocsCard';
 
 const ACCEPTED_AVATAR = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -105,7 +106,8 @@ export default function Profile() {
         <p className="page-sub">Your personal details, bio and compliance documents</p>
       </div>
 
-      {/* Compliance docs — only relevant to students; admins skip this card */}
+      {/* Personal paperwork — students only; admins skip these cards */}
+      {!isAdmin && <LeaseDocsCard />}
       {!isAdmin && <ComplianceDocsCard />}
 
       {/* Avatar section */}

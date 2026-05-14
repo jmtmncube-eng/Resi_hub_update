@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  SquareStack, LayoutGrid, Activity, Camera, Pencil, Wrench, Users as UsersIcon,
+  LayoutGrid, Activity, Camera, Pencil, Wrench, Users as UsersIcon,
   Loader2, Trash2,
 } from 'lucide-react';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -13,7 +13,6 @@ import { ResidencePicker } from '../../components/ResidencePicker';
 import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
 
-import AdminAllocations    from './AdminAllocations';
 import AdminSettings       from './AdminSettings';
 import ResidenceHealth     from './ResidenceHealth';
 import ResidenceTelemetry  from './ResidenceTelemetry';
@@ -24,8 +23,9 @@ import ResidenceContractors from './ResidenceContractors';
  * Residence hub — single console for everything property-related.
  * Tabs:
  *   Health      — KPIs, smart suggestions, charts (works portfolio-wide)
- *   Rooms       — setup + grid (scoped to selected residence)
- *   Allocations — table of every tenancy
+ *   Rooms       — setup + occupancy grid + add/remove tenants (this is the
+ *                 single source of truth for tenancies — the old standalone
+ *                 "Allocations" tab was redundant and has been removed)
  *   Operations  — pool, gas, grass, electricity, solar
  *   Contractors — cleaners, gardeners, grounds-keepers
  *   Telemetry   — camera & sensor feeds (placeholder)
@@ -33,12 +33,11 @@ import ResidenceContractors from './ResidenceContractors';
  * Info tab removed: residence-name editing happens inline in the header.
  */
 
-type Tab = 'health' | 'rooms' | 'allocations' | 'ops' | 'contractors' | 'telemetry';
+type Tab = 'health' | 'rooms' | 'ops' | 'contractors' | 'telemetry';
 
 const TABS: { value: Tab; label: string; icon: typeof Activity; sub: string }[] = [
   { value: 'health',      label: 'Health',      icon: Activity,    sub: 'Business-health metrics, charts & smart suggestions' },
   { value: 'rooms',       label: 'Rooms',       icon: LayoutGrid,  sub: 'Setup, occupancy grid, add or remove tenants' },
-  { value: 'allocations', label: 'Allocations', icon: SquareStack, sub: 'Every tenancy in one table' },
   { value: 'ops',         label: 'Operations',  icon: Wrench,      sub: 'Pool, gas, grass, electricity & solar tracking' },
   { value: 'contractors', label: 'Contractors', icon: UsersIcon,   sub: 'Cleaners, gardeners, grounds-keepers — onboard & bill' },
   { value: 'telemetry',   label: 'Telemetry',   icon: Camera,      sub: 'Camera & sensor feeds (coming soon)' },
@@ -47,7 +46,10 @@ const TABS: { value: Tab; label: string; icon: typeof Activity; sub: string }[] 
 export default function AdminResidence() {
   usePageTitle('Residence · Admin');
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as Tab) || 'health';
+  // Coerce unknown / legacy tab values (e.g. ?tab=allocations from an old
+  // bookmark) back to a valid tab so the body always renders something.
+  const rawTab = params.get('tab') as Tab | null;
+  const tab: Tab = TABS.some(t => t.value === rawTab) ? (rawTab as Tab) : 'health';
   const { selectedId } = useResidence();
   const [editing, setEditing] = useState(false);
 
@@ -151,7 +153,6 @@ export default function AdminResidence() {
       <div key={tab} className="appear">
         {tab === 'health'      && <ResidenceHealth />}
         {tab === 'rooms'       && <AdminSettings initialTab="rooms" hideHeader />}
-        {tab === 'allocations' && <AdminAllocations hideHeader />}
         {tab === 'ops'         && <ResidenceOps />}
         {tab === 'contractors' && <ResidenceContractors />}
         {tab === 'telemetry'   && <ResidenceTelemetry />}

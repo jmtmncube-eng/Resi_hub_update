@@ -29,8 +29,9 @@ export async function completeOnboarding(): Promise<{ onboardedAt: string }> {
 export async function uploadAvatar(file: File): Promise<User> {
   const form = new FormData();
   form.append('avatar', file);
-  const res = await api.post<ApiResponse<User>>('/profile/avatar', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // Do NOT set Content-Type manually — axios auto-sets it WITH the multipart
+  // boundary when the body is FormData. Hard-coding 'multipart/form-data'
+  // drops the boundary and the server can't parse the upload.
+  const res = await api.post<ApiResponse<User>>('/profile/avatar', form);
   return res.data.data;
 }
