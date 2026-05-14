@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { earnCredits } from './wallet.service';
 import { sendEmail } from './email.service';
+import { persistIfDataUrl } from './storage.service';
 
 const APPROVAL_WINDOW_HOURS = 24;
 
@@ -82,6 +83,8 @@ export async function completeChore(choreId: string, userId: string, proofUrl: s
   if (!proofUrl || !proofUrl.trim()) {
     throw new AppError('Photo proof is required to mark a chore done', 400);
   }
+  // Persist the photo proof to disk — the row stores the public URL.
+  const storedProof = persistIfDataUrl(proofUrl.trim(), 'choreproof') as string;
   const chore = await prisma.chore.findUnique({ where: { id: choreId } });
   if (!chore) throw new AppError('Chore not found', 404);
   if (chore.claimedById && chore.claimedById !== userId) {
@@ -101,7 +104,7 @@ export async function completeChore(choreId: string, userId: string, proofUrl: s
       data:  {
         doneById:         userId,
         doneAt:           new Date(),
-        proofUrl:         proofUrl.trim(),
+        proofUrl:         storedProof,
         proofStatus:      'PENDING',
         proofSubmittedAt: new Date(),
         approvalDeadline: deadline,

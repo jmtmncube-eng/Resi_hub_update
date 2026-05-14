@@ -28,8 +28,8 @@ describe('AppError', () => {
 
 describe('errorHandler', () => {
   // Silence the console.error the handler emits, keep test output clean.
-  beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => {}));
-  afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it('maps an AppError to its status code and message', () => {
     const res = mockRes();

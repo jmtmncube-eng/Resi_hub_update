@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { sendEmail } from './email.service';
+import { persistIfDataUrl, deletePersistedFile } from './storage.service';
 
 export async function getMyDocuments(userId: string) {
   return prisma.document.findMany({
@@ -18,7 +19,9 @@ export async function getDocumentById(id: string, userId: string, role: string) 
   return doc;
 }
 
-/** Student uploads base64 proof-of-payment for an invoice */
+/** Student uploads proof-of-payment (POP) for an invoice. The proof
+ *  arrives as a base64 data URL and is persisted to disk — the row
+ *  stores the public URL, not the multi-MB blob. */
 export async function submitPaymentProof(id: string, userId: string, proofUrl: string) {
   const doc = await prisma.document.findUnique({ where: { id } });
   if (!doc)                  throw new AppError('Document not found', 404);
@@ -26,10 +29,15 @@ export async function submitPaymentProof(id: string, userId: string, proofUrl: s
   if (doc.type !== 'INVOICE') throw new AppError('Only invoices can have payment proof', 400);
   if (doc.proofStatus === 'CLEARED') throw new AppError('Invoice already cleared', 409);
 
-  return prisma.document.update({
+  const storedProof = persistIfDataUrl(proofUrl, 'pop') as string;
+
+  const updated = await prisma.document.update({
     where: { id },
-    data:  { proofUrl, proofStatus: 'SUBMITTED' },
+    data:  { proofUrl: storedProof, proofStatus: 'SUBMITTED' },
   });
+  // Replacing an earlier proof — drop the superseded file off disk.
+  if (doc.proofUrl && doc.proofUrl !== storedProof) deletePersistedFile(doc.proofUrl);
+  return updated;
 }
 
 /** Admin clears an invoice (paid / sponsor payment) */
@@ -54,10 +62,13 @@ export async function rejectPaymentProof(id: string) {
   const doc = await prisma.document.findUnique({ where: { id } });
   if (!doc) throw new AppError('Document not found', 404);
 
-  return prisma.document.update({
+  const updated = await prisma.document.update({
     where: { id },
     data:  { proofStatus: 'REJECTED', proofUrl: null },
   });
+  // The rejected proof is cleared off the row — clean it off disk too.
+  deletePersistedFile(doc.proofUrl);
+  return updated;
 }
 
 /** Admin fetches all invoices (for payment management) */

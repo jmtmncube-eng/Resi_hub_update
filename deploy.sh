@@ -104,7 +104,12 @@ echo "[5/7] Waiting for backend (up to ~3 min — ts-node compile)…"
 BACKEND_UP=0
 i=1
 while [ "$i" -le 45 ]; do
-  if docker compose exec -T backend curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null | grep -q 200; then
+  # busybox wget (the backend image is node:alpine — no curl). It exits
+  # non-zero on a connection failure OR a non-2xx response, so a clean
+  # exit is a genuine healthy backend. 127.0.0.1 (not localhost) — inside
+  # the container localhost resolves to ::1 first and the server only
+  # listens on IPv4, and busybox wget won't fall back like curl does.
+  if docker compose exec -T backend wget -q -O /dev/null http://127.0.0.1:5000/health 2>/dev/null; then
     echo "      -> backend ready (after ~$((i * 4))s)"
     BACKEND_UP=1
     break
@@ -142,6 +147,12 @@ fi
 docker compose exec -T backend npx prisma migrate deploy
 # Regenerate the Prisma client in case the migrations advanced the schema.
 docker compose exec -T backend npx prisma generate >/dev/null 2>&1 || true
+
+# Back-fill any base64-in-DB uploads onto disk (idempotent — only touches
+# rows whose value still starts with "data:", so re-runs are no-ops).
+echo "      migrating any base64 uploads → disk…"
+docker compose exec -T backend npx ts-node scripts/migrate-base64-uploads.ts || \
+  echo "      ⚠ base64 upload migration had issues — check: docker compose logs backend"
 
 # ── 7. Reseed (only if SEED=1 passed) ─────────────────────────
 # seed.ts has a FORCE_SEED guard that refuses to wipe a non-empty DB.

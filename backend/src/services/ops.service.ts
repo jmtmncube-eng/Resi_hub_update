@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { persistIfDataUrl } from './storage.service';
 
 const OPS_TYPES = [
   'POOL_CLEAN', 'POOL_CHEMICAL', 'GAS_REFILL', 'GRASS_CUT',
@@ -47,7 +48,7 @@ export async function createOpsService(adminId: string, input: CreateOpsServiceI
       amount:      input.amount != null ? input.amount : null,
       vendor:      input.vendor?.trim() || null,
       note:        input.note?.trim() || null,
-      proofUrl:    input.proofUrl || null,
+      proofUrl:    persistIfDataUrl(input.proofUrl, 'opsproof') || null,
       residenceId: input.residenceId ?? null,
       // Prisma JSON column rejects `Record<string, unknown>` directly;
       // serialise/deserialise to coerce into a plain InputJsonValue.

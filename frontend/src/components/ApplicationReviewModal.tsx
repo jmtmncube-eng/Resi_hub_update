@@ -8,6 +8,7 @@ import {
   listSubmittedApplications, decideApplication,
   AdminApplicationRow, ApplicationDocType,
 } from '../services/application.service';
+import { isPdfUrl } from '../utils/fileKind';
 
 const DOC_LABEL: Record<ApplicationDocType, string> = {
   ID_DOC:             'ID document',
@@ -110,8 +111,8 @@ export default function ApplicationReviewModal({ applicantId, onClose }: Props) 
                   </div>
                   {!d ? (
                     <div style={{ padding: 16, textAlign: 'center', color: 'var(--rose)', fontSize: 11 }}>missing</div>
-                  ) : d.fileUrl?.startsWith('data:application/pdf') ? (
-                    <a href={d.fileUrl} target="_blank" rel="noreferrer"
+                  ) : isPdfUrl(d.fileUrl) ? (
+                    <a href={d.fileUrl ?? undefined} target="_blank" rel="noreferrer"
                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 14, color: 'var(--text)', textDecoration: 'none' }}>
                       <FileCheck2 size={16} style={{ color: 'var(--cyan)' }} />
                       <span style={{ fontSize: 11 }}>Open PDF</span>

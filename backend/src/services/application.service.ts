@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { persistIfDataUrl, deletePersistedFile } from './storage.service';
 
 const TYPE_CAPACITY: Record<string, number> = {
   SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4, STUDIO: 1,
@@ -88,6 +89,23 @@ export async function submitApplication(userId: string, payload: {
     throw new AppError('Your application is already approved.', 409);
   }
 
+  // Persist each validated data URL to disk → public URL. Stored on the
+  // row instead of the multi-MB base64 blob (see storage.service.ts).
+  const idDocStored        = persistIfDataUrl(idDoc,        'iddoc')     as string;
+  const regProofStored     = persistIfDataUrl(regProof,     'regproof')  as string;
+  const fundingProofStored = persistIfDataUrl(fundingProof, 'fundproof') as string;
+  const signatureStored    = persistIfDataUrl(signature,    'signature') as string;
+
+  // Capture prior docs' files so we can clean them off disk after the
+  // re-submit succeeds (don't orphan the old uploads).
+  const priorDocs = await prisma.document.findMany({
+    where: {
+      userId,
+      type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] },
+    },
+    select: { fileUrl: true },
+  });
+
   // Replace any prior application documents (re-submit case)
   await prisma.document.deleteMany({
     where: {
@@ -99,10 +117,10 @@ export async function submitApplication(userId: string, payload: {
   const period = `Application ${new Date().getFullYear()}`;
 
   await prisma.$transaction([
-    prisma.document.create({ data: { userId, type: 'ID_DOC',             period, status: 'Submitted', fileUrl: idDoc } }),
-    prisma.document.create({ data: { userId, type: 'PROOF_REGISTRATION', period, status: 'Submitted', fileUrl: regProof } }),
-    prisma.document.create({ data: { userId, type: 'PROOF_FUNDING',      period, status: 'Submitted', fileUrl: fundingProof } }),
-    prisma.document.create({ data: { userId, type: 'SIGNATURE',          period, status: 'Submitted', fileUrl: signature } }),
+    prisma.document.create({ data: { userId, type: 'ID_DOC',             period, status: 'Submitted', fileUrl: idDocStored } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_REGISTRATION', period, status: 'Submitted', fileUrl: regProofStored } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_FUNDING',      period, status: 'Submitted', fileUrl: fundingProofStored } }),
+    prisma.document.create({ data: { userId, type: 'SIGNATURE',          period, status: 'Submitted', fileUrl: signatureStored } }),
     prisma.user.update({
       where: { id: userId },
       data: {
@@ -114,6 +132,9 @@ export async function submitApplication(userId: string, payload: {
       },
     }),
   ]);
+
+  // Re-submit cleanup — the new rows are committed, drop the old files.
+  priorDocs.forEach(d => deletePersistedFile(d.fileUrl));
 
   return getApplicationStatus(userId);
 }
@@ -227,14 +248,22 @@ export async function uploadApplicationDoc(userId: string, type: string, fileUrl
   if (type === 'SIGNATURE' && validated.startsWith('data:application/pdf')) {
     throw new AppError('Signature must be an image, not a PDF.', 400);
   }
+  // Persist the validated data URL to disk → public URL on the row.
+  const stored = persistIfDataUrl(validated, type.toLowerCase()) as string;
 
   // Upsert: replace any prior doc of this type, keep history light.
+  const priorDocs = await prisma.document.findMany({
+    where:  { userId, type: type as ApplicationDocType },
+    select: { fileUrl: true },
+  });
   await prisma.document.deleteMany({ where: { userId, type: type as ApplicationDocType } });
   const period = `Compliance ${new Date().getFullYear()}`;
-  return prisma.document.create({
-    data: { userId, type: type as ApplicationDocType, period, status: 'Submitted', fileUrl: validated },
+  const created = await prisma.document.create({
+    data: { userId, type: type as ApplicationDocType, period, status: 'Submitted', fileUrl: stored },
     select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
   });
+  priorDocs.forEach(d => deletePersistedFile(d.fileUrl));
+  return created;
 }
 
 // ── Admin: review applications ─────────────────────────────────

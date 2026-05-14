@@ -184,6 +184,22 @@ docker compose exec backend npx prisma migrate deploy
 docker compose exec backend npx prisma migrate status   # verify
 ```
 
+### File storage
+
+All uploaded files (compliance docs, payment proofs / POPs, chore & contractor
+proof photos, avatars, ticket photos) are written to disk by
+`backend/src/services/storage.service.ts` and served by the backend at
+`/api/uploads/...`. On the VPS they live in the **`backend_uploads`** Docker
+volume — it survives `docker compose down` but **not** `down -v`, so back it up
+with the database.
+
+`STORAGE_TYPE` selects the backend (`local`, the default, is the only one
+implemented — there's a documented S3 seam in `storage.service.ts` for later).
+
+Step 6 of `deploy.sh` also runs a one-time, idempotent back-fill
+(`scripts/migrate-base64-uploads.ts`) that moves any legacy base64-in-DB
+uploads onto disk. Re-runs are no-ops.
+
 ---
 
 ## 7. Monitoring & Alerting

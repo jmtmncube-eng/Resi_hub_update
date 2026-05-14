@@ -7,6 +7,7 @@ import {
   getMyApplicationDocs, uploadApplicationDoc,
   ApplicationDocType,
 } from '../services/application.service';
+import { isPdfUrl } from '../utils/fileKind';
 
 const DOC_LABELS: Record<ApplicationDocType, { label: string; hint: string }> = {
   ID_DOC:             { label: 'ID document',           hint: 'Front of your SA ID / passport' },
@@ -141,7 +142,7 @@ function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }
   }
 
   const present = !!fileUrl;
-  const isPdf   = !!fileUrl && fileUrl.startsWith('data:application/pdf');
+  const isPdf   = isPdfUrl(fileUrl);
   const accept  = type === 'SIGNATURE' ? 'image/*' : 'image/*,application/pdf';
 
   return (

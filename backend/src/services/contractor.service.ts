@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { persistIfDataUrl } from './storage.service';
 
 const CONTRACTOR_TYPES = ['CLEANER', 'GROUNDSKEEPER', 'GARDENER', 'OTHER'] as const;
 type ContractorType = typeof CONTRACTOR_TYPES[number];
@@ -201,13 +202,16 @@ export async function markContractorInvoicePaid(
     throw new AppError('Amount must be positive', 400);
   }
 
+  // Persist the payment proof to disk if one was supplied as a data URL.
+  const storedProof = persistIfDataUrl(proofUrl, 'contractorproof');
+
   return prisma.contractorInvoice.update({
     where: { id },
     data: {
       status: 'Paid',
       paidAt: new Date(),
       ...(amount !== undefined && amount > 0 && { amount }),
-      ...(proofUrl && { proofUrl }),
+      ...(storedProof && { proofUrl: storedProof }),
     },
   });
 }
