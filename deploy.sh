@@ -71,27 +71,40 @@ docker compose down
 docker compose up -d
 
 # ── 5. Wait for backend to be healthy ─────────────────────────
+# ts-node compiles the whole TS project on a fresh --no-cache image; on a
+# small VPS that can take 1–2 minutes. We poll for up to ~3 minutes. If it
+# still isn't up we WARN and carry on rather than aborting — the next two
+# steps (prisma db push) will fail loudly on their own if the backend is
+# genuinely dead, and more often than not it just needed another few seconds.
 echo ""
-echo "[5/7] Waiting for backend…"
+echo "[5/7] Waiting for backend (up to ~3 min — ts-node compile)…"
 BACKEND_UP=0
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+i=1
+while [ "$i" -le 45 ]; do
   if docker compose exec -T backend curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null | grep -q 200; then
-    echo "      -> backend ready"
+    echo "      -> backend ready (after ~$((i * 4))s)"
     BACKEND_UP=1
     break
   fi
-  printf "      .. attempt %s/15\n" "$i"
-  sleep 3
+  [ $((i % 5)) -eq 0 ] && printf "      .. still compiling (%ss elapsed)\n" "$((i * 4))"
+  i=$((i + 1))
+  sleep 4
 done
 if [ "$BACKEND_UP" != "1" ]; then
-  echo "      ✗ backend did not come up — check: docker compose logs --tail=50 backend"
-  exit 1
+  echo "      ⚠ backend still not responding after ~3 min — continuing anyway."
+  echo "        If the next steps fail, check: docker compose logs --tail=50 backend"
 fi
 
 # ── 6. Apply schema (idempotent — safe to run every deploy) ───
+# Retry once: if the backend was still finishing its compile during the
+# wait above, the first prisma call can race it — a single retry covers it.
 echo ""
 echo "[6/7] Applying Prisma schema…"
-docker compose exec -T backend npx prisma db push --accept-data-loss
+if ! docker compose exec -T backend npx prisma db push --accept-data-loss; then
+  echo "      first attempt failed — waiting 15s and retrying once…"
+  sleep 15
+  docker compose exec -T backend npx prisma db push --accept-data-loss
+fi
 
 # ── 7. Reseed (only if SEED=1 passed) ─────────────────────────
 # seed.ts has a FORCE_SEED guard that refuses to wipe a non-empty DB.
