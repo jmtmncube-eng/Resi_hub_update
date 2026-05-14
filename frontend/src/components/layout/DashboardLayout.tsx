@@ -45,6 +45,16 @@ const adminNav = [
   { to: ROUTES.ADMIN_AUDIT,       label: 'Activity',  icon: Activity        },
 ];
 
+// Manager (deputy) — everything an admin has EXCEPT the audit log,
+// which stays owner-only. Residence settings are also owner-only, but
+// they live behind a tab inside the Residence hub, not a nav item.
+const managerNav = adminNav.filter(item => item.to !== ROUTES.ADMIN_AUDIT);
+
+// Maintenance (handyman) — a focused single-purpose nav: just Tickets.
+const maintenanceNav = [
+  { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets', icon: Ticket },
+];
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout }        = useAuth();
   const { theme, toggleTheme }  = useTheme();
@@ -52,14 +62,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems =
-    user?.role === 'ADMIN'           ? adminNav    :
-    user?.role === 'ACTIVE_STUDENT'  ? studentNav  : pendingNav;
+    user?.role === 'ADMIN'           ? adminNav        :
+    user?.role === 'MANAGER'         ? managerNav      :
+    user?.role === 'MAINTENANCE'     ? maintenanceNav  :
+    user?.role === 'ACTIVE_STUDENT'  ? studentNav      : pendingNav;
 
   const roleLabel =
-    user?.role === 'ADMIN'           ? 'Admin'   :
-    user?.role === 'ACTIVE_STUDENT'  ? 'Resident': 'Applicant';
+    user?.role === 'ADMIN'           ? 'Admin'       :
+    user?.role === 'MANAGER'         ? 'Manager'     :
+    user?.role === 'MAINTENANCE'     ? 'Maintenance' :
+    user?.role === 'ACTIVE_STUDENT'  ? 'Resident'    : 'Applicant';
 
-  const isAdmin = user?.role === 'ADMIN';
+  // Owner + delegated staff share the "staff" accent (rose); students cyan.
+  const isStaff =
+    user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'MAINTENANCE';
 
   async function handleLogout() {
     await logout();
@@ -79,7 +95,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             fontWeight: 600,
             letterSpacing: '.06em',
             textTransform: 'uppercase',
-            color: isAdmin ? 'var(--rose)' : 'var(--cyan)',
+            color: isStaff ? 'var(--rose)' : 'var(--cyan)',
           }}>
             · {roleLabel}
           </span>
@@ -93,9 +109,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           fontSize: 10,
           textTransform: 'uppercase',
           letterSpacing: '.05em',
-          border: `1px solid ${isAdmin ? 'rgba(232,25,122,.3)' : 'rgba(0,204,204,.3)'}`,
-          color: isAdmin ? 'var(--rose)' : 'var(--cyan)',
-          background: isAdmin ? 'rgba(232,25,122,.08)' : 'rgba(0,204,204,.08)',
+          border: `1px solid ${isStaff ? 'rgba(232,25,122,.3)' : 'rgba(0,204,204,.3)'}`,
+          color: isStaff ? 'var(--rose)' : 'var(--cyan)',
+          background: isStaff ? 'rgba(232,25,122,.08)' : 'rgba(0,204,204,.08)',
         }}>
           {user?.email}
         </span>
@@ -126,7 +142,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
         {/* User info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 4 }}>
-          <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`}
+          <div className={`avatar ${isStaff ? 'avatar-rose' : 'avatar-cyan'}`}
                style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
             {user?.avatarUrl
               ? <img src={user.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

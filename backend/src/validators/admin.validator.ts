@@ -19,7 +19,7 @@ export const updateAllocationSchema = z.object({
 export const updateAccountSchema = z.object({
   name:       z.string().min(2).optional(),
   email:      z.string().email().optional(),
-  role:       z.enum(['ACTIVE_STUDENT', 'PENDING_STUDENT', 'ADMIN']).optional(),
+  role:       z.enum(['ACTIVE_STUDENT', 'PENDING_STUDENT', 'ADMIN', 'MANAGER', 'MAINTENANCE']).optional(),
   phone:      z.string().optional().or(z.literal('')),
   university: z.string().optional().or(z.literal('')),
   program:    z.string().optional().or(z.literal('')),

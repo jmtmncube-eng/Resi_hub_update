@@ -163,9 +163,9 @@ export async function getAccounts(req: Request, res: Response, next: NextFunctio
   } catch (e) { next(e); }
 }
 
-export async function updateAccount(req: Request, res: Response, next: NextFunction) {
+export async function updateAccount(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const data = await adminService.updateAccount(req.params.id, req.body);
+    const data = await adminService.updateAccount(req.params.id, req.body, req.user!.role);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }
@@ -184,7 +184,7 @@ export async function setAccountActive(req: AuthRequest, res: Response, next: Ne
       res.status(400).json({ success: false, error: 'isActive (boolean) is required' });
       return;
     }
-    const data = await adminService.setAccountActive(req.params.id, isActive, req.user!.userId);
+    const data = await adminService.setAccountActive(req.params.id, isActive, req.user!.userId, req.user!.role);
     res.json({ success: true, data });
   } catch (e) { next(e); }
 }

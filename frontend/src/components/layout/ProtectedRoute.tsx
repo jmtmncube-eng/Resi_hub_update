@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Role } from '../../types/auth.types';
-import { ROUTES } from '../../constants/routes';
+import { ROUTES, ROLE_HOME } from '../../constants/routes';
 
 interface Props {
   children:      React.ReactNode;
@@ -29,12 +29,7 @@ export function ProtectedRoute({ children, allowedRoles }: Props) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // Redirect to the user's appropriate home based on their actual role
-    const home = {
-      ACTIVE_STUDENT:  ROUTES.DASHBOARD,
-      PENDING_STUDENT: ROUTES.APPLICATION,
-      ADMIN:           ROUTES.ADMIN,
-    }[user.role];
-    return <Navigate to={home} replace />;
+    return <Navigate to={ROLE_HOME[user.role] ?? ROUTES.LOGIN} replace />;
   }
 
   return <>{children}</>;

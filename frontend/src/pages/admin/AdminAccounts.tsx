@@ -19,23 +19,30 @@ import { UserX as UserXIcon } from 'lucide-react';
 
 const ROLE_BADGE: Record<string, string> = {
   ADMIN:           'badge-rose',
+  MANAGER:         'badge-rose',
+  MAINTENANCE:     'badge-rose',
   ACTIVE_STUDENT:  'badge-cyan',
   PENDING_STUDENT: 'badge-gray',
 };
 
 const roleLabel: Record<string, string> = {
   ADMIN:           'Admin',
+  MANAGER:         'Manager',
+  MAINTENANCE:     'Maintenance',
   ACTIVE_STUDENT:  'Active',
   PENDING_STUDENT: 'Pending',
 };
 
-type RoleFilter = 'all' | 'pending' | 'active' | 'admin';
+/** Owner + delegated staff. */
+const STAFF_ROLES = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
+
+type RoleFilter = 'all' | 'pending' | 'active' | 'staff';
 
 const FILTERS: { value: RoleFilter; label: string }[] = [
   { value: 'all',     label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'active',  label: 'Active' },
-  { value: 'admin',   label: 'Admins' },
+  { value: 'staff',   label: 'Staff' },
 ];
 
 function extractError(err: unknown, fallback: string): string {
@@ -82,14 +89,14 @@ export default function AdminAccounts() {
     if (filter === 'all') return accounts;
     if (filter === 'pending') return accounts.filter(a => a.role === 'PENDING_STUDENT');
     if (filter === 'active')  return accounts.filter(a => a.role === 'ACTIVE_STUDENT');
-    return accounts.filter(a => a.role === 'ADMIN');
+    return accounts.filter(a => STAFF_ROLES.includes(a.role));
   }, [accounts, filter]);
 
   const totals = {
     all:     accounts.length,
     active:  accounts.filter(a => a.role === 'ACTIVE_STUDENT').length,
     pending: accounts.filter(a => a.role === 'PENDING_STUDENT').length,
-    admin:   accounts.filter(a => a.role === 'ADMIN').length,
+    staff:   accounts.filter(a => STAFF_ROLES.includes(a.role)).length,
   };
 
   // ── Mutations ──────────────────────────────────────────────────
@@ -132,7 +139,7 @@ export default function AdminAccounts() {
       <div>
         <h1 className="page-title">Accounts</h1>
         <p className="page-sub">
-          {totals.all} total · {totals.active} active · {totals.pending} pending · {totals.admin} admins
+          {totals.all} total · {totals.active} active · {totals.pending} pending · {totals.staff} staff
         </p>
       </div>
 
@@ -141,7 +148,7 @@ export default function AdminAccounts() {
         <KpiPill label="Pending review" value={totals.pending} accent="rose"  hint={totals.pending > 0 ? 'tap to filter' : 'all clear'}
                  onClick={() => setFilter('pending')} active={filter === 'pending'} />
         <KpiPill label="Active students" value={totals.active}  accent="cyan"  onClick={() => setFilter('active')}  active={filter === 'active'} />
-        <KpiPill label="Admins"          value={totals.admin}   accent="rose"  onClick={() => setFilter('admin')}   active={filter === 'admin'} />
+        <KpiPill label="Staff"           value={totals.staff}   accent="rose"  onClick={() => setFilter('staff')}   active={filter === 'staff'} />
         <KpiPill label="Total accounts"  value={totals.all}     accent="text"  onClick={() => setFilter('all')}     active={filter === 'all'} />
       </div>
 
@@ -502,6 +509,10 @@ function validateEmail(raw: string): string | null {
 
 function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  // Only the owner can assign roles — a manager editing an account sees
+  // the role as read-only (the backend enforces this too).
+  const canChangeRole = user?.role === 'ADMIN';
   const [form, setForm] = useState<EditFormState>({
     name:       account.name,
     email:      account.email,
@@ -573,11 +584,22 @@ function EditAccountModal({ account, onClose }: { account: AdminAccount; onClose
             />
           </ModalField>
           <ModalField label="Role">
-            <select value={form.role} onChange={update('role')} className="input-base">
-              <option value="PENDING_STUDENT">Pending student</option>
-              <option value="ACTIVE_STUDENT">Active student</option>
-              <option value="ADMIN">Admin</option>
-            </select>
+            {canChangeRole ? (
+              <select value={form.role} onChange={update('role')} className="input-base">
+                <optgroup label="Students">
+                  <option value="PENDING_STUDENT">Pending student</option>
+                  <option value="ACTIVE_STUDENT">Active student</option>
+                </optgroup>
+                <optgroup label="Staff">
+                  <option value="MAINTENANCE">Maintenance staff</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="ADMIN">Admin (owner)</option>
+                </optgroup>
+              </select>
+            ) : (
+              <input value={roleLabel[form.role] ?? form.role} disabled className="input-base"
+                     title="Only an admin can change roles" />
+            )}
           </ModalField>
           <ModalField label="Phone" error={phoneError} hint="10 digits — e.g. 0712345678">
             <input

@@ -1,4 +1,14 @@
-export type Role = 'ACTIVE_STUDENT' | 'PENDING_STUDENT' | 'ADMIN';
+export type Role =
+  | 'ACTIVE_STUDENT'
+  | 'PENDING_STUDENT'
+  | 'ADMIN'
+  | 'MANAGER'      // staff — admin-lite (no audit log / residence settings)
+  | 'MAINTENANCE'; // staff — maintenance tickets + ops logs only
+
+/** Staff = anyone who runs the residence (owner + delegated staff). */
+export const STAFF_ROLES: Role[] = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
+export const isStaff = (role?: Role): boolean =>
+  !!role && STAFF_ROLES.includes(role);
 
 export interface User {
   id:         string;

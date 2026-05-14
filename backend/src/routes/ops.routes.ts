@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireRole }  from '../middleware/role.middleware';
+import { requireRole, OPS_STAFF } from '../middleware/role.middleware';
 import * as ctrl        from '../controllers/ops.controller';
 
 const router = Router();
 
-// All ops endpoints are admin-only
-router.use(authenticate, requireRole('ADMIN'));
+// Ops logs — owner, manager, and the maintenance handyman.
+router.use(authenticate, requireRole(...OPS_STAFF));
 
 router.get('/services',          ctrl.listServices);
 router.post('/services',         ctrl.createService);

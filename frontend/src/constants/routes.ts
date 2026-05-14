@@ -44,4 +44,6 @@ export const ROLE_HOME = {
   ACTIVE_STUDENT:  ROUTES.DASHBOARD,
   PENDING_STUDENT: ROUTES.APPLICATION,
   ADMIN:           ROUTES.ADMIN,
+  MANAGER:         ROUTES.ADMIN,              // deputy lands on the overview
+  MAINTENANCE:     ROUTES.ADMIN_MAINTENANCE,  // handyman lands on Tickets
 } as const;

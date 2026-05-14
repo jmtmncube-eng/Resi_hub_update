@@ -209,6 +209,7 @@
 | `init` | Initial schema — all models | 2026-03-25 |
 | `batch_a_reconcile` | Capture schema drift from the db-push era | 2026-05-14 |
 | `notifications_center` | `Notification` model + `NotificationType` enum | 2026-05-14 |
+| `staff_roles` | `MANAGER` + `MAINTENANCE` added to `Role` enum | 2026-05-14 |
 
 ---
 
@@ -444,11 +445,19 @@
   `deploy.sh`.
 
 **Batch D**
-- Notifications centre: `Notification` model + service/controller/routes;
+- #9 Notifications centre: `Notification` model + service/controller/routes;
   `createNotification` wired into all 7 event sites (invoices incl. bulk,
   chore approve/reject, maintenance status, application, account approve/
   deactivate); `NotificationBell` in the dashboard header — unread badge,
   dropdown history, mark-read / mark-all-read, 45s unread-count poll.
+- #11 Staff roles: `MANAGER` (admin-lite — all day-to-day ops, no audit
+  log / residence settings / role changes) and `MAINTENANCE` (handyman —
+  tickets + ops logs only) added to the `Role` enum. Semantic route
+  groups (`ADMIN_ONLY` / `MANAGEMENT` / `OPS_STAFF`) in role.middleware.ts;
+  every admin route re-tiered. Service-level privilege guards block a
+  manager from changing roles or touching staff/admin accounts. Frontend:
+  per-role nav + route guards, role assignment on the Accounts page
+  (admin-only). Verified end-to-end — every permission boundary holds.
 
 **Skipped** (need external infrastructure): #2 backups, #5 error monitoring,
 #7 password reset, #10 email reliability.

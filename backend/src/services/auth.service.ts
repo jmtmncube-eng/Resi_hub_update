@@ -86,8 +86,9 @@ export async function registerUser(data: RegisterInput) {
 async function notifyAdminsOfNewApplicant(applicant: { name: string; email: string }): Promise<void> {
   const { sendEmail } = await import('./email.service');
   const { notifyMany } = await import('./notification.service');
+  // Owners + managers both review applications.
   const admins = await prisma.user.findMany({
-    where:  { role: 'ADMIN', isActive: true },
+    where:  { role: { in: ['ADMIN', 'MANAGER'] }, isActive: true },
     select: { id: true, name: true, email: true },
   });
   await Promise.all(admins.map(a =>

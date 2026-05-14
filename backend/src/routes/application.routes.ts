@@ -1,6 +1,6 @@
 import { Router }       from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireRole }  from '../middleware/role.middleware';
+import { requireRole, MANAGEMENT } from '../middleware/role.middleware';
 import * as ctrl        from '../controllers/application.controller';
 
 const router = Router();
@@ -18,7 +18,7 @@ router.get('/my-docs',      ctrl.getMyDocs);
 router.post('/upload-doc',  ctrl.uploadDoc);
 
 // Admin review
-router.get ('/admin/list',       requireRole('ADMIN'), ctrl.listSubmitted);
-router.post('/admin/:id/decide', requireRole('ADMIN'), ctrl.decide);
+router.get ('/admin/list',       requireRole(...MANAGEMENT), ctrl.listSubmitted);
+router.post('/admin/:id/decide', requireRole(...MANAGEMENT), ctrl.decide);
 
 export default router;

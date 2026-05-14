@@ -63,6 +63,11 @@ const ACTIVE:  Role[] = ['ACTIVE_STUDENT'];
 const PENDING: Role[] = ['PENDING_STUDENT'];
 const BOTH:    Role[] = ['ACTIVE_STUDENT', 'PENDING_STUDENT'];
 const ADMIN:   Role[] = ['ADMIN'];
+// Staff-role access tiers — mirror the backend role groups in
+// role.middleware.ts. MANAGEMENT = owner + deputy; OPS_STAFF also
+// includes the maintenance handyman.
+const MANAGEMENT: Role[] = ['ADMIN', 'MANAGER'];
+const OPS_STAFF:  Role[] = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
 
 function App() {
   return (
@@ -97,22 +102,25 @@ function App() {
           <Route path={ROUTES.APPLICATION} element={<Page roles={PENDING}><ApplicationStatus /></Page>} />
           <Route path={ROUTES.ROOMS}       element={<Page roles={PENDING}><BrowseRooms /></Page>} />
 
-          {/* ── Admin ──────────────────────────────────────── */}
-          <Route path={ROUTES.ADMIN}             element={<Page roles={ADMIN}><AdminOverview /></Page>} />
-          <Route path={ROUTES.ADMIN_RESIDENCE}   element={<Page roles={ADMIN}><AdminResidence /></Page>} />
+          {/* ── Admin / Staff ──────────────────────────────────
+              ADMIN       — owner only (audit log).
+              MANAGEMENT  — owner + manager.
+              OPS_STAFF   — owner + manager + maintenance handyman. */}
+          <Route path={ROUTES.ADMIN}             element={<Page roles={MANAGEMENT}><AdminOverview /></Page>} />
+          <Route path={ROUTES.ADMIN_RESIDENCE}   element={<Page roles={MANAGEMENT}><AdminResidence /></Page>} />
           {/* Legacy admin URLs → redirect into the consolidated Residence hub.
               Allocations was merged into the Rooms tab — both old URLs land there. */}
           <Route path={ROUTES.ADMIN_OCCUPANCY}   element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
           <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
           <Route path={ROUTES.ADMIN_SETTINGS}    element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=info`} replace />} />
-          <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={ADMIN}><AdminMaintenance /></Page>} />
-          <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={ADMIN}><AdminNews /></Page>} />
-          <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={ADMIN}><AdminVisitors /></Page>} />
-          <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={ADMIN}><AdminRewards /></Page>} />
-          <Route path={ROUTES.ADMIN_CHORES}      element={<Page roles={ADMIN}><AdminChores /></Page>} />
-          <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={ADMIN}><AdminAccounts /></Page>} />
+          <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={OPS_STAFF}><AdminMaintenance /></Page>} />
+          <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={MANAGEMENT}><AdminNews /></Page>} />
+          <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={MANAGEMENT}><AdminVisitors /></Page>} />
+          <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={MANAGEMENT}><AdminRewards /></Page>} />
+          <Route path={ROUTES.ADMIN_CHORES}      element={<Page roles={MANAGEMENT}><AdminChores /></Page>} />
+          <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={MANAGEMENT}><AdminAccounts /></Page>} />
           <Route path={ROUTES.ADMIN_AUDIT}       element={<Page roles={ADMIN}><AdminAudit /></Page>} />
-          <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={ADMIN}><AdminPayments /></Page>} />
+          <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={MANAGEMENT}><AdminPayments /></Page>} />
 
           {/* ── Default ────────────────────────────────────── */}
           <Route path="/"  element={<Navigate to={ROUTES.LOGIN} replace />} />

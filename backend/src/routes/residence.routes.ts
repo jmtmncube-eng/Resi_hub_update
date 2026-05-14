@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireRole }  from '../middleware/role.middleware';
+import { requireRole, MANAGEMENT } from '../middleware/role.middleware';
 import * as residence   from '../controllers/residence.controller';
 import * as contractor  from '../controllers/contractor.controller';
 
 const router = Router();
-router.use(authenticate, requireRole('ADMIN'));
+router.use(authenticate, requireRole(...MANAGEMENT));
 
 // Residences
 router.get('/',                      residence.list);

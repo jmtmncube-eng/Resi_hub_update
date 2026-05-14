@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import * as ctrl from '../controllers/maintenance.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireRole } from '../middleware/role.middleware';
+import { requireRole, OPS_STAFF } from '../middleware/role.middleware';
 import { validate } from '../middleware/validation.middleware';
 import { createTicketSchema, updateTicketSchema } from '../validators/maintenance.validator';
 
@@ -17,12 +17,12 @@ const router = Router();
 router.use(authenticate);
 
 // Student
-router.get('/',     requireRole('ACTIVE_STUDENT', 'ADMIN'), ctrl.getMyTickets);
+router.get('/',     requireRole('ACTIVE_STUDENT', ...OPS_STAFF), ctrl.getMyTickets);
 router.post('/',    requireRole('ACTIVE_STUDENT'), upload.array('media', 5), validate(createTicketSchema), ctrl.createTicket);
-router.get('/:id',  requireRole('ACTIVE_STUDENT', 'ADMIN'), ctrl.getTicket);
+router.get('/:id',  requireRole('ACTIVE_STUDENT', ...OPS_STAFF), ctrl.getTicket);
 
 // Admin
-router.get('/admin/all', requireRole('ADMIN'), ctrl.getAllTickets);
-router.patch('/:id',     requireRole('ADMIN'), validate(updateTicketSchema), ctrl.updateTicket);
+router.get('/admin/all', requireRole(...OPS_STAFF), ctrl.getAllTickets);
+router.patch('/:id',     requireRole(...OPS_STAFF), validate(updateTicketSchema), ctrl.updateTicket);
 
 export default router;

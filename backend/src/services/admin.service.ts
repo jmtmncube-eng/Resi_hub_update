@@ -517,9 +517,22 @@ export async function getAllAccounts(search?: string) {
   });
 }
 
-export async function updateAccount(id: string, data: UpdateAccountInput) {
+export async function updateAccount(id: string, data: UpdateAccountInput, actorRole: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
+
+  // ── Privilege guard ──────────────────────────────────────────
+  // A MANAGER may edit student accounts only, and may never change a
+  // role. Only the owner (ADMIN) can touch staff/admin accounts or
+  // assign roles — this is the privilege-escalation boundary.
+  if (actorRole !== 'ADMIN') {
+    if (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'MAINTENANCE') {
+      throw new AppError('Only an admin can edit staff or admin accounts', 403);
+    }
+    if (data.role !== undefined && data.role !== user.role) {
+      throw new AppError('Only an admin can change a user\'s role', 403);
+    }
+  }
 
   // Email uniqueness guard if it's changing
   if (data.email && data.email !== user.email) {
@@ -674,10 +687,14 @@ export async function deleteRoom(id: string) {
 }
 
 /** Toggle a user's active flag. Deactivated users cannot log in. */
-export async function setAccountActive(id: string, isActive: boolean, adminId: string) {
+export async function setAccountActive(id: string, isActive: boolean, adminId: string, actorRole: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
   if (user.id === adminId) throw new AppError("You can't deactivate your own account", 400);
+  // A MANAGER may activate/deactivate students only — never staff/admin.
+  if (actorRole !== 'ADMIN' && (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'MAINTENANCE')) {
+    throw new AppError('Only an admin can change a staff or admin account', 403);
+  }
   if (user.role === 'ADMIN' && !isActive) {
     // Belt-and-braces: prevent locking out the last admin
     const otherActiveAdmins = await prisma.user.count({

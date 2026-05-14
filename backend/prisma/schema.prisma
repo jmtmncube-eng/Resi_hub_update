@@ -20,6 +20,10 @@ enum Role {
   ACTIVE_STUDENT
   PENDING_STUDENT
   ADMIN
+  // ── Staff roles — delegate operational work without full ownership ──
+  MANAGER      // admin-lite: all day-to-day ops; no audit log, no residence
+               // settings, can't change roles or touch admin/manager accounts
+  MAINTENANCE  // handyman: maintenance tickets + ops service logs only
 }
 
 enum RoomType {

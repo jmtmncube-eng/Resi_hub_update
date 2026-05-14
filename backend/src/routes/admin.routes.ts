@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate }  from '../middleware/auth.middleware';
-import { requireRole }   from '../middleware/role.middleware';
+import { requireRole, MANAGEMENT } from '../middleware/role.middleware';
 import { validate }      from '../middleware/validation.middleware';
 import * as ctrl         from '../controllers/admin.controller';
 import {
@@ -14,8 +14,10 @@ import {
 
 const router = Router();
 
-// All admin routes are restricted to ADMIN role
-router.use(authenticate, requireRole('ADMIN'));
+// Admin API — owner + manager. Privilege-sensitive account actions
+// (role changes, touching admin/manager accounts) are guarded again in
+// admin.service.ts against the actor's own role.
+router.use(authenticate, requireRole(...MANAGEMENT));
 
 // ── Overview ──────────────────────────────────────────────────
 router.get('/stats',          ctrl.getStats);

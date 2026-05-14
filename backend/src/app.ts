@@ -109,12 +109,17 @@ app.use('/api/wallet',      walletRoutes);
 app.use('/api/profile',     profileRoutes);
 app.use('/api/documents',   documentRoutes);
 app.use('/api/housemates',  housemateRoutes);
-app.use('/api/admin',       adminRoutes);
-app.use('/api/application', applicationRoutes);
-app.use('/api/settings',    settingsRoutes);
+// The /api/admin/* sub-routers MUST be registered before the broad
+// /api/admin router — otherwise the latter's role-guard middleware runs
+// first and can 403 a request before it ever reaches the more specific
+// sub-router (e.g. a MAINTENANCE user hitting /api/admin/ops, which the
+// /api/admin MANAGEMENT guard would reject).
 app.use('/api/admin/ops',         opsRoutes);
 app.use('/api/admin/residences',  residenceRoutes);
 app.use('/api/admin/audit',       auditRoutes);
+app.use('/api/admin',       adminRoutes);
+app.use('/api/application', applicationRoutes);
+app.use('/api/settings',    settingsRoutes);
 app.use('/api/notifications',     notificationRoutes);
 app.use('/api/gate',              gateRoutes);   // public — QR is the credential
 

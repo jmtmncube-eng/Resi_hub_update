@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as ctrl        from '../controllers/document.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { requireRole }  from '../middleware/role.middleware';
+import { requireRole, MANAGEMENT } from '../middleware/role.middleware';
 
 const router = Router();
 router.use(authenticate);
@@ -14,9 +14,9 @@ router.post('/:id/sign',                 ctrl.signDocument);
 router.post('/:id/proof',                ctrl.submitPaymentProof);
 
 // Admin routes
-router.get('/admin/invoices',            requireRole('ADMIN'), ctrl.getAllInvoices);
-router.post('/admin/invoices/bulk',      requireRole('ADMIN'), ctrl.bulkCreateInvoices);
-router.post('/:id/clear',                requireRole('ADMIN'), ctrl.clearPayment);
-router.post('/:id/reject-proof',         requireRole('ADMIN'), ctrl.rejectPaymentProof);
+router.get('/admin/invoices',            requireRole(...MANAGEMENT), ctrl.getAllInvoices);
+router.post('/admin/invoices/bulk',      requireRole(...MANAGEMENT), ctrl.bulkCreateInvoices);
+router.post('/:id/clear',                requireRole(...MANAGEMENT), ctrl.clearPayment);
+router.post('/:id/reject-proof',         requireRole(...MANAGEMENT), ctrl.rejectPaymentProof);
 
 export default router;
