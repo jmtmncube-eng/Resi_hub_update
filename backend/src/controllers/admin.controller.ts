@@ -234,6 +234,14 @@ export async function getRevenueReport(req: Request, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
+export async function getAnalytics(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { residenceId } = req.query as { residenceId?: string };
+    const data = await adminService.getAnalytics(residenceId);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+}
+
 // ── Visitor Log ───────────────────────────────────────────────
 export async function getVisitorLog(req: Request, res: Response, next: NextFunction) {
   try {

@@ -112,6 +112,31 @@ export const getRevenueReport = async (residenceId?: string) => {
   return res.data.data as RevenueReport;
 };
 
+// ── Analytics ─────────────────────────────────────────────────
+export interface AnalyticsMonth {
+  period: string;          // "YYYY-MM"
+  billed: number;
+  collected: number;
+  invoiceCount: number;
+  ticketsOpened: number;
+  newResidents: number;
+}
+export interface Analytics {
+  series: AnalyticsMonth[];
+  snapshot: {
+    collectionRate: number;
+    occupancyRate: number;
+    totalBilled: number;
+    totalCollected: number;
+    newResidents6mo: number;
+    ticketsOpened6mo: number;
+  };
+}
+export const getAnalytics = async (residenceId?: string) => {
+  const res = await api.get('/admin/analytics', { params: residenceId ? { residenceId } : {} });
+  return res.data.data as Analytics;
+};
+
 // ── Payments (invoices for admin) ─────────────────────────────
 export const getAllInvoices = async () => {
   const res = await api.get('/documents/admin/invoices');

@@ -848,6 +848,107 @@ export async function getRevenueReport(residenceId?: string) {
   };
 }
 
+// ── Analytics (#15) ───────────────────────────────────────────
+/**
+ * Six-month trend analytics, computed from existing rows (no snapshot
+ * tables): rent billed vs collected, tickets opened, new residents — plus
+ * a current snapshot (slot occupancy, all-time collection rate).
+ * residenceId scopes invoices via the user's allocation room.
+ */
+export async function getAnalytics(residenceId?: string) {
+  // Build the last 6 "YYYY-MM" keys, oldest first.
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const earliest = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  // Residence scope → the set of user ids living there.
+  let userIdScope: string[] | undefined;
+  if (residenceId) {
+    const residents = await prisma.user.findMany({
+      where:  { allocation: { is: { room: { is: { residenceId } } } } },
+      select: { id: true },
+    });
+    userIdScope = residents.map(r => r.id);
+  }
+
+  const [invoices, tickets, allocations] = await Promise.all([
+    prisma.document.findMany({
+      where: {
+        type: 'INVOICE',
+        period: { in: months },
+        ...(userIdScope ? { userId: { in: userIdScope } } : {}),
+      },
+      select: { period: true, amount: true, status: true, proofStatus: true },
+    }),
+    prisma.maintenanceTicket.findMany({
+      where: {
+        createdAt: { gte: earliest },
+        ...(residenceId ? { residenceId } : {}),
+      },
+      select: { createdAt: true },
+    }),
+    prisma.allocation.findMany({
+      where: {
+        createdAt: { gte: earliest },
+        ...(residenceId ? { room: { residenceId } } : {}),
+      },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const toNum    = (s: string | null) => Number((s ?? '').replace(/[^0-9.]/g, '') || 0);
+
+  const series = months.map(period => {
+    const monthInvoices = invoices.filter(i => i.period === period);
+    const billed    = monthInvoices.reduce((s, i) => s + toNum(i.amount), 0);
+    const collected = monthInvoices
+      .filter(i => i.proofStatus === 'CLEARED' || i.status === 'Paid')
+      .reduce((s, i) => s + toNum(i.amount), 0);
+    return {
+      period,
+      billed,
+      collected,
+      invoiceCount:  monthInvoices.length,
+      ticketsOpened: tickets.filter(t => monthKey(t.createdAt) === period).length,
+      newResidents:  allocations.filter(a => monthKey(a.createdAt) === period).length,
+    };
+  });
+
+  // Snapshot: collection rate over the 6-month window + current slot occupancy.
+  const totalBilled    = series.reduce((s, m) => s + m.billed, 0);
+  const totalCollected = series.reduce((s, m) => s + m.collected, 0);
+  const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
+
+  const [activeAllocs, allRooms] = await Promise.all([
+    prisma.allocation.count({
+      where: { status: 'ACTIVE', ...(residenceId ? { room: { residenceId } } : {}) },
+    }),
+    prisma.room.findMany({
+      where:  residenceId ? { residenceId } : undefined,
+      select: { capacity: true, type: true },
+    }),
+  ]);
+  const totalSlots = allRooms.reduce((s, r) => s + (r.capacity || TYPE_CAPACITY[r.type] || 1), 0);
+  const occupancyRate = totalSlots > 0 ? Math.round((activeAllocs / totalSlots) * 100) : 0;
+
+  return {
+    series,
+    snapshot: {
+      collectionRate,
+      occupancyRate,
+      totalBilled,
+      totalCollected,
+      newResidents6mo: series.reduce((s, m) => s + m.newResidents, 0),
+      ticketsOpened6mo: series.reduce((s, m) => s + m.ticketsOpened, 0),
+    },
+  };
+}
+
 // ── Rewards / Vouchers ────────────────────────────────────────
 export async function getAllVouchers() {
   return prisma.voucher.findMany({

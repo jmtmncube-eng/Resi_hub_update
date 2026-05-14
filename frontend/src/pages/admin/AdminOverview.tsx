@@ -15,6 +15,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { ResiMark } from '../../components/Brand';
 import { Modal } from '../../components/Modal';
 import { WeatherWidget } from '../../components/WeatherWidget';
+import { AnalyticsSection } from '../../components/AnalyticsSection';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { downloadHealthReportPdf } from '../../utils/pdf';
 
@@ -202,6 +203,9 @@ export default function AdminOverview() {
           ))}
         </div>
       </section>
+
+      {/* ── ANALYTICS (6-month trends) ──────────────────────────── */}
+      <AnalyticsSection />
 
       {/* ── STUDENTS & OPERATIONS ──────────────────────────────── */}
       <section>

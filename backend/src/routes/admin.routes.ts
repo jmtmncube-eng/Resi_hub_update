@@ -55,4 +55,7 @@ router.get('/visitors',       ctrl.getVisitorLog);
 // ── Revenue Report ────────────────────────────────────────────
 router.get('/revenue',        ctrl.getRevenueReport);
 
+// ── Analytics ─────────────────────────────────────────────────
+router.get('/analytics',      ctrl.getAnalytics);
+
 export default router;

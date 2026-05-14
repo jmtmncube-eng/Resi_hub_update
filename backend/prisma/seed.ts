@@ -506,16 +506,17 @@ async function main() {
       signedAt: unsigned ? null : D('2026-02-01'),
       signedByName: unsigned ? null : s.name,
     }}));
-    // April invoice — paid
+    // April invoice — paid. Period is "YYYY-MM" to match the format the
+    // app's own invoice flow + analytics expect (assertValidPeriod).
     docPromises.push(prisma.document.create({ data: {
-      userId: s.id, type: DocumentType.INVOICE, period: 'April 2026',
+      userId: s.id, type: DocumentType.INVOICE, period: '2026-04',
       amount: 'R4,500', status: 'Paid',
       proofStatus: 'CLEARED', clearedAt: D('2026-05-02'), clearedBy: admin.id,
     }}));
     // May invoice — outstanding for some
     const owesMay = ['Sarah Johnson', 'David Chen', 'Thandi Khumalo', 'Fatima Adams'].includes(s.name);
     docPromises.push(prisma.document.create({ data: {
-      userId: s.id, type: DocumentType.INVOICE, period: 'May 2026',
+      userId: s.id, type: DocumentType.INVOICE, period: '2026-05',
       amount: 'R4,500', status: owesMay ? 'Unpaid' : 'Paid',
       proofStatus: owesMay ? null : 'CLEARED',
       clearedAt: owesMay ? null : D('2026-05-04'),
