@@ -202,7 +202,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Single top bar — works for desktop and mobile.
-            Hamburger + brand show on mobile only; user menu always on the right. */}
+            Hamburger shows on mobile only; user menu always on the right.
+            No brand here — the sidebar already carries the logo (always
+            visible on desktop, opened via the hamburger on mobile), so a
+            second copy in the topbar was redundant. */}
         <div style={{
           height: 56,
           background: 'var(--bg2)',
@@ -217,9 +220,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           zIndex: 100,
           boxShadow: '0 1px 14px var(--shadow)',
         }}>
-          {/* Mobile-only hamburger + brand. Sidebar is hidden on phones,
-              so the topbar carries the brand mark + wordmark instead so
-              users always know where they are. */}
+          {/* Mobile-only hamburger — opens the sidebar (which carries the brand) */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
@@ -232,10 +233,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          {/* Mobile brand — logo + wordmark, only on small screens */}
-          <span className="md:hidden" style={{ display: 'inline-flex' }}>
-            <Brand size="sm" />
-          </span>
           {/* Flex spacer so UserMenu always pins to the right */}
           <div style={{ flex: 1 }} />
           <UserMenu />

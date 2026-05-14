@@ -106,11 +106,7 @@ export default function Profile() {
         <p className="page-sub">Your personal details, bio and compliance documents</p>
       </div>
 
-      {/* Personal paperwork — students only; admins skip these cards */}
-      {!isAdmin && <LeaseDocsCard />}
-      {!isAdmin && <ComplianceDocsCard />}
-
-      {/* Avatar section */}
+      {/* Avatar section — always first, identity at the top of the page */}
       <div className="card" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ position: 'relative' }}>
@@ -206,6 +202,12 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Personal paperwork — students only; admins skip these cards.
+          Sits below identity + details so the page reads top-down:
+          who you are → your details → your room → your documents. */}
+      {!isAdmin && <LeaseDocsCard />}
+      {!isAdmin && <ComplianceDocsCard />}
     </div>
   );
 }
