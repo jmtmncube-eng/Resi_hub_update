@@ -207,6 +207,8 @@
 | Migration | Description | Date |
 |-----------|-------------|------|
 | `init` | Initial schema — all models | 2026-03-25 |
+| `batch_a_reconcile` | Capture schema drift from the db-push era | 2026-05-14 |
+| `notifications_center` | `Notification` model + `NotificationType` enum | 2026-05-14 |
 
 ---
 
@@ -421,5 +423,39 @@
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2026-05-01
+### Session 10 — 2026-05-14 — Hardening (Batches A, C, D)
+
+**Batch A — Foundation**
+- Secrets: `docker-compose` reads `${VAR:-fallback}` refs; `deploy.sh` generates
+  strong JWT secrets into a gitignored `.env`; Postgres + backend ports locked
+  to `127.0.0.1`. `.env.example` added.
+- Migrations: `deploy.sh` switched from `db push` to versioned
+  `prisma migrate deploy` (baselines a pre-existing DB first);
+  `batch_a_reconcile` captures accumulated drift.
+- Production frontend build: compose split into base + `docker-compose.override.yml`
+  (dev Vite) + `docker-compose.prod.yml` (static nginx); `VITE_*` baked as build args.
+
+**Batch C — Trust**
+- Automated tests: Vitest backend suite — 46 pure unit tests (JWT, error
+  middleware, auth validators, the upload security gate, storage service).
+- Object storage: `storage.service.ts` unifies all uploads onto disk
+  (`persistIfDataUrl` / `deletePersistedFile`, S3 seam documented); compliance
+  docs + payment proofs moved off base64-in-DB; idempotent back-fill script in
+  `deploy.sh`.
+
+**Batch D**
+- Notifications centre: `Notification` model + service/controller/routes;
+  `createNotification` wired into all 7 event sites (invoices incl. bulk,
+  chore approve/reject, maintenance status, application, account approve/
+  deactivate); `NotificationBell` in the dashboard header — unread badge,
+  dropdown history, mark-read / mark-all-read, 45s unread-count poll.
+
+**Skipped** (need external infrastructure): #2 backups, #5 error monitoring,
+#7 password reset, #10 email reliability.
+
+**TypeScript**: 0 errors (frontend + backend) · **Tests**: 46 passing
+
+---
+
+**Document Version**: 2.1
+**Last Updated**: 2026-05-14

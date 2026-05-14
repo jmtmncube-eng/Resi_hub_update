@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { sendEmail } from './email.service';
+import { createNotification } from './notification.service';
 import { persistIfDataUrl, deletePersistedFile } from './storage.service';
 
 export async function getMyDocuments(userId: string) {
@@ -171,6 +172,12 @@ export async function initiateRentInvoice(userId: string, period: string) {
       amount: Number(user.allocation.rent).toLocaleString(),
     },
   }).catch(() => { /* logged inside */ });
+  void createNotification(userId, {
+    type:  'INVOICE',
+    title: `New rent invoice — ${prettyPeriod(period)}`,
+    body:  `R${Number(user.allocation.rent).toLocaleString()} due. Upload your proof of payment.`,
+    link:  '/documents',
+  });
 
   return created;
 }
@@ -260,6 +267,16 @@ export async function bulkCreateInvoices(args: BulkInvoiceArgs): Promise<BulkInv
       });
     }),
   );
+
+  // In-app notification per student. Best-effort — never blocks the run.
+  for (const c of created) {
+    void createNotification(c.userId, {
+      type:  'INVOICE',
+      title: `New rent invoice — ${prettyPeriod(period)}`,
+      body:  `R${Number(c.amount ?? 0).toLocaleString()} due. Upload your proof of payment.`,
+      link:  '/documents',
+    });
+  }
 
   return {
     period,

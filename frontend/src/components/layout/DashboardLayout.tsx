@@ -13,6 +13,7 @@ import { WelcomeTour } from '../WelcomeTour';
 import { UserMenu }    from '../UserMenu';
 import { Brand }       from '../Brand';   // kept — used in the sidebar header
 import { LiveNotifier } from '../LiveNotifier';
+import { NotificationBell } from '../NotificationBell';
 import { IdleLogout }   from '../IdleLogout';
 
 const studentNav = [
@@ -233,8 +234,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          {/* Flex spacer so UserMenu always pins to the right */}
+          {/* Flex spacer so the bell + UserMenu always pin to the right */}
           <div style={{ flex: 1 }} />
+          <NotificationBell />
           <UserMenu />
         </div>
 

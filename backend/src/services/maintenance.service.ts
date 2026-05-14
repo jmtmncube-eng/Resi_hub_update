@@ -58,6 +58,7 @@ export async function updateTicket(id: string, data: UpdateTicketInput) {
   // for note-only tweaks that they don't need to know about.
   if (data.status && data.status !== ticket.status) {
     const { sendEmail } = await import('./email.service');
+    const { createNotification } = await import('./notification.service');
     sendEmail({
       to: ticket.student.email,
       template: 'maintenanceTriaged',
@@ -68,6 +69,12 @@ export async function updateTicket(id: string, data: UpdateTicketInput) {
         adminNote: data.adminNote ?? undefined,
       },
     }).catch(() => { /* logged inside */ });
+    void createNotification(ticket.student.id, {
+      type:  'MAINTENANCE',
+      title: `Ticket ${data.status.replace('_', ' ').toLowerCase()}: ${ticket.category}`,
+      body:  `${ticket.location}${data.adminNote ? ` — ${data.adminNote}` : ''}`,
+      link:  '/maintenance',
+    });
   }
 
   return updated;

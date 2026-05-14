@@ -85,9 +85,10 @@ export async function registerUser(data: RegisterInput) {
 
 async function notifyAdminsOfNewApplicant(applicant: { name: string; email: string }): Promise<void> {
   const { sendEmail } = await import('./email.service');
+  const { notifyMany } = await import('./notification.service');
   const admins = await prisma.user.findMany({
     where:  { role: 'ADMIN', isActive: true },
-    select: { name: true, email: true },
+    select: { id: true, name: true, email: true },
   });
   await Promise.all(admins.map(a =>
     sendEmail({
@@ -96,6 +97,13 @@ async function notifyAdminsOfNewApplicant(applicant: { name: string; email: stri
       data:     { adminName: a.name, applicantName: applicant.name, applicantEmail: applicant.email },
     }),
   ));
+  // Durable in-app notification for every admin.
+  void notifyMany(admins.map(a => a.id), {
+    type:  'APPLICATION',
+    title: `New applicant: ${applicant.name}`,
+    body:  `${applicant.email} is awaiting review.`,
+    link:  '/admin/accounts',
+  });
 }
 
 export async function refreshTokens(token: string) {

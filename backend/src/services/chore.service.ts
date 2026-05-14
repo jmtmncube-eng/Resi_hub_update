@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { earnCredits } from './wallet.service';
 import { sendEmail } from './email.service';
+import { createNotification } from './notification.service';
 import { persistIfDataUrl } from './storage.service';
 
 const APPROVAL_WINDOW_HOURS = 24;
@@ -268,6 +269,12 @@ export async function approveChoreProof(choreId: string, adminId: string) {
       data: { name: student.name, choreName: chore.name, credits: reward },
     }).catch(() => { /* logged inside */ });
   }
+  void createNotification(studentId, {
+    type:  'CHORE_APPROVED',
+    title: `Chore approved: ${chore.name}`,
+    body:  `+${reward} credits added to your wallet.`,
+    link:  '/wallet',
+  });
 
   return prisma.chore.findUnique({ where: { id: choreId } });
 }
@@ -307,6 +314,12 @@ export async function rejectChoreProof(choreId: string, adminId: string, adminNo
       data: { name: student.name, choreName: chore.name, reason: adminNote ?? '' },
     }).catch(() => { /* logged inside */ });
   }
+  void createNotification(studentId, {
+    type:  'CHORE_REJECTED',
+    title: `Chore proof rejected: ${chore.name}`,
+    body:  adminNote ? `Reason: ${adminNote}` : 'Resubmit a clearer photo.',
+    link:  '/housemates',
+  });
 
   return updated;
 }

@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { ensureContractForUser, initiateRentInvoice } from './document.service';
 import { sendEmail } from './email.service';
+import { createNotification } from './notification.service';
 import { createAuditLog } from '../utils/audit.util';
 
 /** Build the YYYY-MM period string for "next month from today". Used so a
@@ -699,6 +700,11 @@ export async function setAccountActive(id: string, isActive: boolean, adminId: s
       template: 'accountDeactivated',
       data:     { name: user.name },
     }).catch(() => { /* logged inside */ });
+    void createNotification(user.id, {
+      type:  'ACCOUNT',
+      title: 'Your account has been deactivated',
+      body:  'Contact management if you think this is a mistake.',
+    });
   }
 
   void createAuditLog({
@@ -749,6 +755,12 @@ export async function approveAccount(id: string) {
     template: 'accountApproved',
     data:     { name: user.name },
   }).catch(() => { /* logged inside sendEmail */ });
+  void createNotification(id, {
+    type:  'ACCOUNT',
+    title: 'Your account has been approved 🎉',
+    body:  'Welcome to ResiHub — your resident dashboard is now live.',
+    link:  '/dashboard',
+  });
 
   // Audit trail
   void createAuditLog({

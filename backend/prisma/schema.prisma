@@ -120,6 +120,20 @@ enum ApplicationStatus {
   REJECTED    // admin rejected (with note)
 }
 
+// Categorises an in-app notification — drives the icon/colour the bell
+// dropdown renders. The notification's `link` is what it navigates to.
+enum NotificationType {
+  INVOICE         // new rent invoice raised
+  CONTRACT        // lease ready to sign
+  CHORE_APPROVED  // chore proof approved → credits awarded
+  CHORE_REJECTED  // chore proof rejected
+  MAINTENANCE     // maintenance ticket status changed
+  APPLICATION     // application submitted / approved / rejected
+  ACCOUNT         // account approved / deactivated
+  ANNOUNCEMENT    // admin posted news
+  GENERAL         // anything else
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MODELS
 // ═══════════════════════════════════════════════════════════════
@@ -161,9 +175,31 @@ model User {
   newsAuthored       News[]
   newsReads          NewsRead[]
   voucherClaims      VoucherClaim[]
+  notifications      Notification[]
 
   @@index([role])
   @@index([email])
+}
+
+// In-app notification — the persistent backbone of the notification
+// centre (the bell dropdown). Created server-side alongside the
+// best-effort emails, so a user always has a durable record even when
+// email delivery is off / they were logged out when it happened.
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType @default(GENERAL)
+  title     String
+  body      String?
+  link      String?          // in-app route to open on click, e.g. "/documents"
+  read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
 
 model Room {

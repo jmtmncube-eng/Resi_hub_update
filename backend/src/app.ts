@@ -23,6 +23,7 @@ import opsRoutes         from './routes/ops.routes';
 import residenceRoutes   from './routes/residence.routes';
 import auditRoutes       from './routes/audit.routes';
 import gateRoutes        from './routes/gate.routes';
+import notificationRoutes from './routes/notification.routes';
 
 const app = express();
 
@@ -114,6 +115,7 @@ app.use('/api/settings',    settingsRoutes);
 app.use('/api/admin/ops',         opsRoutes);
 app.use('/api/admin/residences',  residenceRoutes);
 app.use('/api/admin/audit',       auditRoutes);
+app.use('/api/notifications',     notificationRoutes);
 app.use('/api/gate',              gateRoutes);   // public — QR is the credential
 
 // ── 404 handler ───────────────────────────────────────────────
