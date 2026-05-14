@@ -16,10 +16,17 @@ export async function updateSettings(data: {
   phone?:       string;
   email?:       string;
   description?: string;
+  autoInvoiceEnabled?: boolean;
+  autoInvoiceDay?:     number;
 }) {
+  // Clamp the invoice day to 1–28 so it always lands in every month.
+  const clean = { ...data };
+  if (clean.autoInvoiceDay !== undefined) {
+    clean.autoInvoiceDay = Math.min(Math.max(Math.round(clean.autoInvoiceDay), 1), 28);
+  }
   return prisma.residenceSettings.upsert({
     where:  { id: 'settings' },
-    create: { id: 'settings', ...data },
-    update: data,
+    create: { id: 'settings', ...clean },
+    update: clean,
   });
 }

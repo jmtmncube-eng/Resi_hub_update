@@ -73,6 +73,17 @@ export async function listSubmitted(_req: AuthRequest, res: Response, next: Next
   }
 }
 
+// ── Admin: set a compliance doc's expiry date ──────────────────
+export async function setDocExpiry(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { expiresAt } = req.body as { expiresAt?: string | null };
+    const data = await service.setDocExpiry(req.params.docId, expiresAt ?? null);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Admin: approve / reject ────────────────────────────────────
 export async function decide(req: AuthRequest, res: Response, next: NextFunction) {
   try {

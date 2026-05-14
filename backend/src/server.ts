@@ -3,6 +3,7 @@ dotenv.config();
 
 import app from './app';
 import { PrismaClient } from '@prisma/client';
+import { startCronJobs } from './jobs/cron';
 
 const prisma = new PrismaClient();
 const PORT = parseInt(process.env.PORT || '5000', 10);
@@ -22,6 +23,7 @@ async function bootstrap() {
       console.log(`  ❤️  Health: http://localhost:${PORT}/health`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('');
+      startCronJobs();
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

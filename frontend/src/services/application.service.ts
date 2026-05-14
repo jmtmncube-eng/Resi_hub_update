@@ -24,6 +24,7 @@ export interface ApplicationDocument {
   type:      ApplicationDocType;
   status:    string;
   fileUrl:   string | null;
+  expiresAt: string | null;
   createdAt: string;
 }
 
@@ -130,5 +131,14 @@ export async function getMyApplicationDocs(): Promise<MyDocsByType> {
 /** Upsert a single application doc (admin / student) — replaces prior version of that type. */
 export async function uploadApplicationDoc(type: ApplicationDocType, fileUrl: string): Promise<ApplicationDocument> {
   const res = await api.post<ApiResponse<ApplicationDocument>>('/application/upload-doc', { type, fileUrl });
+  return res.data.data;
+}
+
+/** Admin / manager: set or clear a compliance document's expiry date.
+ *  `expiresAt` as null clears it. */
+export async function setDocExpiry(docId: string, expiresAt: string | null): Promise<ApplicationDocument> {
+  const res = await api.patch<ApiResponse<ApplicationDocument>>(
+    `/application/admin/docs/${docId}/expiry`, { expiresAt },
+  );
   return res.data.data;
 }

@@ -18,7 +18,8 @@ router.get('/my-docs',      ctrl.getMyDocs);
 router.post('/upload-doc',  ctrl.uploadDoc);
 
 // Admin review
-router.get ('/admin/list',       requireRole(...MANAGEMENT), ctrl.listSubmitted);
-router.post('/admin/:id/decide', requireRole(...MANAGEMENT), ctrl.decide);
+router.get ('/admin/list',              requireRole(...MANAGEMENT), ctrl.listSubmitted);
+router.post('/admin/:id/decide',        requireRole(...MANAGEMENT), ctrl.decide);
+router.patch('/admin/docs/:docId/expiry', requireRole(...MANAGEMENT), ctrl.setDocExpiry);
 
 export default router;

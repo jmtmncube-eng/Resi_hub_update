@@ -8,6 +8,7 @@ import {
   ApplicationDocType,
 } from '../services/application.service';
 import { isPdfUrl } from '../utils/fileKind';
+import { expiryState, expiryLabel, expiryColor } from '../utils/expiry';
 
 const DOC_LABELS: Record<ApplicationDocType, { label: string; hint: string }> = {
   ID_DOC:             { label: 'ID document',           hint: 'Front of your SA ID / passport' },
@@ -82,6 +83,7 @@ export default function ComplianceDocsCard() {
               hint={meta.hint}
               fileUrl={doc?.fileUrl ?? null}
               uploadedAt={doc?.createdAt ?? null}
+              expiresAt={doc?.expiresAt ?? null}
               uploading={upload.isPending && upload.variables?.type === type}
               onUpload={(fileUrl) => upload.mutate({ type, fileUrl })}
             />
@@ -92,12 +94,13 @@ export default function ComplianceDocsCard() {
   );
 }
 
-function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }: {
+function DocSlot({ type, label, hint, fileUrl, uploadedAt, expiresAt, uploading, onUpload }: {
   type:       ApplicationDocType;
   label:      string;
   hint:       string;
   fileUrl:    string | null;
   uploadedAt: string | null;
+  expiresAt:  string | null;
   uploading:  boolean;
   onUpload:   (dataUrl: string) => void;
 }) {
@@ -177,11 +180,21 @@ function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }
           </a>
         )}
       </div>
-      <p style={{ fontSize: 10, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginBottom: 10 }}>
+      <p style={{ fontSize: 10, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginBottom: present && expiryState(expiresAt) !== 'none' ? 6 : 10 }}>
         {present
           ? `${isPdf ? 'PDF' : 'Image'} on file · uploaded ${uploadedAt ? new Date(uploadedAt).toLocaleDateString() : '—'}`
           : hint}
       </p>
+
+      {present && expiryState(expiresAt) !== 'none' && (
+        <p style={{
+          fontSize: 10, fontWeight: 700, marginBottom: 10,
+          fontFamily: "'IBM Plex Mono', monospace",
+          color: expiryColor(expiryState(expiresAt)),
+        }}>
+          {expiryLabel(expiresAt)}
+        </p>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <button onClick={() => cameraRef.current?.click()} disabled={uploading} className="press-soft"

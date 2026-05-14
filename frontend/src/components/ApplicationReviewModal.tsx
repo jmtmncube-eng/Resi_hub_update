@@ -5,10 +5,11 @@ import { toast } from 'sonner';
 import { Loader2, Check, X, FileCheck2, ExternalLink } from 'lucide-react';
 import { Modal } from './Modal';
 import {
-  listSubmittedApplications, decideApplication,
+  listSubmittedApplications, decideApplication, setDocExpiry,
   AdminApplicationRow, ApplicationDocType,
 } from '../services/application.service';
 import { isPdfUrl } from '../utils/fileKind';
+import { expiryState, expiryLabel, expiryColor } from '../utils/expiry';
 
 const DOC_LABEL: Record<ApplicationDocType, string> = {
   ID_DOC:             'ID document',
@@ -122,6 +123,9 @@ export default function ApplicationReviewModal({ applicantId, onClose }: Props) 
                          style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                          onClick={() => window.open(d.fileUrl!, '_blank')} />
                   ) : null}
+                  {d && t !== 'SIGNATURE' && (
+                    <DocExpiryEditor docId={d.id} expiresAt={d.expiresAt} />
+                  )}
                 </div>
               );
             })}
@@ -163,5 +167,47 @@ export default function ApplicationReviewModal({ applicantId, onClose }: Props) 
         </>
       )}
     </Modal>
+  );
+}
+
+/** Per-document expiry editor — admin records when a compliance doc
+ *  expires; the backend cron then reminds the resident as it nears. */
+function DocExpiryEditor({ docId, expiresAt }: { docId: string; expiresAt: string | null }) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(expiresAt ? expiresAt.slice(0, 10) : '');
+
+  const save = useMutation({
+    mutationFn: (next: string | null) => setDocExpiry(docId, next),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-applications'] });
+      toast.success('Expiry updated');
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof AxiosError ? err.response?.data?.error : null;
+      toast.error(msg ?? 'Could not update expiry');
+    },
+  });
+
+  const state = expiryState(expiresAt);
+
+  return (
+    <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace" }}>
+        Expiry
+      </span>
+      <input
+        type="date"
+        value={value}
+        disabled={save.isPending}
+        onChange={(e) => { setValue(e.target.value); save.mutate(e.target.value || null); }}
+        className="input-base"
+        style={{ fontSize: 11, padding: '4px 6px' }}
+      />
+      {state !== 'none' && (
+        <span style={{ fontSize: 10, fontWeight: 700, color: expiryColor(state), fontFamily: "'IBM Plex Mono', monospace" }}>
+          {expiryLabel(expiresAt)}
+        </span>
+      )}
+    </div>
   );
 }

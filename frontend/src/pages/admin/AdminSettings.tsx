@@ -37,6 +37,7 @@ const TYPE_COLOR: Record<string, { color: string; bg: string }> = {
 
 const BLANK: Partial<ResidenceSettings> = {
   name: '', tagline: '', address: '', phone: '', email: '', description: '',
+  autoInvoiceEnabled: false, autoInvoiceDay: 1,
 };
 
 interface AdminSettingsProps {
@@ -72,6 +73,8 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
       phone:       form.phone       || undefined,
       email:       form.email       || undefined,
       description: form.description || undefined,
+      autoInvoiceEnabled: form.autoInvoiceEnabled,
+      autoInvoiceDay:     form.autoInvoiceDay,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] });
@@ -337,6 +340,48 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                     value={form.description ?? ''}
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   />
+                </div>
+
+                {/* ── Recurring invoices ───────────────────────────── */}
+                <div style={{
+                  padding: '14px 16px', borderRadius: 10,
+                  background: 'var(--bg3)', border: '1px solid var(--border)',
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!form.autoInvoiceEnabled}
+                      onChange={e => setForm(f => ({ ...f, autoInvoiceEnabled: e.target.checked }))}
+                      style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--cyan)', flexShrink: 0 }}
+                    />
+                    <span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                        Auto-generate monthly rent invoices
+                      </span>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                        Each month a background job raises that month's rent invoice for every active
+                        resident. It skips anyone already invoiced, so it never double-charges.
+                      </span>
+                    </span>
+                  </label>
+                  {form.autoInvoiceEnabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingLeft: 26 }}>
+                      <label className="field-label" style={{ margin: 0 }}>Generate on day</label>
+                      <input
+                        type="number" min={1} max={28}
+                        className="input-base"
+                        style={{ width: 70 }}
+                        value={form.autoInvoiceDay ?? 1}
+                        onChange={e => setForm(f => ({ ...f, autoInvoiceDay: Number(e.target.value) }))}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>of each month (1–28)</span>
+                      {form.autoInvoiceLastRun && (
+                        <span style={{ fontSize: 11, color: 'var(--text4)', marginLeft: 'auto', fontFamily: "'IBM Plex Mono', monospace" }}>
+                          last run: {form.autoInvoiceLastRun}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

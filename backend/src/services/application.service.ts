@@ -47,7 +47,7 @@ export async function getApplicationStatus(userId: string) {
       },
       documents: {
         where: { type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] } },
-        select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
+        select: { id: true, type: true, status: true, fileUrl: true, expiresAt: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
       },
     },
@@ -223,7 +223,7 @@ export function validateDocDataUrl(field: string, raw: unknown): string {
 export async function getMyApplicationDocs(userId: string) {
   const docs = await prisma.document.findMany({
     where: { userId, type: { in: APPLICATION_DOC_TYPES as unknown as ApplicationDocType[] } },
-    select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
+    select: { id: true, type: true, status: true, fileUrl: true, expiresAt: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
   });
   // Group by type so the frontend can quickly see which are missing
@@ -289,11 +289,34 @@ export async function listSubmittedApplications() {
       createdAt:              true,
       documents: {
         where: { type: { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] } },
-        select: { id: true, type: true, fileUrl: true, createdAt: true },
+        select: { id: true, type: true, fileUrl: true, expiresAt: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
       },
     },
     orderBy: { applicationSubmittedAt: 'desc' },
+  });
+}
+
+// ── Compliance-doc expiry (#14) ────────────────────────────────
+// Admin/manager records when a compliance document expires. A daily
+// cron then reminds the student (and admins) as the date approaches.
+// expiresAt = null clears the expiry. Resetting it also clears the
+// reminder throttle so a fresh date re-arms the cron.
+export async function setDocExpiry(docId: string, expiresAt: string | null) {
+  const doc = await prisma.document.findUnique({ where: { id: docId } });
+  if (!doc) throw new AppError('Document not found', 404);
+  if (!APPLICATION_DOC_TYPES.includes(doc.type as ApplicationDocType)) {
+    throw new AppError('Only compliance documents can have an expiry date', 400);
+  }
+  let parsed: Date | null = null;
+  if (expiresAt) {
+    parsed = new Date(expiresAt);
+    if (isNaN(parsed.getTime())) throw new AppError('Invalid expiry date', 400);
+  }
+  return prisma.document.update({
+    where: { id: docId },
+    data:  { expiresAt: parsed, expiryNotifiedAt: null },
+    select: { id: true, type: true, status: true, fileUrl: true, expiresAt: true, createdAt: true },
   });
 }
 

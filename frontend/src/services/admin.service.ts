@@ -348,5 +348,8 @@ export interface ResidenceSettings {
   id: string; name: string; tagline: string | null;
   address: string | null; phone: string | null;
   email: string | null; description: string | null;
+  autoInvoiceEnabled: boolean;
+  autoInvoiceDay: number;
+  autoInvoiceLastRun: string | null;
   updatedAt: string;
 }
