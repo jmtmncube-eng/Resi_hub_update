@@ -11,6 +11,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { formatPeriod, formatRand } from '../../utils/period';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Modal } from '../../components/Modal';
+import { ExportCsvButton } from '../../components/ExportCsvButton';
 
 const PROOF_LABEL: Record<string, string> = {
   SUBMITTED: 'Proof Submitted',
@@ -74,14 +75,17 @@ export default function AdminPayments() {
           <h1 className="page-title">Payments</h1>
           <p className="page-sub">Revenue tracking, proof reviews, and late-payer management</p>
         </div>
-        <button
-          onClick={() => setBulkOpen(true)}
-          className="btn-primary press-soft"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13 }}
-        >
-          <Send size={14} />
-          Generate invoices
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ExportCsvButton type="invoices" />
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="btn-primary press-soft"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13 }}
+          >
+            <Send size={14} />
+            Generate invoices
+          </button>
+        </div>
       </div>
 
       {/* KPI strip */}

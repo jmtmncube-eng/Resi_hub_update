@@ -11,6 +11,7 @@ import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
 import ApplicationReviewModal from '../../components/ApplicationReviewModal';
 import AccountOverviewDrawer from '../../components/AccountOverviewDrawer';
+import { ExportCsvButton } from '../../components/ExportCsvButton';
 import { UserX as UserXIcon } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────
@@ -136,11 +137,14 @@ export default function AdminAccounts() {
   return (
     <div className="space-y-5 appear">
       {/* Header */}
-      <div>
-        <h1 className="page-title">Accounts</h1>
-        <p className="page-sub">
-          {totals.all} total · {totals.active} active · {totals.pending} pending · {totals.staff} staff
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">Accounts</h1>
+          <p className="page-sub">
+            {totals.all} total · {totals.active} active · {totals.pending} pending · {totals.staff} staff
+          </p>
+        </div>
+        <ExportCsvButton type="accounts" />
       </div>
 
       {/* KPI strip */}

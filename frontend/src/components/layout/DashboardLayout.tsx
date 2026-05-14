@@ -14,6 +14,7 @@ import { UserMenu }    from '../UserMenu';
 import { Brand }       from '../Brand';   // kept — used in the sidebar header
 import { LiveNotifier } from '../LiveNotifier';
 import { NotificationBell } from '../NotificationBell';
+import { GlobalSearch } from '../GlobalSearch';
 import { IdleLogout }   from '../IdleLogout';
 
 const studentNav = [
@@ -250,6 +251,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
+          {/* Global search — renders only for management roles */}
+          <GlobalSearch />
           {/* Flex spacer so the bell + UserMenu always pin to the right */}
           <div style={{ flex: 1 }} />
           <NotificationBell />

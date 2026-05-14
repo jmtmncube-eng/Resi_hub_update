@@ -6,6 +6,7 @@ import { getTickets, updateTicket } from '../../services/maintenance.service';
 import type { MaintenanceTicket } from '../../types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
+import { ExportCsvButton } from '../../components/ExportCsvButton';
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN:        'badge-rose',
@@ -82,9 +83,12 @@ export default function AdminMaintenance() {
     <div className="space-y-6 appear">
 
       {/* Header */}
-      <div>
-        <h1 className="page-title">Maintenance</h1>
-        <p className="page-sub">{allTickets.length} tickets total · {countFor(['OPEN', 'IN_PROGRESS'])} need attention</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="page-title">Maintenance</h1>
+          <p className="page-sub">{allTickets.length} tickets total · {countFor(['OPEN', 'IN_PROGRESS'])} need attention</p>
+        </div>
+        <ExportCsvButton type="tickets" />
       </div>
 
       {/* Status tabs */}

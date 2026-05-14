@@ -3,6 +3,7 @@ import { authenticate }  from '../middleware/auth.middleware';
 import { requireRole, MANAGEMENT } from '../middleware/role.middleware';
 import { validate }      from '../middleware/validation.middleware';
 import * as ctrl         from '../controllers/admin.controller';
+import * as searchCtrl   from '../controllers/search.controller';
 import {
   createAllocationSchema,
   updateAllocationSchema,
@@ -57,5 +58,9 @@ router.get('/revenue',        ctrl.getRevenueReport);
 
 // ── Analytics ─────────────────────────────────────────────────
 router.get('/analytics',      ctrl.getAnalytics);
+
+// ── Global search + CSV export ────────────────────────────────
+router.get('/search',         searchCtrl.search);
+router.get('/export/:type',   searchCtrl.exportCsv);
 
 export default router;

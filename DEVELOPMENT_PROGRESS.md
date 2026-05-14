@@ -211,6 +211,7 @@
 | `notifications_center` | `Notification` model + `NotificationType` enum | 2026-05-14 |
 | `staff_roles` | `MANAGER` + `MAINTENANCE` added to `Role` enum | 2026-05-14 |
 | `lease_lifecycle` | Lease fields on `Allocation` + `Inspection` model + `DepositStatus`/`InspectionType` enums | 2026-05-14 |
+| `recurring_invoices_doc_expiry` | Auto-invoice settings + `Document.expiresAt` | 2026-05-14 |
 
 ---
 
@@ -472,6 +473,23 @@
   (read-only + give-notice) and a `LeaseManageModal` from the admin
   account drawer (full lifecycle console). Verified end-to-end.
 
+**Batch F**
+- #13 Recurring invoices: a daily node-cron (02:00) raises the month's
+  rent invoices on a configurable day when enabled in residence
+  settings. Idempotent twice over (per-student + per-month markers).
+- #14 Compliance-doc expiry: `Document.expiresAt` + the same cron warns
+  residents/admins about docs expiring within 30 days; a management-only
+  endpoint sets expiry; ApplicationReviewModal + ComplianceDocsCard
+  surface it.
+- #15 Analytics: GET /admin/analytics computes 6-month trends from
+  existing rows (rent billed vs collected, tickets, new residents) +
+  a snapshot; AnalyticsSection on the Admin Overview with CSS bar charts.
+  Also fixed the seed's invoice period format to "YYYY-MM".
+- #16 Global search + CSV export: GET /admin/search spans residents,
+  rooms, invoices, tickets — a debounced GlobalSearch box in the topbar
+  (management only). GET /admin/export/:type streams RFC-4180 CSV;
+  Export buttons on the Accounts, Payments and Maintenance pages.
+
 **Skipped** (need external infrastructure): #2 backups, #5 error monitoring,
 #7 password reset, #10 email reliability.
 
@@ -479,5 +497,5 @@
 
 ---
 
-**Document Version**: 2.2
+**Document Version**: 2.3
 **Last Updated**: 2026-05-14
