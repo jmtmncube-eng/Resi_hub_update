@@ -210,6 +210,7 @@
 | `batch_a_reconcile` | Capture schema drift from the db-push era | 2026-05-14 |
 | `notifications_center` | `Notification` model + `NotificationType` enum | 2026-05-14 |
 | `staff_roles` | `MANAGER` + `MAINTENANCE` added to `Role` enum | 2026-05-14 |
+| `lease_lifecycle` | Lease fields on `Allocation` + `Inspection` model + `DepositStatus`/`InspectionType` enums | 2026-05-14 |
 
 ---
 
@@ -459,6 +460,18 @@
   per-role nav + route guards, role assignment on the Accounts page
   (admin-only). Verified end-to-end — every permission boundary holds.
 
+**Batch E**
+- #12 Lease lifecycle: the lease now lives on the `Allocation` (term
+  dates, deposit amount/status/refund, notice + move-out tracking) plus a
+  new `Inspection` model (move-in / routine / move-out, condition, notes,
+  photos). `lease.service.ts` owns every transition — set terms, record
+  deposit, renew, give notice, schedule move-out, complete move-out
+  (frees the room), refund deposit, log inspections — with notifications
+  on the tenant-visible ones. New `/api/lease` routes (student reads own;
+  management mutates). Frontend: `MyLeaseCard` on the student Profile
+  (read-only + give-notice) and a `LeaseManageModal` from the admin
+  account drawer (full lifecycle console). Verified end-to-end.
+
 **Skipped** (need external infrastructure): #2 backups, #5 error monitoring,
 #7 password reset, #10 email reliability.
 
@@ -466,5 +479,5 @@
 
 ---
 
-**Document Version**: 2.1
+**Document Version**: 2.2
 **Last Updated**: 2026-05-14

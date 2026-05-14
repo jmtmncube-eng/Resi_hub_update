@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   X, Loader2, Home, Wallet, Wrench,
-  FileText, BadgeCheck, AlertCircle, Phone, Mail,
+  FileText, BadgeCheck, AlertCircle, Phone, Mail, ScrollText,
 } from 'lucide-react';
 import { getAccountOverview, AccountOverview } from '../services/admin.service';
+import LeaseManageModal from './LeaseManageModal';
 
 const ROLE_BADGE: Record<string, string> = {
   ADMIN:           'badge-rose',
@@ -97,6 +98,7 @@ export default function AccountOverviewDrawer({ accountId, onClose }: Props) {
 
 function DrawerBody({ data }: { data: AccountOverview }) {
   const appTone = APPLICATION_TONE[data.applicationStatus];
+  const [leaseOpen, setLeaseOpen] = useState(false);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -178,11 +180,28 @@ function DrawerBody({ data }: { data: AccountOverview }) {
               <Mini label="Balance"   value={fmtR(data.allocation.balance)} hint={Number(data.allocation.balance) > 0 ? 'outstanding' : 'all clear'} accent={Number(data.allocation.balance) > 0 ? 'rose' : 'green'} />
               <Mini label="Move-in"   value={data.allocation.moveIn ? new Date(data.allocation.moveIn).toLocaleDateString() : '—'} hint="" />
             </div>
+            <button
+              onClick={() => setLeaseOpen(true)}
+              className="press-soft"
+              style={{
+                marginTop: 12, width: '100%', padding: '9px 0', borderRadius: 8,
+                background: 'rgba(0,204,204,.08)', color: 'var(--cyan)',
+                border: '1px solid rgba(0,204,204,.25)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              <ScrollText size={13} /> Manage lease
+            </button>
           </div>
         ) : (
           <Empty>No room allocated yet.</Empty>
         )}
       </Section>
+
+      {leaseOpen && data.allocation && (
+        <LeaseManageModal allocationId={data.allocation.id} onClose={() => setLeaseOpen(false)} />
+      )}
 
       {/* Application — only relevant for pending students */}
       {data.role === 'PENDING_STUDENT' && (

@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import ComplianceDocsCard from '../../components/ComplianceDocsCard';
 import LeaseDocsCard from '../../components/LeaseDocsCard';
+import MyLeaseCard from '../../components/MyLeaseCard';
 
 const ACCEPTED_AVATAR = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -205,7 +206,8 @@ export default function Profile() {
 
       {/* Personal paperwork — students only; admins skip these cards.
           Sits below identity + details so the page reads top-down:
-          who you are → your details → your room → your documents. */}
+          who you are → your details → your room → your lease → your documents. */}
+      {!isAdmin && <MyLeaseCard />}
       {!isAdmin && <LeaseDocsCard />}
       {!isAdmin && <ComplianceDocsCard />}
     </div>

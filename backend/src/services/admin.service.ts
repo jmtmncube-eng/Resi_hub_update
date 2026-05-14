@@ -159,8 +159,9 @@ const TYPE_CAPACITY: Record<string, number> = {
 /** Recompute a room's status from its current allocations.
  *  - All slots filled with ACTIVE  → OCCUPIED
  *  - Any allocation present (ACTIVE or RESERVED) but slots remain → RESERVED
- *  - No active or reserved allocations → VACANT */
-async function recomputeRoomStatus(roomId: string): Promise<void> {
+ *  - No active or reserved allocations → VACANT
+ *  Exported so the lease service can free a room on move-out. */
+export async function recomputeRoomStatus(roomId: string): Promise<void> {
   const room = await prisma.room.findUnique({
     where: { id: roomId },
     include: {

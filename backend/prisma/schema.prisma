@@ -46,6 +46,21 @@ enum AllocationStatus {
   ENDED
 }
 
+// Where a tenant's security deposit stands in the lease lifecycle.
+enum DepositStatus {
+  NONE                // no deposit recorded yet
+  HELD                // deposit paid and held by the residence
+  PARTIALLY_REFUNDED  // some withheld (damages, cleaning), rest returned
+  REFUNDED            // fully returned at move-out
+}
+
+// Inspection points in the lease lifecycle.
+enum InspectionType {
+  MOVE_IN
+  ROUTINE
+  MOVE_OUT
+}
+
 enum Priority {
   LOW
   NORMAL
@@ -236,15 +251,47 @@ model Allocation {
   /// True = tenant tops up their own prepaid meter / smart electricity account.
   /// False (default) = admin buys electricity in bulk for the residence and bills back.
   electricitySelfManaged Boolean @default(false)
+
+  // ── Lease lifecycle ──────────────────────────────────────────
+  leaseStart        DateTime?              // start of the current lease term
+  leaseEnd          DateTime?              // end of the current lease term
+  depositAmount     Decimal?      @db.Decimal(10, 2)
+  depositStatus     DepositStatus @default(NONE)
+  depositRefunded   Decimal?      @db.Decimal(10, 2)  // amount returned at move-out
+  depositNote       String?                            // e.g. "R500 withheld — carpet cleaning"
+  noticeGivenAt     DateTime?              // when the tenant gave notice to vacate
+  moveOutDate       DateTime?              // scheduled move-out date
+  moveOutCompletedAt DateTime?             // set when move-out is actually completed
+
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  room Room @relation(fields: [roomId], references: [id])
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room        Room         @relation(fields: [roomId], references: [id])
+  inspections Inspection[]
 
   @@index([roomId])
   @@index([status])
+}
+
+// A room-condition inspection tied to an allocation — move-in, routine,
+// or move-out. Photos are stored on disk via storage.service.ts; the row
+// holds the public /api/uploads/... URLs.
+model Inspection {
+  id           String         @id @default(cuid())
+  allocationId String
+  type         InspectionType
+  inspectedAt  DateTime       @default(now())
+  condition    String                          // "Good" | "Fair" | "Poor" — free text, kept simple
+  notes        String?
+  photoUrls    String[]       @default([])
+  inspectorId  String?                          // staff member who carried it out
+  createdAt    DateTime       @default(now())
+
+  allocation Allocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+
+  @@index([allocationId])
 }
 
 model MaintenanceTicket {
