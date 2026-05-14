@@ -41,14 +41,27 @@ const authLimiter = rateLimit({
   message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
-/** Global per-IP fail-safe — protects the DB from a misbehaving frontend
- *  (infinite re-render loop, broken polling) hammering an endpoint. Real
- *  abuse should still hit the dedicated authLimiter on /api/auth. */
+/** Global per-IP fail-safe for ANONYMOUS traffic only.
+ *
+ *  Signed-in users (every request carries an Authorization: Bearer header)
+ *  are skipped entirely — no caps, no throttling, unlimited access. The
+ *  cap only applies to unauthenticated requests (login, register, token
+ *  refresh, public gate scan) to blunt brute-force / scraping. Even if a
+ *  bad actor sends a fake Bearer header to dodge this, the route's own
+ *  `authenticate` middleware still rejects them with 401.
+ *
+ *  Dedicated brute-force protection on the login endpoint lives in
+ *  authLimiter (applied inside auth.routes) and is intentionally NOT
+ *  skipped — that one guards the not-yet-signed-in path. */
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,    // 1 minute
-  max:      600,          // 10 req/sec sustained — generous for legit use
+  max:      600,          // generous ceiling for anonymous traffic
   standardHeaders: true,
   legacyHeaders:   false,
+  skip: (req) => {
+    const auth = req.headers.authorization;
+    return typeof auth === 'string' && auth.startsWith('Bearer ');
+  },
   message: { success: false, error: 'Too many requests in a short time. Slow down.' },
 });
 app.use('/api', globalLimiter);
