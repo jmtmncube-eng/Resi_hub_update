@@ -7,6 +7,14 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# Vite inlines env vars at BUILD time — they must be present before
+# `npm run build`, not at container runtime. docker-compose.prod.yml
+# passes these as build args (sourced from .env).
+ARG VITE_API_BASE_URL=/api
+ARG VITE_APP_NAME=ResiHub
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_APP_NAME=$VITE_APP_NAME
 RUN npm run build
 
 # ── Nginx serving production build ───────────

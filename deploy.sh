@@ -9,11 +9,11 @@
 #
 #  This is the ONLY command you need on the VPS. It:
 #    1. pulls the latest code (hard reset to origin/main)
-#    2. makes sure .env exists with the VPS-correct settings
+#    2. ensures .env exists — generates strong JWT secrets on first run
 #    3. rebuilds the Docker images from scratch (--no-cache)
 #    4. recreates the containers
 #    5. waits for the backend to come up healthy
-#    6. applies the Prisma schema
+#    6. applies database migrations (baselines an existing DB first)
 #    7. optionally reseeds (SEED=1 only)
 #    8. reloads nginx
 #
@@ -36,6 +36,12 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+# Production override: every `docker compose` call below automatically
+# layers docker-compose.prod.yml on top (static nginx frontend build
+# instead of the Vite dev server). Local dev keeps using plain
+# `docker compose up` with just the base file.
+export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+
 # ── 1. Sync code ───────────────────────────────────────────────
 echo ""
 echo "[1/7] Pulling latest code…"
@@ -43,21 +49,38 @@ git fetch origin
 git reset --hard origin/main      # discard any stray local edits on the VPS
 echo "      -> $(git log -1 --oneline)"
 
-# ── 2. Ensure .env (VPS-correct defaults; never clobbers existing) ──
-# The VPS already runs other apps on :3000, so the frontend is exposed
-# on :3001 and nginx proxies /api/ to the backend (hence VITE_API_BASE_URL=/api).
-# If you ever change these, edit .env directly — this block won't overwrite it.
+# ── 2. Ensure .env (secrets + VPS settings; never clobbers existing) ──
+# Strong JWT secrets are GENERATED here on first run and then persisted —
+# they never get committed (.env is gitignored) and never get overwritten
+# (rotating them would log every user out). Plain settings are backfilled
+# only if absent, so hand-edits to .env always win.
 echo ""
-echo "[2/7] Checking .env…"
-if [ ! -f .env ]; then
-  printf 'FRONTEND_PORT=3001\nVITE_API_BASE_URL=/api\n' > .env
-  echo "      -> created .env (FRONTEND_PORT=3001, VITE_API_BASE_URL=/api)"
-else
-  # Backfill any missing keys without touching what's already set.
-  grep -q '^FRONTEND_PORT='     .env || { echo 'FRONTEND_PORT=3001'    >> .env; echo "      -> added FRONTEND_PORT=3001"; }
-  grep -q '^VITE_API_BASE_URL=' .env || { echo 'VITE_API_BASE_URL=/api' >> .env; echo "      -> added VITE_API_BASE_URL=/api"; }
-  echo "      -> .env present"
-fi
+echo "[2/7] Ensuring .env (secrets + settings)…"
+touch .env
+
+# Backfill KEY=VALUE only when KEY is absent.
+ensure_env() {
+  grep -q "^$1=" .env || { printf '%s=%s\n' "$1" "$2" >> .env; echo "      + $1"; }
+}
+# A secret counts as "set" only if it has a non-empty value — covers the
+# case where .env was copied from .env.example with the keys left blank.
+ensure_secret() {
+  grep -q "^$1=..*" .env || {
+    printf '%s=%s\n' "$1" "$(openssl rand -hex 32)" >> .env
+    echo "      + $1 (generated)"
+  }
+}
+
+ensure_secret JWT_SECRET
+ensure_secret JWT_REFRESH_SECRET
+ensure_env    JWT_EXPIRES_IN         24h
+ensure_env    JWT_REFRESH_EXPIRES_IN 7d
+ensure_env    NODE_ENV               production
+ensure_env    FRONTEND_URL           https://resihub.athera.co.za
+ensure_env    FRONTEND_PORT          3001
+ensure_env    VITE_API_BASE_URL      /api
+chmod 600 .env 2>/dev/null || true
+echo "      -> .env ready (chmod 600)"
 
 # ── 3. Rebuild images (no cache, no shortcuts) ────────────────
 echo ""
@@ -95,16 +118,30 @@ if [ "$BACKEND_UP" != "1" ]; then
   echo "        If the next steps fail, check: docker compose logs --tail=50 backend"
 fi
 
-# ── 6. Apply schema (idempotent — safe to run every deploy) ───
-# Retry once: if the backend was still finishing its compile during the
-# wait above, the first prisma call can race it — a single retry covers it.
+# ── 6. Apply database migrations ──────────────────────────────
+# Versioned migrations replaced `db push --accept-data-loss` — db push
+# silently drops a column the day a schema change isn't purely additive.
+#
+# An EXISTING database (from the old db-push era) already has every
+# table, so `migrate deploy` would error trying to re-create them. We
+# baseline it first: mark every migration as already-applied (resolve
+# --applied is harmless if it's genuinely already recorded — we swallow
+# that error). A FRESH empty database has no "User" table → we skip
+# baselining and `migrate deploy` builds the whole schema from scratch.
 echo ""
-echo "[6/7] Applying Prisma schema…"
-if ! docker compose exec -T backend npx prisma db push --accept-data-loss; then
-  echo "      first attempt failed — waiting 15s and retrying once…"
-  sleep 15
-  docker compose exec -T backend npx prisma db push --accept-data-loss
+echo "[6/7] Applying database migrations…"
+HAS_USER=$(docker compose exec -T postgres psql -U resihub -d resihub_db -tAc \
+  "SELECT to_regclass('public.\"User\"') IS NOT NULL;" 2>/dev/null | tr -d '[:space:]')
+if [ "$HAS_USER" = "t" ]; then
+  echo "      existing schema detected — baselining migration history…"
+  for m in $(docker compose exec -T backend sh -c 'ls prisma/migrations 2>/dev/null' | grep -E '^[0-9]' | tr -d '\r'); do
+    docker compose exec -T backend npx prisma migrate resolve --applied "$m" >/dev/null 2>&1 || true
+  done
+  echo "      -> baselined"
 fi
+docker compose exec -T backend npx prisma migrate deploy
+# Regenerate the Prisma client in case the migrations advanced the schema.
+docker compose exec -T backend npx prisma generate >/dev/null 2>&1 || true
 
 # ── 7. Reseed (only if SEED=1 passed) ─────────────────────────
 # seed.ts has a FORCE_SEED guard that refuses to wipe a non-empty DB.

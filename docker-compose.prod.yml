@@ -1,38 +1,38 @@
-version: '3.8'
-
-# Production Docker Compose
-# Usage: docker-compose -f docker-compose.prod.yml up -d
-
+# ============================================================
+#  Production override — layered ON TOP of docker-compose.yml
+# ============================================================
+#  This is NOT a standalone compose file. It only contains the deltas
+#  that differ from the base (dev) compose. deploy.sh applies it
+#  automatically via COMPOSE_FILE; to run it by hand:
+#
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+#  What it changes vs the base:
+#    • frontend: Vite dev server  →  static production build served by
+#      nginx. Far faster page loads, and free of the dev-mode HMR /
+#      rate-limit fragility we used to fight on the VPS.
+#
+#  Everything else (backend, postgres, container names, the loopback
+#  port bindings, volumes) is inherited unchanged from docker-compose.yml.
+#  The backend stays on ts-node for now — its own prod build is a
+#  separate follow-up; it has the slow-compile cost but none of the
+#  HMR / rate-limit issues the frontend dev server had.
+# ============================================================
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend.prod
-    container_name: resihub-backend-prod
-    restart: always
-    env_file:
-      - ./backend/.env
-    ports:
-      - "5000:5000"
-    volumes:
-      - backend_uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   frontend:
     build:
       context: ./frontend
       dockerfile: ../docker/Dockerfile.frontend.prod
-    container_name: resihub-frontend-prod
-    restart: always
+      args:
+        # Vite inlines these at build time — sourced from .env.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_APP_NAME: ResiHub
+    # The prod image is nginx:alpine serving the pre-built SPA. The base
+    # compose has no frontend command/ports/volumes (those live in the
+    # override files), so there's nothing to fight — we just supply the
+    # prod values here. deploy.sh sets COMPOSE_FILE explicitly, which
+    # stops docker-compose.override.yml (the dev config) from loading.
+    command: ["nginx", "-g", "daemon off;"]
+    # Prod image listens on :80 (nginx), not :3000 (Vite dev server).
     ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - backend
-
-volumes:
-  backend_uploads:
+      - "${FRONTEND_PORT:-3001}:80"

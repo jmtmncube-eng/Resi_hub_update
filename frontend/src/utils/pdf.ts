@@ -483,7 +483,7 @@ export function downloadHealthReportPdf(data: HealthReportData): void {
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: CYAN, textColor: '#FFFFFF', fontStyle: 'bold' },
       didParseCell: (cell) => {
-        if (cell.section === 'body' && cell.column.index === 3 && cell.row.raw[3] === 'LOW') {
+        if (cell.section === 'body' && cell.column.index === 3 && (cell.row.raw as unknown as string[])[3] === 'LOW') {
           cell.cell.styles.textColor = ROSE; cell.cell.styles.fontStyle = 'bold';
         }
       },

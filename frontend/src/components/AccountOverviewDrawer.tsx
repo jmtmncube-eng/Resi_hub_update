@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  X, Loader2, Home, Wallet, Wrench, Users as UsersIcon,
-  FileText, CalendarDays, BadgeCheck, AlertCircle, Phone, Mail,
+  X, Loader2, Home, Wallet, Wrench,
+  FileText, BadgeCheck, AlertCircle, Phone, Mail,
 } from 'lucide-react';
 import { getAccountOverview, AccountOverview } from '../services/admin.service';
 

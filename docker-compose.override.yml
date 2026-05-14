@@ -1,0 +1,23 @@
+# ============================================================
+#  Local dev override — AUTO-LOADED by `docker compose`
+# ============================================================
+#  Docker Compose automatically merges docker-compose.override.yml on
+#  top of docker-compose.yml for any plain `docker compose ...` command.
+#  So local development is just:
+#
+#      docker compose up -d
+#
+#  This file runs the frontend as the Vite dev server (HMR, fast
+#  iteration). deploy.sh sets COMPOSE_FILE explicitly on the VPS, which
+#  DISABLES this auto-load — production uses docker-compose.prod.yml
+#  instead (static nginx build).
+# ============================================================
+services:
+  frontend:
+    # Vite dev server — hot reload, source bind-mounted in.
+    command: npm run dev
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules

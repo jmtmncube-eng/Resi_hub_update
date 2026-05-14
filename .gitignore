@@ -51,3 +51,9 @@ coverage/
 
 # ── Vite ──────────────────────────────────────────────────────
 .vite/
+
+# ── Claude Code (local agent state) ───────────────────────────
+.claude/
+
+# ── Windows null-device artifact ──────────────────────────────
+nul
