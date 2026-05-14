@@ -103,18 +103,46 @@ function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef   = useRef<HTMLInputElement>(null);
 
+  const ALLOWED = type === 'SIGNATURE'
+    ? ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    : ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { toast.error('Max 5 MB'); return; }
+    if (f.size > 5 * 1024 * 1024) {
+      toast.error(`${label} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
+      e.target.value = '';
+      return;
+    }
+    // Guard the MIME up front so the user gets instant feedback instead
+    // of a round-trip rejection from the server.
+    if (f.type && !ALLOWED.includes(f.type)) {
+      toast.error(
+        type === 'SIGNATURE'
+          ? 'Signature must be an image (PNG, JPG, WEBP, GIF).'
+          : 'Upload a PDF or image (PNG, JPG, WEBP, GIF).',
+      );
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = re => onUpload(re.target?.result as string);
+    reader.onerror = () => toast.error(`Couldn't read ${label} — try another file.`);
+    reader.onload  = re => {
+      const result = re.target?.result;
+      if (typeof result === 'string' && result.startsWith('data:')) {
+        onUpload(result);
+      } else {
+        toast.error(`Couldn't read ${label} — try another file.`);
+      }
+    };
     reader.readAsDataURL(f);
     e.target.value = '';
   }
 
   const present = !!fileUrl;
-  const accept = type === 'SIGNATURE' ? 'image/*' : 'image/*,application/pdf';
+  const isPdf   = !!fileUrl && fileUrl.startsWith('data:application/pdf');
+  const accept  = type === 'SIGNATURE' ? 'image/*' : 'image/*,application/pdf';
 
   return (
     <div style={{
@@ -130,8 +158,19 @@ function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }
           ? <CheckCircle2 size={14} style={{ color: '#4ade80' }} />
           : <AlertCircle  size={14} style={{ color: '#f59e0b' }} />}
         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1 }}>{label}</p>
+        {present && (
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fontWeight: 700,
+            padding: '1px 6px', borderRadius: 4,
+            background: isPdf ? 'rgba(232,25,122,.12)' : 'rgba(0,204,204,.12)',
+            color:      isPdf ? 'var(--rose)' : 'var(--cyan)',
+            letterSpacing: '.05em',
+          }}>
+            {isPdf ? 'PDF' : 'IMG'}
+          </span>
+        )}
         {present && fileUrl && (
-          <a href={fileUrl} target="_blank" rel="noreferrer" title="Open"
+          <a href={fileUrl} target="_blank" rel="noreferrer" title="Open file in a new tab"
              style={{ color: 'var(--cyan)', display: 'flex', alignItems: 'center' }}>
             <ExternalLink size={11} />
           </a>
@@ -139,7 +178,7 @@ function DocSlot({ type, label, hint, fileUrl, uploadedAt, uploading, onUpload }
       </div>
       <p style={{ fontSize: 10, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace", marginBottom: 10 }}>
         {present
-          ? `Uploaded ${uploadedAt ? new Date(uploadedAt).toLocaleDateString() : '—'}`
+          ? `${isPdf ? 'PDF' : 'Image'} on file · uploaded ${uploadedAt ? new Date(uploadedAt).toLocaleDateString() : '—'}`
           : hint}
       </p>
 

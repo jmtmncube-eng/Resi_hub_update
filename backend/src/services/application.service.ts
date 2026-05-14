@@ -74,15 +74,12 @@ export async function submitApplication(userId: string, payload: {
   if (!/^\d{13}$/.test(idNumber)) {
     throw new AppError('ID number must be exactly 13 digits.', 400);
   }
-  for (const [field, val] of Object.entries({ idDocUrl, regProofUrl, fundingProofUrl, signatureDataUrl })) {
-    if (!val || typeof val !== 'string' || !val.startsWith('data:')) {
-      throw new AppError(`${field} is required and must be a data URL.`, 400);
-    }
-    // Cap at ~6.5 MB base64 (~5 MB raw)
-    if (val.length > 6_500_000) {
-      throw new AppError(`${field} is too large (max 5 MB).`, 400);
-    }
-  }
+  // Validate + normalise each uploaded file (MIME whitelist, base64
+  // integrity, size cap, magic-byte check). Throws AppError on any issue.
+  const idDoc       = validateDocDataUrl('ID document',           idDocUrl);
+  const regProof    = validateDocDataUrl('Proof of registration', regProofUrl);
+  const fundingProof = validateDocDataUrl('Proof of funding',     fundingProofUrl);
+  const signature   = validateDocDataUrl('Signature',            signatureDataUrl);
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user)                              throw new AppError('User not found', 404);
@@ -102,10 +99,10 @@ export async function submitApplication(userId: string, payload: {
   const period = `Application ${new Date().getFullYear()}`;
 
   await prisma.$transaction([
-    prisma.document.create({ data: { userId, type: 'ID_DOC',             period, status: 'Submitted', fileUrl: idDocUrl } }),
-    prisma.document.create({ data: { userId, type: 'PROOF_REGISTRATION', period, status: 'Submitted', fileUrl: regProofUrl } }),
-    prisma.document.create({ data: { userId, type: 'PROOF_FUNDING',      period, status: 'Submitted', fileUrl: fundingProofUrl } }),
-    prisma.document.create({ data: { userId, type: 'SIGNATURE',          period, status: 'Submitted', fileUrl: signatureDataUrl } }),
+    prisma.document.create({ data: { userId, type: 'ID_DOC',             period, status: 'Submitted', fileUrl: idDoc } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_REGISTRATION', period, status: 'Submitted', fileUrl: regProof } }),
+    prisma.document.create({ data: { userId, type: 'PROOF_FUNDING',      period, status: 'Submitted', fileUrl: fundingProof } }),
+    prisma.document.create({ data: { userId, type: 'SIGNATURE',          period, status: 'Submitted', fileUrl: signature } }),
     prisma.user.update({
       where: { id: userId },
       data: {
@@ -131,6 +128,76 @@ export async function submitApplication(userId: string, payload: {
 const APPLICATION_DOC_TYPES = ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] as const;
 type ApplicationDocType = typeof APPLICATION_DOC_TYPES[number];
 
+// ── Uploaded-file (data URL) hardening ─────────────────────────
+// Compliance docs come in as base64 data URLs. Base64 is lossless so
+// storage never corrupts the file — but we still validate hard on the
+// way in: whitelist the MIME, prove the base64 decodes cleanly (catches
+// truncated / malformed uploads), enforce the size cap, and sanity-check
+// the file's magic bytes so a renamed / spoofed file is rejected.
+
+const ALLOWED_DOC_MIME = new Set([
+  'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+  'application/pdf',
+]);
+const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB raw — matches the frontend limit
+
+/**
+ * Validate a base64 data URL for a compliance document.
+ * Returns the (trimmed) data URL unchanged on success; throws AppError otherwise.
+ */
+function validateDocDataUrl(field: string, raw: unknown): string {
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new AppError(`${field} is required.`, 400);
+  }
+  const val = raw.trim();
+  // Strict shape:  data:<mime>;base64,<payload>
+  const match = /^data:([a-zA-Z0-9/+.\-]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(val);
+  if (!match) {
+    throw new AppError(`${field} must be an uploaded file (PDF or image).`, 400);
+  }
+  const mime = match[1].toLowerCase();
+  const b64  = match[2].replace(/\s/g, '');
+
+  if (!ALLOWED_DOC_MIME.has(mime)) {
+    throw new AppError(`${field} must be a PDF or image (PNG, JPG, WEBP, GIF) — got "${mime}".`, 400);
+  }
+
+  // Decode + integrity check. Base64 of N bytes is deterministic, so
+  // re-encoding the decoded buffer must match the original payload —
+  // any mismatch means the upload was truncated or tampered with.
+  const bytes = Buffer.from(b64, 'base64');
+  if (bytes.length === 0 || bytes.toString('base64') !== b64) {
+    throw new AppError(`${field} looks truncated or corrupted — please re-upload.`, 400);
+  }
+  if (bytes.length > MAX_DOC_BYTES) {
+    throw new AppError(
+      `${field} is too large (${(bytes.length / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`,
+      400,
+    );
+  }
+
+  // Magic-byte sanity check — rejects a file whose real type doesn't
+  // match its declared MIME (e.g. an .exe renamed to .pdf).
+  const head = bytes.subarray(0, 12);
+  if (mime === 'application/pdf') {
+    if (head.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      throw new AppError(`${field} is not a valid PDF file.`, 400);
+    }
+  } else {
+    // Image magic bytes
+    const isPng  = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+    const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+    const isGif  = head.subarray(0, 3).toString('latin1') === 'GIF';
+    const isWebp = head.subarray(0, 4).toString('latin1') === 'RIFF'
+                && head.subarray(8, 12).toString('latin1') === 'WEBP';
+    if (!isPng && !isJpeg && !isGif && !isWebp) {
+      throw new AppError(`${field} is not a valid image file.`, 400);
+    }
+  }
+
+  return val;
+}
+
 export async function getMyApplicationDocs(userId: string) {
   const docs = await prisma.document.findMany({
     where: { userId, type: { in: APPLICATION_DOC_TYPES as unknown as ApplicationDocType[] } },
@@ -152,18 +219,19 @@ export async function uploadApplicationDoc(userId: string, type: string, fileUrl
   if (!APPLICATION_DOC_TYPES.includes(type as ApplicationDocType)) {
     throw new AppError(`Unknown document type: ${type}`, 400);
   }
-  if (!fileUrl || typeof fileUrl !== 'string' || !fileUrl.startsWith('data:')) {
-    throw new AppError('fileUrl must be a data URL', 400);
-  }
-  if (fileUrl.length > 6_500_000) {
-    throw new AppError('File is too large (max 5 MB).', 400);
+  // Signatures are always images (drawn on a canvas); ID / proofs may be
+  // PDF or image. validateDocDataUrl whitelists both, so a single call
+  // covers it — but reject a PDF for the signature slot explicitly.
+  const validated = validateDocDataUrl('File', fileUrl);
+  if (type === 'SIGNATURE' && validated.startsWith('data:application/pdf')) {
+    throw new AppError('Signature must be an image, not a PDF.', 400);
   }
 
   // Upsert: replace any prior doc of this type, keep history light.
   await prisma.document.deleteMany({ where: { userId, type: type as ApplicationDocType } });
   const period = `Compliance ${new Date().getFullYear()}`;
   return prisma.document.create({
-    data: { userId, type: type as ApplicationDocType, period, status: 'Submitted', fileUrl },
+    data: { userId, type: type as ApplicationDocType, period, status: 'Submitted', fileUrl: validated },
     select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
   });
 }

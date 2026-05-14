@@ -19,15 +19,31 @@ function UploadTile({ label, hint, value, onChange, accent = 'cyan' }: {
   const accentColor = accent === 'cyan' ? 'var(--cyan)' : accent === 'rose' ? 'var(--rose)' : '#f59e0b';
   const accentRgba  = accent === 'cyan' ? '0,204,204'   : accent === 'rose' ? '232,25,122'  : '245,158,11';
 
+  const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error(`${label} must be under 5 MB`);
+      toast.error(`${label} is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
+      e.target.value = '';
+      return;
+    }
+    if (file.type && !ALLOWED_MIME.includes(file.type)) {
+      toast.error(`${label} must be a PDF or image (PNG, JPG, WEBP, GIF).`);
+      e.target.value = '';
       return;
     }
     const reader = new FileReader();
-    reader.onload = re => onChange(re.target?.result as string);
+    reader.onerror = () => toast.error(`Couldn't read ${label} — try another file.`);
+    reader.onload  = re => {
+      const result = re.target?.result;
+      if (typeof result === 'string' && result.startsWith('data:')) {
+        onChange(result);
+      } else {
+        toast.error(`Couldn't read ${label} — try another file.`);
+      }
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
   }

@@ -67,8 +67,12 @@ const globalLimiter = rateLimit({
 app.use('/api', globalLimiter);
 
 // ── Body parsing ───────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 35mb ceiling: an application submit carries 4 compliance docs as
+// base64 data URLs. Each file is capped at 5 MB raw (~6.85 MB base64),
+// so a worst-case 4-file submit is ~27 MB + JSON overhead. 35mb gives
+// headroom without being reckless. Single-file endpoints are far under.
+app.use(express.json({ limit: '35mb' }));
+app.use(express.urlencoded({ extended: true, limit: '35mb' }));
 
 // ── Static file serving (local uploads) ───────────────────────
 // Served at BOTH paths:
