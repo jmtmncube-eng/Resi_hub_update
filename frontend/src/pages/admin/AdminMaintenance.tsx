@@ -128,7 +128,17 @@ export default function AdminMaintenance() {
           <h1 className="page-title">Maintenance</h1>
           <p className="page-sub">{allTickets.length} tickets total · {countFor(['OPEN', 'IN_PROGRESS'])} need attention</p>
         </div>
-        <ExportCsvButton type="tickets" />
+        {/* Pass current page state. `tab` is one of the status keys
+            (OPEN_GROUP collapses OPEN + IN_PROGRESS, ALL = no filter);
+            priority + free-text search are forwarded as-is. */}
+        <ExportCsvButton
+          type="tickets"
+          filters={{
+            q:        search || undefined,
+            status:   tab === 'ALL' ? undefined : tab,
+            priority: priorityFilter !== 'ALL' ? priorityFilter : undefined,
+          }}
+        />
       </div>
 
       {/* Status tabs */}

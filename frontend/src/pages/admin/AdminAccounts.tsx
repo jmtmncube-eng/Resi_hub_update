@@ -205,7 +205,17 @@ export default function AdminAccounts() {
             <HelpHint label="Click any tile below to filter the list." />
           </p>
         </div>
-        <ExportCsvButton type="accounts" />
+        {/* Pass current page state so the CSV matches what's on screen.
+            `filter` doubles as the role tab (all / pending / active /
+            to-review); `search` is the free-text box. Residence comes
+            from ResidenceContext inside the button. */}
+        <ExportCsvButton
+          type="accounts"
+          filters={{
+            q:    search || undefined,
+            role: filter === 'all' ? undefined : filter,
+          }}
+        />
       </div>
 
       {/* KPI strip — every tile is a click-to-filter (the HelpHint

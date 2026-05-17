@@ -99,21 +99,65 @@ function toCsv(header: string[], rows: unknown[][]): string {
 
 export type ExportType = 'accounts' | 'invoices' | 'tickets';
 
-/** Produce a CSV string for one of the admin tables. */
-export async function exportCsv(type: ExportType, residenceId?: string): Promise<string> {
+export interface ExportFilters {
+  residenceId?: string;
+  /** Free-text search — name or email match. Applies to all three types. */
+  q?: string;
+  /** Accounts only — narrows to a single Role enum value, or one of the
+   *  synthetic groupings 'staff' / 'students'. */
+  role?: string;
+  /** Tickets: enum status value. Invoices: 'all' | 'awaiting' |
+   *  'acknowledged' | 'overdue'. */
+  status?: string;
+  /** Tickets only — priority enum. */
+  priority?: string;
+  /** Invoices only — explicit proofStatus filter when the admin clicked
+   *  one of the KPI tiles. Mirrors the page's `invoiceFilter` state. */
+  proof?: string;
+}
+
+/** Produce a CSV string for one of the admin tables.
+ *  Filters mirror exactly what the corresponding page renders, so the
+ *  exported row count matches the visible list. */
+export async function exportCsv(type: ExportType, f: ExportFilters = {}): Promise<string> {
+  const { residenceId, q, role, status, priority, proof } = f;
+
   if (type === 'accounts') {
+    // Build a Prisma `where` that mirrors AdminAccounts' three filters:
+    // residence (tab), role (KPI tile click / pill), and search box.
+    const STAFF      = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
+    const STUDENTS   = ['ACTIVE_STUDENT', 'PENDING_STUDENT'];
+    const where: Record<string, unknown> = {};
+    if (residenceId) where.allocation = { is: { room: { is: { residenceId } } } };
+    if (role === 'staff')       where.role = { in: STAFF };
+    else if (role === 'students') where.role = { in: STUDENTS };
+    else if (role === 'pending')  where.role = 'PENDING_STUDENT';
+    else if (role === 'active')   where.role = 'ACTIVE_STUDENT';
+    else if (role)                where.role = role; // direct enum value
+    if (q) where.OR = [
+      { name:  { contains: q, mode: 'insensitive' } },
+      { email: { contains: q, mode: 'insensitive' } },
+    ];
+
     const users = await prisma.user.findMany({
-      where: residenceId ? { allocation: { is: { room: { is: { residenceId } } } } } : undefined,
+      where,
       select: {
         name: true, email: true, role: true, phone: true,
         university: true, program: true, year: true, isActive: true, createdAt: true,
+        applicationStatus: true,
         allocation: { select: { room: { select: { number: true, block: true } }, status: true } },
       },
       orderBy: { name: 'asc' },
     });
+    // The "to-review" tile = pending students with SUBMITTED application;
+    // applied post-fetch since `role` alone can't express the
+    // applicationStatus intersection cleanly.
+    const filtered = role === 'to-review'
+      ? users.filter(u => u.role === 'PENDING_STUDENT' && u.applicationStatus === 'SUBMITTED')
+      : users;
     return toCsv(
       ['Name', 'Email', 'Role', 'Phone', 'University', 'Program', 'Year', 'Active', 'Room', 'Allocation', 'Joined'],
-      users.map(u => [
+      filtered.map(u => [
         u.name, u.email, u.role, u.phone, u.university, u.program, u.year,
         u.isActive ? 'yes' : 'no',
         u.allocation?.room ? `${u.allocation.room.block}-${u.allocation.room.number}` : '',
@@ -124,11 +168,22 @@ export async function exportCsv(type: ExportType, residenceId?: string): Promise
   }
 
   if (type === 'invoices') {
+    const where: Record<string, unknown> = { type: 'INVOICE' };
+    if (residenceId) where.user = { allocation: { is: { room: { is: { residenceId } } } } };
+    if (q) where.user = {
+      ...(where.user as object),
+      OR: [
+        { name:  { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ],
+    };
+    // Mirror the AdminPayments invoiceFilter state.
+    if (proof === 'awaiting')          where.proofStatus = 'SUBMITTED';
+    else if (proof === 'acknowledged') where.proofStatus = 'ACKNOWLEDGED';
+    else if (proof === 'overdue')      { where.status = 'Overdue'; where.NOT = { proofStatus: 'CLEARED' }; }
+
     const invoices = await prisma.document.findMany({
-      where: {
-        type: 'INVOICE',
-        ...(residenceId ? { user: { allocation: { is: { room: { is: { residenceId } } } } } } : {}),
-      },
+      where: where as never,
       select: {
         period: true, amount: true, status: true, proofStatus: true,
         clearedAt: true, createdAt: true, user: { select: { name: true, email: true } },
@@ -145,9 +200,22 @@ export async function exportCsv(type: ExportType, residenceId?: string): Promise
     );
   }
 
-  // tickets
+  // tickets — status + priority + search
+  const where: Record<string, unknown> = {};
+  if (residenceId) where.residenceId = residenceId;
+  // Status: 'OPEN_GROUP' folds OPEN + IN_PROGRESS (matches the page tab).
+  if (status === 'OPEN_GROUP')    where.status = { in: ['OPEN', 'IN_PROGRESS'] };
+  else if (status && status !== 'ALL') where.status = status;
+  if (priority && priority !== 'ALL') where.priority = priority;
+  if (q) where.OR = [
+    { category:    { contains: q, mode: 'insensitive' } },
+    { location:    { contains: q, mode: 'insensitive' } },
+    { description: { contains: q, mode: 'insensitive' } },
+    { student: { name:  { contains: q, mode: 'insensitive' } } },
+    { student: { email: { contains: q, mode: 'insensitive' } } },
+  ];
   const tickets = await prisma.maintenanceTicket.findMany({
-    where: residenceId ? { residenceId } : undefined,
+    where: where as never,
     select: {
       category: true, location: true, description: true, priority: true,
       status: true, adminNote: true, createdAt: true,

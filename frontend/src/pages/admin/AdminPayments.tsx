@@ -110,7 +110,15 @@ export default function AdminPayments() {
           <p className="page-sub">Revenue tracking, proof reviews, and late-payer management</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ExportCsvButton type="invoices" />
+          {/* Pass the active invoice filter so the CSV scopes to the
+              same subset the page is showing (Awaiting Review / Pending
+              Bank Confirm / Overdue, or all). */}
+          <ExportCsvButton
+            type="invoices"
+            filters={{
+              proof: invoiceFilter === 'all' ? undefined : invoiceFilter,
+            }}
+          />
           <button
             onClick={() => setBulkOpen(true)}
             className="btn-primary press-soft"
