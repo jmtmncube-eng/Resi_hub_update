@@ -6,15 +6,16 @@ import { ROUTES }  from '../constants/routes';
 import { Modal }   from './Modal';
 
 /**
- * Auto-signs the user out after 90 seconds of no activity, with a 15-second
- * warning modal at the 75s mark so they can stay signed in. Mounted once
- * inside DashboardLayout (so it only runs for authenticated users).
+ * Auto-signs the user out after 5 minutes of no activity, with a
+ * 30-second warning modal at the 4:30 mark so they can stay signed in.
+ * Mounted once inside DashboardLayout (so it only runs for authenticated
+ * users).
  *
  * Activity = mousedown, mousemove, keydown, scroll, touchstart, click.
  */
 
-const IDLE_MS    = 90_000;   // 90s total inactivity
-const WARN_MS    = 75_000;   // show warning at 75s (15s grace)
+const IDLE_MS    = 300_000;  // 5 min total inactivity
+const WARN_MS    = 270_000;  // show warning at 4:30 (30s grace)
 
 export function IdleLogout() {
   const { user, logout } = useAuth();

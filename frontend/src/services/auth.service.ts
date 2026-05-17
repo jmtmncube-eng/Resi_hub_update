@@ -20,3 +20,13 @@ export async function getMe(): Promise<User> {
 export async function logout(): Promise<void> {
   await api.post('/auth/logout');
 }
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await api.post<ApiResponse<never> & { message: string }>('/auth/forgot-password', { email });
+  return { message: res.data.message ?? '' };
+}
+
+export async function resetPassword(token: string, password: string): Promise<{ message: string }> {
+  const res = await api.post<ApiResponse<never> & { message: string }>('/auth/reset-password', { token, password });
+  return { message: res.data.message ?? '' };
+}

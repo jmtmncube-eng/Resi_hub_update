@@ -387,10 +387,13 @@ export default function AdminOverview() {
         <p className="micro-label" style={{ marginBottom: 14 }}>Quick Actions</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'View Occupancy',  to: '/admin/occupancy',   icon: '🏠' },
-            { label: 'Add Allocation',  to: '/admin/allocations', icon: '➕' },
-            { label: 'Urgent Tickets',  to: '/admin/maintenance', icon: '🔴' },
-            { label: 'Manage Accounts', to: '/admin/accounts',    icon: '👤' },
+            // Point at the new Residence hub directly — the old standalone
+            // /admin/occupancy and /admin/allocations URLs still 302 to here
+            // but the redirect adds a flicker. Land users where the page now is.
+            { label: 'View Occupancy',  to: '/admin/residence?tab=rooms', icon: '🏠' },
+            { label: 'Add Allocation',  to: '/admin/residence?tab=rooms', icon: '➕' },
+            { label: 'Urgent Tickets',  to: '/admin/maintenance',         icon: '🔴' },
+            { label: 'Manage Accounts', to: '/admin/accounts',            icon: '👤' },
           ].map(a => (
             <Link key={a.label} to={a.to} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -429,8 +432,11 @@ export default function AdminOverview() {
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{stats.rooms.occupied} occupied</span>
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{stats.rooms.vacant} vacant</span>
+          {/* Stays in slot-units to match the headline (top-right) and every
+              other occupancy metric on the page. Mixing slot/room counts in
+              the same widget confuses the eye. */}
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{stats.rooms.filledSlots} slots filled</span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)' }}>{stats.rooms.totalSlots - stats.rooms.filledSlots} slots open</span>
         </div>
       </div>
 

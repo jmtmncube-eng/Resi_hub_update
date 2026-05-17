@@ -55,6 +55,7 @@ interface NewApplicantData      { adminName: string; applicantName: string; appl
 interface MaintenanceTriagedData{ studentName: string; ticketTitle: string; status: string; adminNote?: string; }
 interface AccountApprovedData   { name: string; }
 interface AccountDeactivatedData{ name: string; }
+interface PasswordResetData    { name: string; resetUrl: string; expiresInMinutes: number; }
 
 export const templates = {
   invoiceCreated: (d: InvoiceCreatedData): Rendered => {
@@ -100,6 +101,12 @@ export const templates = {
     const subject = `Your ResiHub account has been deactivated`;
     const intro   = `Hi ${escapeHtml(d.name)}, your account was deactivated by an administrator. Please contact your residence office if you think this is a mistake.`;
     return { subject, html: shell({ title: 'Account deactivated', intro, body: '' }), text: stripHtml(intro) };
+  },
+  passwordReset: (d: PasswordResetData): Rendered => {
+    const subject = `Reset your ResiHub password`;
+    const intro   = `Hi ${escapeHtml(d.name)}, we received a request to reset your password. Tap the button below to set a new one — the link expires in <b>${d.expiresInMinutes} minutes</b>.`;
+    const body    = `<p style="margin:0;color:rgba(255,255,255,.62);font-size:12px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>`;
+    return { subject, html: shell({ title: 'Reset your password', intro, body, cta: { label: 'Reset password', url: d.resetUrl } }), text: stripHtml(intro + ' ' + body) };
   },
 };
 

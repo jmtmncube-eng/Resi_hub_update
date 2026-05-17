@@ -158,7 +158,10 @@ export function NotificationBell() {
             zIndex: 1000,
           }}
         >
-          {/* Header */}
+          {/* Header — title left; right slot holds either
+              "Mark all read" (when unread > 0) or the green ✓ "caught up"
+              indicator (when the inbox is empty). They never coexist, so
+              the row reads cleanly in both states. */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '12px 14px', borderBottom: '1px solid var(--border)',
@@ -166,7 +169,7 @@ export function NotificationBell() {
             <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
               Notifications
             </p>
-            {unread > 0 && (
+            {unread > 0 ? (
               <button
                 onClick={() => readAll.mutate()}
                 disabled={readAll.isPending}
@@ -179,7 +182,13 @@ export function NotificationBell() {
               >
                 <CheckCheck size={12} /> Mark all read
               </button>
-            )}
+            ) : items.length === 0 && !isLoading ? (
+              <CheckCircle2
+                size={16}
+                style={{ color: '#4ade80' }}
+                aria-label="All caught up"
+              />
+            ) : null}
           </div>
 
           {/* List */}
@@ -189,8 +198,8 @@ export function NotificationBell() {
                 Loading…
               </p>
             ) : items.length === 0 ? (
-              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-                <Bell size={22} style={{ color: 'var(--text4)', marginBottom: 8 }} />
+              <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+                {/* No icon here — the ✓ now sits on the header row. */}
                 <p style={{ fontSize: 12, color: 'var(--text3)' }}>You're all caught up.</p>
               </div>
             ) : (

@@ -12,9 +12,13 @@ import { Sun, Camera as CameraIcon, Wifi, WifiOff, Clock } from 'lucide-react';
  */
 export default function TelemetryStatusCard({
   solarKwh30,
+  compact = false,
 }: {
   /** Last 30 days of MANUALLY-logged solar kWh (already shown elsewhere). */
   solarKwh30?: number;
+  /** When true, the two sources sit side-by-side in a grid and the long
+   *  hint paragraphs are hidden. Heading + status pill always show. */
+  compact?: boolean;
 }) {
   return (
     <div className="card-sm" style={{ padding: '16px 18px' }}>
@@ -30,7 +34,13 @@ export default function TelemetryStatusCard({
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={compact ? {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 8,
+      } : {
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }}>
         <Source
           icon={Sun}
           label="Solar inverter"
@@ -40,6 +50,7 @@ export default function TelemetryStatusCard({
             ? `${solarKwh30.toFixed(0)} kWh logged manually (last 30d)`
             : 'No readings logged yet'}
           hint="Goipotle / Sunsynk / Victron API integration on the roadmap — readings will auto-pull once wired."
+          compact={compact}
         />
         <Source
           icon={CameraIcon}
@@ -48,19 +59,21 @@ export default function TelemetryStatusCard({
           color="#60a5fa"
           line2="0 cameras connected"
           hint="Hikvision / Dahua / Reolink IP camera integration coming. Live thumbnails + motion alerts will surface here."
+          compact={compact}
         />
       </div>
     </div>
   );
 }
 
-function Source({ icon: Icon, label, status, color, line2, hint }: {
+function Source({ icon: Icon, label, status, color, line2, hint, compact }: {
   icon: typeof Sun;
   label: string;
   status: 'live' | 'manual' | 'not-connected';
   color: string;
   line2: string;
   hint: string;
+  compact?: boolean;
 }) {
   const statusMeta = {
     live:           { icon: Wifi,    color: '#4ade80',   label: 'Live'           },
@@ -101,9 +114,14 @@ function Source({ icon: Icon, label, status, color, line2, hint }: {
           <StatusIcon size={10} /> {statusMeta.label}
         </span>
       </div>
-      <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, lineHeight: 1.5 }}>
-        {hint}
-      </p>
+      {/* Hide the long explanatory paragraph in compact mode — the
+          heading + status pill carry the message; the hint is more
+          context that belongs in the list view. */}
+      {!compact && (
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, lineHeight: 1.5 }}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

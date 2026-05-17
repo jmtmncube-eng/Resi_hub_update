@@ -57,3 +57,9 @@ coverage/
 
 # ── Windows null-device artifact ──────────────────────────────
 nul
+
+# ── Walkthrough scratch (diagnostic screenshots + session notes) ──
+# These live locally during a Claude Code walkthrough session; they
+# get pruned/actioned and removed at the end. Never committed.
+.mcp-*.png
+WALKTHROUGH_NOTES.md

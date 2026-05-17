@@ -2,6 +2,17 @@
 export type TicketStatus   = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'EMERGENCY';
 
+/** One row from the ticket audit trail. `changes` is a structured diff
+ *  ({ field: { from, to } }) so the UI can render rich timeline rows. */
+export interface MaintenanceTicketUpdate {
+  id:        string;
+  actorId:   string | null;
+  actorName: string;
+  summary:   string;
+  changes:   Record<string, { from: unknown; to: unknown }>;
+  createdAt: string;
+}
+
 export interface MaintenanceTicket {
   id:          string;
   studentId:   string;
@@ -15,6 +26,8 @@ export interface MaintenanceTicket {
   createdAt:   string;
   updatedAt:   string;
   student?: { id: string; name: string; avatarUrl?: string };
+  /** Audit trail — newest first. Backend includes it on every ticket fetch. */
+  updates?: MaintenanceTicketUpdate[];
 }
 
 // ── News ────────────────────────────────────────────────────────

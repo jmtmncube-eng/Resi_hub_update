@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/auth.service';
+import * as passwordReset from '../services/passwordReset.service';
 import { createAuditLog } from '../utils/audit.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -53,6 +54,25 @@ export async function logout(_req: Request, res: Response): Promise<void> {
   // JWT is stateless — client discards tokens
   // Future: add token blocklist here if needed
   res.json({ success: true, message: 'Logged out successfully' });
+}
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await passwordReset.requestReset(req.body.email);
+    // Always return success — don't leak whether the email exists.
+    res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await passwordReset.resetPassword(req.body.token, req.body.password);
+    res.json({ success: true, message: 'Password updated. You can now sign in with your new password.' });
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function getMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {

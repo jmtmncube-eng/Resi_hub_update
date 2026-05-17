@@ -208,7 +208,12 @@ export default function Login() {
 
               {/* Password */}
               <div>
-                <label className="field-label">Password</label>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <label className="field-label">Password</label>
+                  <Link to={ROUTES.FORGOT_PASSWORD} style={{ fontSize: 11, color: 'var(--cyan)', textDecoration: 'none', fontWeight: 500 }}>
+                    Forgot password?
+                  </Link>
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     {...register('password')}

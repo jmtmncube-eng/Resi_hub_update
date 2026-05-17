@@ -17,7 +17,7 @@ import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
 import { useResidence } from '../../contexts/ResidenceContext';
 import { format } from 'date-fns';
-import TelemetryStatusCard from '../../components/TelemetryStatusCard';
+import { ViewSwitcher, useViewMode } from '../../components/ViewSwitcher';
 
 // ─────────────────────────────────────────────────────────────────
 // Static config — drives the section grid
@@ -98,6 +98,7 @@ export default function ResidenceOps() {
   const confirm = useConfirm();
   const { selectedId: residenceId } = useResidence();
   const [logOpen, setLogOpen] = useState<SectionConfig | null>(null);
+  const [view, setView] = useViewMode('residence-ops-view', 'list');
 
   // Every ops query keyed on residenceId so the picker actually narrows
   // the data instead of just labelling it.
@@ -126,9 +127,12 @@ export default function ResidenceOps() {
 
   return (
     <div className="space-y-5">
-      <p className="page-sub" style={{ marginTop: 0 }}>
-        Operational tracking for the residence — cleaning, utilities, services. Log it once, the system tracks frequency and cost.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <p className="page-sub" style={{ marginTop: 0, flex: 1 }}>
+          Operational tracking for the residence — cleaning, utilities, services. Log it once, the system tracks frequency and cost.
+        </p>
+        <ViewSwitcher value={view} onChange={setView} />
+      </div>
 
       {/* Top KPI row + reminders */}
       {insights && (
@@ -183,11 +187,6 @@ export default function ResidenceOps() {
         </div>
       )}
 
-      {/* Live monitoring placeholder — solar inverter + cameras (API pending) */}
-      {insights && (
-        <TelemetryStatusCard solarKwh30={insights.solarKwhLast30} />
-      )}
-
       {/* Reminders list */}
       {insights && insights.reminders.length > 0 && (
         <div className="card-sm" style={{ padding: '16px 20px' }}>
@@ -211,8 +210,13 @@ export default function ResidenceOps() {
         </div>
       )}
 
-      {/* Sections grid */}
-      <div className="space-y-5" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Sections — list mode stacks full-width cards (the verbose view
+          with recent entries); cards mode lays them out in an auto-fit
+          grid so all 5 fit above the fold at a glance. */}
+      <div style={view === 'cards'
+        ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }
+        : { display: 'flex', flexDirection: 'column', gap: 16 }
+      }>
         {SECTIONS.map(section => (
           <SectionCard
             key={section.key}
@@ -231,9 +235,14 @@ export default function ResidenceOps() {
               if (ok) removeMut.mutate(id);
             }}
             insights={insights}
+            compact={view === 'cards'}
           />
         ))}
       </div>
+
+      {/* Live monitoring lives on its own dedicated tab now —
+          Residence → Live monitoring. Keeping Operations focused
+          purely on the manual-log workflow. */}
 
       {/* Log entry modal */}
       {logOpen && (
@@ -257,7 +266,7 @@ export default function ResidenceOps() {
 // ─────────────────────────────────────────────────────────────────
 
 function SectionCard({
-  section, services, stock, onLog, onDelete, insights,
+  section, services, stock, onLog, onDelete, insights, compact = false,
 }: {
   section: SectionConfig;
   services: OpsService[];
@@ -265,6 +274,9 @@ function SectionCard({
   onLog: () => void;
   onDelete: (id: string) => void;
   insights: import('../../services/ops.service').OpsInsights | undefined;
+  /** Compact (cards) mode — keep heading + key stats + Log button,
+   *  drop the Recent entries list (the main vertical-space hog). */
+  compact?: boolean;
 }) {
   const Icon = section.icon;
   const recent = services.slice(0, 5);
@@ -276,37 +288,41 @@ function SectionCard({
     .reduce((sum, s) => sum + s.total, 0) ?? 0;
 
   return (
-    <div className="card" style={{ padding: '20px 24px' }}>
-      {/* Header */}
+    <div className="card" style={{ padding: compact ? '14px 16px' : '20px 24px' }}>
+      {/* Header — same shape in both modes; compact just shrinks slightly
+          and we hide the blurb so the card stays scannable. */}
       <div style={{
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        gap: 16, flexWrap: 'wrap', marginBottom: 16,
+        gap: 12, flexWrap: 'wrap', marginBottom: compact ? 12 : 16,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 10 : 14, minWidth: 0 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 11,
+            width: compact ? 36 : 44, height: compact ? 36 : 44, borderRadius: compact ? 9 : 11,
             background: `${section.accent}1f`,
             border: `1px solid ${section.accent}55`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <Icon size={20} color={section.accent} />
+            <Icon size={compact ? 16 : 20} color={section.accent} />
           </div>
           <div>
-            <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{section.title}</p>
-            <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{section.blurb}</p>
+            <p style={{ fontSize: compact ? 14 : 17, fontWeight: 700, color: 'var(--text)' }}>{section.title}</p>
+            {!compact && (
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{section.blurb}</p>
+            )}
           </div>
         </div>
         <button
           onClick={onLog}
+          aria-label={`Log entry for ${section.title}`}
           className="btn-primary press-soft"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', fontSize: 13,
+            padding: compact ? '6px 10px' : '8px 14px', fontSize: compact ? 11 : 13,
             background: section.accent, color: '#0f0f12',
           }}
         >
-          <Plus size={13} /> Log entry
+          <Plus size={compact ? 11 : 13} /> Log{compact ? '' : ' entry'}
         </button>
       </div>
 
@@ -338,23 +354,27 @@ function SectionCard({
         })}
       </div>
 
-      {/* Recent entries */}
-      {recent.length === 0 ? (
-        <p style={{
-          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)',
-          textAlign: 'center', padding: '12px 0',
-        }}>
-          No entries yet — click <b style={{ color: section.accent }}>Log entry</b> to start tracking.
-        </p>
-      ) : (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <p className="micro-label" style={{ marginBottom: 8 }}>Recent entries</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {recent.map(s => (
-              <EntryRow key={s.id} entry={s} onDelete={() => onDelete(s.id)} accent={section.accent} />
-            ))}
+      {/* Recent entries — list view only; cards view drops this to
+          stay compact. In cards mode the stat strip's "{n} entries"
+          hint on Cadence still tells you how many exist. */}
+      {!compact && (
+        recent.length === 0 ? (
+          <p style={{
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)',
+            textAlign: 'center', padding: '12px 0',
+          }}>
+            No entries yet — click <b style={{ color: section.accent }}>Log entry</b> to start tracking.
+          </p>
+        ) : (
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <p className="micro-label" style={{ marginBottom: 8 }}>Recent entries</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {recent.map(s => (
+                <EntryRow key={s.id} entry={s} onDelete={() => onDelete(s.id)} accent={section.accent} />
+              ))}
+            </div>
           </div>
-        </div>
+        )
       )}
     </div>
   );
@@ -494,6 +514,9 @@ function LogModal({ section, onClose, onSaved }: {
         note:   note.trim() || undefined,
         proofUrl: proof ?? undefined,
         meta:   Object.keys(metaPayload).length ? metaPayload : undefined,
+        // Stamp it with the currently-selected residence so the entry
+        // shows up in the filtered list (residenceId-null orphans us).
+        residenceId: residenceId ?? undefined,
       });
       // Adjust stock if user provided new values
       for (const [key, raw] of Object.entries(adjustStock)) {

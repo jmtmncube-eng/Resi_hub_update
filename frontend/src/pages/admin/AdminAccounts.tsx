@@ -12,6 +12,7 @@ import { useConfirm } from '../../components/useConfirm';
 import ApplicationReviewModal from '../../components/ApplicationReviewModal';
 import AccountOverviewDrawer from '../../components/AccountOverviewDrawer';
 import { ExportCsvButton } from '../../components/ExportCsvButton';
+import { HelpHint } from '../../components/HelpHint';
 import { UserX as UserXIcon } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────
@@ -140,16 +141,24 @@ export default function AdminAccounts() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Accounts</h1>
+          {/* HelpHint sits next to the totals line — spatially closer to
+              the KPI tile strip it explains than the page title was. */}
           <p className="page-sub">
             {totals.all} total · {totals.active} active · {totals.pending} pending · {totals.staff} staff
+            <HelpHint label="Click any tile below to filter the list." />
           </p>
         </div>
         <ExportCsvButton type="accounts" />
       </div>
 
-      {/* KPI strip */}
+      {/* KPI strip — every tile is a click-to-filter (the HelpHint
+          next to the page title explains the affordance once globally,
+          so individual tiles no longer carry an inline hint). The
+          Pending tile keeps its "all clear" hint as a STATE signal
+          (when there's nothing to review), which is different from
+          the interaction hint we moved out. */}
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-        <KpiPill label="Pending review" value={totals.pending} accent="rose"  hint={totals.pending > 0 ? 'tap to filter' : 'all clear'}
+        <KpiPill label="Pending review" value={totals.pending} accent="rose"  hint={totals.pending === 0 ? 'all clear' : undefined}
                  onClick={() => setFilter('pending')} active={filter === 'pending'} />
         <KpiPill label="Active students" value={totals.active}  accent="cyan"  onClick={() => setFilter('active')}  active={filter === 'active'} />
         <KpiPill label="Staff"           value={totals.staff}   accent="rose"  onClick={() => setFilter('staff')}   active={filter === 'staff'} />

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench } from 'lucide-react';
+import { Wrench, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 import { getTickets, updateTicket } from '../../services/maintenance.service';
 import type { MaintenanceTicket } from '../../types';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -43,6 +44,14 @@ export default function AdminMaintenance() {
   const [editId, setEditId]                 = useState<string | null>(null);
   const [editForm, setEditForm]             = useState({ status: '', priority: '', adminNote: '' });
   const [photoPreview, setPhotoPreview]     = useState<string | null>(null);
+  // Which ticket cards have their audit-trail timeline expanded.
+  // Set (not boolean) so multiple cards can be open at once.
+  const [expandedUpdates, setExpandedUpdates] = useState<Set<string>>(new Set());
+  const toggleUpdates = (id: string) => setExpandedUpdates(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   // Fetch ALL tickets (status filter applied client-side so the tab
   // counts stay live without four separate round-trips).
@@ -241,6 +250,66 @@ export default function AdminMaintenance() {
                   >
                     Update
                   </button>
+                </div>
+              )}
+
+              {/* Audit trail — expandable timeline of every update made
+                  to this ticket (status / priority / note changes), with
+                  who did it and when. Hidden by default; the "N updates"
+                  chip in the bottom-right toggles it. Only shows when
+                  there's history to show (a freshly-created ticket has
+                  no updates yet). */}
+              {t.updates && t.updates.length > 0 && editId !== t.id && (
+                <div style={{
+                  marginTop: 12,
+                  paddingTop: 10,
+                  borderTop: '1px dashed var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => toggleUpdates(t.id)}
+                      aria-expanded={expandedUpdates.has(t.id)}
+                      aria-controls={`updates-${t.id}`}
+                      className="btn-ghost press-soft"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '4px 10px', fontSize: 11,
+                        color: 'var(--text3)',
+                        fontFamily: "'IBM Plex Mono', monospace",
+                      }}
+                    >
+                      <History size={11} />
+                      {t.updates.length} update{t.updates.length === 1 ? '' : 's'}
+                      {expandedUpdates.has(t.id) ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    </button>
+                  </div>
+
+                  {expandedUpdates.has(t.id) && (
+                    <div id={`updates-${t.id}`} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {t.updates.map(u => (
+                        <div key={u.id} style={{
+                          display: 'flex', flexDirection: 'column', gap: 2,
+                          padding: '8px 10px', borderRadius: 8,
+                          background: 'var(--bg3)', border: '1px solid var(--border)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                              {u.summary}
+                            </span>
+                            <span style={{ fontSize: 10, color: 'var(--text4)', fontFamily: "'IBM Plex Mono', monospace" }}>
+                              {formatDistanceToNow(new Date(u.createdAt), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                            by {u.actorName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

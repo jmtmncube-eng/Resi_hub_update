@@ -11,8 +11,10 @@ import { ROUTES }           from './constants/routes';
 import type { Role }        from './types/auth.types';
 
 // ── Auth ───────────────────────────────────────────────────────
-import Login    from './pages/auth/Login';
-import Register from './pages/auth/Register';
+import Login           from './pages/auth/Login';
+import Register        from './pages/auth/Register';
+import ForgotPassword  from './pages/auth/ForgotPassword';
+import ResetPassword   from './pages/auth/ResetPassword';
 import NotFound from './pages/NotFound';
 
 // ── Public legal pages ────────────────────────────────────────
@@ -82,6 +84,8 @@ function App() {
           {/* ── Public ─────────────────────────────────────── */}
           <Route path={ROUTES.LOGIN}    element={<Login />} />
           <Route path={ROUTES.REGISTER} element={<Register />} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+          <Route path={ROUTES.RESET_PASSWORD}  element={<ResetPassword />} />
           <Route path={ROUTES.PRIVACY}  element={<PrivacyPolicy />} />
           <Route path={ROUTES.TERMS}    element={<TermsOfUse />} />
           <Route path={ROUTES.GATE}     element={<Gate />} />

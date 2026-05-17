@@ -195,9 +195,33 @@ model User {
   newsReads          NewsRead[]
   voucherClaims      VoucherClaim[]
   notifications      Notification[]
+  passwordResets     PasswordResetToken[]
 
   @@index([role])
   @@index([email])
+}
+
+// Single-use token issued by /api/auth/forgot-password and consumed by
+// /api/auth/reset-password. Stored cryptographically random (32 bytes
+// hex) and indexed for fast lookup. expiresAt is 1h from issue; usedAt
+// goes non-null the moment the token is exchanged for a password
+// change, so a reused link is a no-op (you can never reset twice with
+// the same token).
+//
+// A user's older unused tokens are invalidated whenever they request a
+// new reset — see passwordReset.service.ts.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // In-app notification — the persistent backbone of the notification
@@ -311,11 +335,30 @@ model MaintenanceTicket {
   // Relations
   student   User       @relation(fields: [studentId],   references: [id], onDelete: Cascade)
   residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
+  updates   MaintenanceTicketUpdate[]
 
   @@index([studentId])
   @@index([status])
   @@index([priority])
   @@index([createdAt])
+}
+
+// Audit trail for ticket triage — one row per admin/manager/maintenance
+// update so the ticket card surfaces a "who changed what when" timeline
+// instead of overwriting state silently. The ticket itself still holds
+// the CURRENT values; this table is purely additive history.
+model MaintenanceTicketUpdate {
+  id         String   @id @default(cuid())
+  ticketId   String
+  actorId    String?  // who made the change (admin / manager / maintenance staff). Null = system.
+  actorName  String   // denormalised — survives the actor being deactivated/deleted.
+  summary    String   // human-readable: "Status: OPEN → IN_PROGRESS · Note added".
+  changes    Json     // structured: { status: {from, to}, adminNote: {from, to} } — for richer rendering.
+  createdAt  DateTime @default(now())
+
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 model VisitorPass {

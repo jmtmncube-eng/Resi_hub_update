@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   LayoutGrid, Activity, Camera, Pencil, Wrench, Users as UsersIcon,
-  Loader2, Trash2,
+  Loader2, Trash2, Radio,
 } from 'lucide-react';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { listResidences, updateResidence, archiveResidence } from '../../services/residence.service';
@@ -18,29 +18,33 @@ import ResidenceHealth     from './ResidenceHealth';
 import ResidenceTelemetry  from './ResidenceTelemetry';
 import ResidenceOps        from './ResidenceOps';
 import ResidenceContractors from './ResidenceContractors';
+import ResidenceLiveMonitoring from './ResidenceLiveMonitoring';
 
 /**
  * Residence hub — single console for everything property-related.
  * Tabs:
- *   Health      — KPIs, smart suggestions, charts (works portfolio-wide)
- *   Rooms       — setup + occupancy grid + add/remove tenants (this is the
- *                 single source of truth for tenancies — the old standalone
- *                 "Allocations" tab was redundant and has been removed)
- *   Operations  — pool, gas, grass, electricity, solar
- *   Contractors — cleaners, gardeners, grounds-keepers
- *   Telemetry   — camera & sensor feeds (placeholder)
+ *   Health          — KPIs, smart suggestions, charts (works portfolio-wide)
+ *   Rooms           — setup + occupancy grid + add/remove tenants (this is the
+ *                     single source of truth for tenancies — the old standalone
+ *                     "Allocations" tab was redundant and has been removed)
+ *   Operations      — pool, gas, grass, electricity, solar (manual logging)
+ *   Contractors     — cleaners, gardeners, grounds-keepers
+ *   Live monitoring — connection status of solar inverter + IP cameras
+ *                     (lifted out of Operations so it doesn't crowd that tab)
+ *   Telemetry       — camera & sensor feeds (roadmap preview)
  *
  * Info tab removed: residence-name editing happens inline in the header.
  */
 
-type Tab = 'health' | 'rooms' | 'ops' | 'contractors' | 'telemetry';
+type Tab = 'health' | 'rooms' | 'ops' | 'contractors' | 'live' | 'telemetry';
 
 const TABS: { value: Tab; label: string; icon: typeof Activity; sub: string }[] = [
-  { value: 'health',      label: 'Health',      icon: Activity,    sub: 'Business-health metrics, charts & smart suggestions' },
-  { value: 'rooms',       label: 'Rooms',       icon: LayoutGrid,  sub: 'Setup, occupancy grid, add or remove tenants' },
-  { value: 'ops',         label: 'Operations',  icon: Wrench,      sub: 'Pool, gas, grass, electricity & solar tracking' },
-  { value: 'contractors', label: 'Contractors', icon: UsersIcon,   sub: 'Cleaners, gardeners, grounds-keepers — onboard & bill' },
-  { value: 'telemetry',   label: 'Telemetry',   icon: Camera,      sub: 'Camera & sensor feeds (coming soon)' },
+  { value: 'health',      label: 'Health',          icon: Activity,    sub: 'Business-health metrics, charts & smart suggestions' },
+  { value: 'rooms',       label: 'Rooms',           icon: LayoutGrid,  sub: 'Setup, occupancy grid, add or remove tenants' },
+  { value: 'ops',         label: 'Operations',      icon: Wrench,      sub: 'Pool, gas, grass, electricity & solar tracking' },
+  { value: 'contractors', label: 'Contractors',     icon: UsersIcon,   sub: 'Cleaners, gardeners, grounds-keepers — onboard & bill' },
+  { value: 'live',        label: 'Live monitoring', icon: Radio,       sub: 'Real-time connection status for the on-site feeds' },
+  { value: 'telemetry',   label: 'Telemetry',       icon: Camera,      sub: 'Camera & sensor feeds (coming soon)' },
 ];
 
 export default function AdminResidence() {
@@ -155,6 +159,7 @@ export default function AdminResidence() {
         {tab === 'rooms'       && <AdminSettings initialTab="rooms" hideHeader />}
         {tab === 'ops'         && <ResidenceOps />}
         {tab === 'contractors' && <ResidenceContractors />}
+        {tab === 'live'        && <ResidenceLiveMonitoring />}
         {tab === 'telemetry'   && <ResidenceTelemetry />}
       </div>
 

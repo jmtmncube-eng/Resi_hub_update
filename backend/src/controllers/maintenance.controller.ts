@@ -25,9 +25,9 @@ export async function createTicket(req: AuthRequest, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
-export async function updateTicket(req: Request, res: Response, next: NextFunction) {
+export async function updateTicket(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const ticket = await svc.updateTicket(req.params.id, req.body);
+    const ticket = await svc.updateTicket(req.params.id, req.body, req.user!.userId);
     res.json({ success: true, data: ticket });
   } catch (err) { next(err); }
 }
