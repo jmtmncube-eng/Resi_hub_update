@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { TrendingUp, AlertTriangle, CheckCircle2, Clock, Eye, X, Loader2, BarChart3, Send, Calendar } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2, Clock, X, Loader2, BarChart3, Send, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { format } from 'date-fns';
@@ -44,6 +44,9 @@ export default function AdminPayments() {
   const [proofModal, setProofModal] = useState<AdminInvoice | null>(null);
   const [clearTarget, setClearTarget] = useState<AdminInvoice | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  // Period drill-in — clicking a row in the Revenue tab opens a modal
+  // listing every student in each of the four buckets for that month.
+  const [periodModal, setPeriodModal] = useState<string | null>(null);
 
   function jumpToInvoices(filter: 'all' | 'awaiting' | 'acknowledged' | 'overdue') {
     setInvoiceFilter(filter);
@@ -178,7 +181,20 @@ export default function AdminPayments() {
                 ))}
               </div>
               {(report?.monthlyBreakdown ?? []).map(row => (
-                <div key={row.period} style={{ display: 'flex', gap: 16, padding: '13px 18px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+                <div
+                  key={row.period}
+                  onClick={() => setPeriodModal(row.period)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setPeriodModal(row.period);
+                    }
+                  }}
+                  className="hover-lift"
+                  style={{ display: 'flex', gap: 16, padding: '13px 18px', borderBottom: '1px solid var(--border)', alignItems: 'center', cursor: 'pointer' }}
+                >
                   <span style={{ flex: 2, fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{formatPeriod(row.period)}</span>
                   <span style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text2)' }}>R{row.expected.toLocaleString()}</span>
                   <span style={{ flex: 1, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--cyan)' }}>R{row.cleared.toLocaleString()}</span>
@@ -252,16 +268,27 @@ export default function AdminPayments() {
               {visible.map((inv, idx) => (
                 <div
                   key={inv.id}
+                  onClick={() => setProofModal(inv)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setProofModal(inv);
+                    }
+                  }}
+                  className="hover-lift"
                   style={{
                     display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px',
                     borderBottom: idx < visible.length - 1 ? '1px solid var(--border)' : 'none',
+                    cursor: 'pointer',
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>{inv.user.name}</p>
                     <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>{formatPeriod(inv.period)} · {formatRand(inv.amount)}</p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
                     {inv.proofStatus && (
                       <span style={{
                         fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
@@ -276,26 +303,11 @@ export default function AdminPayments() {
                     <span className={`badge ${inv.status === 'Paid' ? 'badge-cyan' : inv.status === 'Overdue' ? 'badge-rose' : 'badge-gray'}`}>
                       {inv.status}
                     </span>
-                    {/* Review button — opens the proof modal where the
-                        admin can Acknowledge (step 1) or Clear directly.
-                        Shown for SUBMITTED (first review) AND
-                        ACKNOWLEDGED (revisit). */}
-                    {(inv.proofStatus === 'SUBMITTED' || inv.proofStatus === 'ACKNOWLEDGED') && inv.proofUrl && (
-                      <button
-                        onClick={() => setProofModal(inv)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6,
-                          background: inv.proofStatus === 'ACKNOWLEDGED' ? 'rgba(245,158,11,.12)' : 'rgba(167,139,250,.12)',
-                          border:     `1px solid ${inv.proofStatus === 'ACKNOWLEDGED' ? 'rgba(245,158,11,.25)' : 'rgba(167,139,250,.25)'}`,
-                          color:      inv.proofStatus === 'ACKNOWLEDGED' ? '#f59e0b' : '#a78bfa',
-                          fontSize: 12, cursor: 'pointer' }}
-                      >
-                        <Eye size={12} /> Review
-                      </button>
-                    )}
                     {/* Direct Clear button — for invoices with no proof
                         in the system (sponsor payments, EFT we just
                         confirmed via the bank statement). Always
-                        available until the invoice is CLEARED. */}
+                        available until the invoice is CLEARED.
+                        Review path is now the row click → full modal. */}
                     {inv.proofStatus !== 'CLEARED' && (
                       <button
                         onClick={() => setClearTarget(inv)}
@@ -355,58 +367,124 @@ export default function AdminPayments() {
         </div>
       )}
 
-      {/* Proof review modal */}
-      <Modal open={!!proofModal} onClose={() => setProofModal(null)} maxWidth={560}>
-        {proofModal && (
+      {/* Invoice detail modal — opened by clicking ANY invoice row, so
+          it has to render in any of: SUBMITTED / ACKNOWLEDGED / CLEARED /
+          REJECTED / no-proof-yet. Layout:
+            1. Header with name + period + amount + status badge
+            2. Mini "facts" grid (created, paid-on if cleared, etc.)
+            3. Proof image OR "no proof uploaded yet" placeholder
+            4. Context strip explaining the current step (mid-flight only)
+            5. Actions appropriate to the state */}
+      <Modal open={!!proofModal} onClose={() => setProofModal(null)} maxWidth={580}>
+        {proofModal && (() => {
+          const ps          = proofModal.proofStatus;
+          const isSubmitted = ps === 'SUBMITTED';
+          const isAck       = ps === 'ACKNOWLEDGED';
+          const isCleared   = ps === 'CLEARED';
+          const isRejected  = ps === 'REJECTED';
+          return (
           <>
-            <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>PAYMENT PROOF</p>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{proofModal.user.name} — {formatPeriod(proofModal.period)}</p>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>INVOICE · {formatPeriod(proofModal.period)}</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{proofModal.user.name}</p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                  {proofModal.user.email} · {formatRand(proofModal.amount)}
+                </p>
               </div>
-              <button onClick={() => setProofModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }}>
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {ps && (
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+                    padding: '3px 9px', borderRadius: 20,
+                    background: `${PROOF_COLOR[ps]}18`,
+                    color:      PROOF_COLOR[ps],
+                    border:     `1px solid ${PROOF_COLOR[ps]}30`,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {PROOF_LABEL[ps] ?? ps}
+                  </span>
+                )}
+                <span className={`badge ${proofModal.status === 'Paid' ? 'badge-cyan' : proofModal.status === 'Overdue' ? 'badge-rose' : 'badge-gray'}`}>
+                  {proofModal.status}
+                </span>
+                <button onClick={() => setProofModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }} aria-label="Close">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
+            {/* Facts grid — the few derivable timestamps we have today.
+                When the schema gains acknowledgedAt / proofSubmittedAt
+                we'll surface those here too. */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 10, marginBottom: 16,
+              padding: '12px 14px', borderRadius: 10,
+              background: 'var(--bg3)', border: '1px solid var(--border)',
+            }}>
+              <DetailFact label="Invoice raised" value={format(new Date(proofModal.createdAt), "dd MMM yyyy")} />
+              {isCleared && proofModal.clearedAt && (
+                <DetailFact label="Cleared on"   value={format(new Date(proofModal.clearedAt), "dd MMM yyyy")} />
+              )}
+              {proofModal.proofUrl && (
+                <DetailFact label="Proof"        value="On file"  tone="cyan" />
+              )}
+              {isRejected && (
+                <DetailFact label="Last action"  value="Proof rejected" tone="rose" />
+              )}
+            </div>
+
+            {/* Proof image or placeholder */}
             {proofModal.proofUrl ? (
               <img
                 src={proofModal.proofUrl}
                 alt="Payment proof"
-                style={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 20 }}
+                style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, background: 'var(--bg3)', marginBottom: 16, border: '1px solid var(--border)' }}
               />
             ) : (
-              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 40, textAlign: 'center', marginBottom: 20 }}>
-                <p style={{ color: 'var(--text3)' }}>No image uploaded</p>
+              <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 32, textAlign: 'center', marginBottom: 16, border: '1px dashed var(--border)' }}>
+                <p style={{ color: 'var(--text3)', fontSize: 12 }}>
+                  {isCleared ? 'Cleared directly (no proof image — likely sponsor / EFT).' : 'No proof uploaded yet.'}
+                </p>
               </div>
             )}
-            {/* Current state chip — important context for the admin
-                because the action set changes between SUBMITTED and
-                ACKNOWLEDGED. */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', borderRadius: 8, marginBottom: 16,
-              background: `${PROOF_COLOR[proofModal.proofStatus ?? '']}12`,
-              border:     `1px solid ${PROOF_COLOR[proofModal.proofStatus ?? '']}30`,
-              fontSize: 12,
-            }}>
-              <Clock size={13} style={{ color: PROOF_COLOR[proofModal.proofStatus ?? ''] }} />
-              <span style={{ color: 'var(--text2)' }}>
-                {proofModal.proofStatus === 'ACKNOWLEDGED'
-                  ? "You've acknowledged this proof. Confirm cleared once the funds reflect in the residence account."
-                  : "Step 1: mark as received once the proof looks valid. Step 2: confirm cleared once funds reflect in the bank."}
-              </span>
-            </div>
+
+            {/* Context strip — only when there's an open action path */}
+            {(isSubmitted || isAck) && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', borderRadius: 8, marginBottom: 16,
+                background: `${PROOF_COLOR[ps!]}12`,
+                border:     `1px solid ${PROOF_COLOR[ps!]}30`,
+                fontSize: 12,
+              }}>
+                <Clock size={13} style={{ color: PROOF_COLOR[ps!] }} />
+                <span style={{ color: 'var(--text2)' }}>
+                  {isAck
+                    ? "You've acknowledged this proof. Confirm cleared once the funds reflect in the residence account."
+                    : "Step 1: mark as received once the proof looks valid. Step 2: confirm cleared once funds reflect in the bank."}
+                </span>
+              </div>
+            )}
+
+            {/* Actions — appropriate to state */}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>Close</button>
-              <button
-                onClick={() => rejectMut.mutate(proofModal.id)}
-                disabled={rejectMut.isPending || ackMut.isPending || clearMut.isPending}
-                style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}
-              >
-                {rejectMut.isPending ? <Loader2 size={12} className="animate-spin" /> : 'Reject'}
+              <button onClick={() => setProofModal(null)} className="btn-ghost" style={{ padding: '9px 18px', fontSize: 13 }}>
+                Close
               </button>
-              {/* Step 1 button — only available before acknowledgement */}
-              {proofModal.proofStatus === 'SUBMITTED' && (
+              {/* Reject — available wherever a proof exists and isn't already CLEARED */}
+              {(isSubmitted || isAck || isRejected) && proofModal.proofUrl && !isCleared && (
+                <button
+                  onClick={() => rejectMut.mutate(proofModal.id)}
+                  disabled={rejectMut.isPending || ackMut.isPending || clearMut.isPending}
+                  style={{ padding: '9px 18px', fontSize: 13, borderRadius: 8, background: 'rgba(232,25,122,.12)', border: '1px solid rgba(232,25,122,.25)', color: 'var(--rose)', cursor: 'pointer' }}
+                >
+                  {rejectMut.isPending ? <Loader2 size={12} className="animate-spin" /> : 'Reject'}
+                </button>
+              )}
+              {/* Step 1 — only when fresh submitted */}
+              {isSubmitted && (
                 <button
                   onClick={() => ackMut.mutate(proofModal.id)}
                   disabled={ackMut.isPending || rejectMut.isPending || clearMut.isPending}
@@ -416,18 +494,109 @@ export default function AdminPayments() {
                   Mark received
                 </button>
               )}
-              {/* Step 2 — confirm cleared. Available from either state. */}
-              <button
-                onClick={() => setClearTarget(proofModal)}
-                disabled={clearMut.isPending || ackMut.isPending || rejectMut.isPending}
-                className="btn-primary"
-                style={{ padding: '9px 18px', fontSize: 13 }}
-              >
-                <CheckCircle2 size={14} /> Confirm cleared
-              </button>
+              {/* Confirm cleared — available unless already cleared */}
+              {!isCleared && (
+                <button
+                  onClick={() => setClearTarget(proofModal)}
+                  disabled={clearMut.isPending || ackMut.isPending || rejectMut.isPending}
+                  className="btn-primary"
+                  style={{ padding: '9px 18px', fontSize: 13 }}
+                >
+                  <CheckCircle2 size={14} /> Confirm cleared
+                </button>
+              )}
             </div>
           </>
-        )}
+          );
+        })()}
+      </Modal>
+
+      {/* Revenue period drill-in modal — opens when the admin clicks
+          a month row in the Revenue tab. Buckets every invoice for
+          that period into Cleared / In-flight / Pending so the admin
+          can see which students owe vs which have paid in one glance.
+          Each row is clickable → opens the InvoiceDetailModal above
+          (sequential modals — the period modal stays open behind the
+          invoice one, so closing the invoice modal returns to the
+          period view). */}
+      <Modal open={!!periodModal} onClose={() => setPeriodModal(null)} maxWidth={620}>
+        {periodModal && (() => {
+          const rows = invoices.filter(i => i.period === periodModal);
+          const cleared    = rows.filter(i => i.proofStatus === 'CLEARED');
+          const inFlight   = rows.filter(i => i.proofStatus === 'SUBMITTED' || i.proofStatus === 'ACKNOWLEDGED');
+          const pendingRow = rows.filter(i => !i.proofStatus || i.proofStatus === 'REJECTED');
+          const sum = (xs: AdminInvoice[]) =>
+            xs.reduce((s, i) => s + Number(i.amount?.replace(/[^0-9.]/g, '') ?? 0), 0);
+          return (
+            <>
+              <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', letterSpacing: '.06em', marginBottom: 2 }}>REVENUE · {formatPeriod(periodModal)}</p>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{rows.length} invoice{rows.length === 1 ? '' : 's'} · R{sum(rows).toLocaleString()} expected</p>
+                </div>
+                <button onClick={() => setPeriodModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4 }} aria-label="Close">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+                <BucketStat label="Cleared"   count={cleared.length}    total={sum(cleared)}    tone="cyan" />
+                <BucketStat label="In flight" count={inFlight.length}   total={sum(inFlight)}   tone="amber" />
+                <BucketStat label="Pending"   count={pendingRow.length} total={sum(pendingRow)} tone="rose" />
+              </div>
+
+              <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+                {[
+                  { label: 'Cleared',   list: cleared,    color: 'var(--cyan)' },
+                  { label: 'In flight', list: inFlight,   color: '#f59e0b' },
+                  { label: 'Pending',   list: pendingRow, color: 'var(--rose)' },
+                ].map(group => group.list.length > 0 && (
+                  <div key={group.label}>
+                    <div style={{
+                      padding: '8px 14px', background: 'var(--bg3)',
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)',
+                      letterSpacing: '.06em', textTransform: 'uppercase',
+                      borderBottom: '1px solid var(--border)',
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color, display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }} />
+                      {group.label} ({group.list.length})
+                    </div>
+                    {group.list.map(inv => (
+                      <div
+                        key={inv.id}
+                        onClick={() => setProofModal(inv)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setProofModal(inv); } }}
+                        className="hover-lift"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 14px', borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--text2)' }}>{inv.user.name}</span>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>{inv.user.email}</span>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: group.color, minWidth: 64, textAlign: 'right' }}>
+                          R{Number(inv.amount?.replace(/[^0-9.]/g, '') ?? 0).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {rows.length === 0 && (
+                  <p style={{ padding: 24, textAlign: 'center', color: 'var(--text3)', fontSize: 12 }}>
+                    No invoices for this period.
+                  </p>
+                )}
+              </div>
+
+              <p style={{ marginTop: 12, fontSize: 11, color: 'var(--text4)', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Tip: click any row above to open the full invoice + proof.
+              </p>
+            </>
+          );
+        })()}
       </Modal>
 
       <ConfirmModal
@@ -669,6 +838,31 @@ function BulkInvoiceModal({ onClose, onDone }: { onClose: () => void; onDone: ()
           </div>
         )}
     </Modal>
+  );
+}
+
+/** Compact bucket summary tile for the revenue-period modal. */
+function BucketStat({ label, count, total, tone }: {
+  label: string; count: number; total: number; tone: 'cyan' | 'amber' | 'rose';
+}) {
+  const color = tone === 'cyan' ? 'var(--cyan)' : tone === 'amber' ? '#f59e0b' : 'var(--rose)';
+  return (
+    <div style={{ padding: '12px 14px', borderRadius: 10, background: `${color}10`, border: `1px solid ${color}30` }}>
+      <p style={{ fontSize: 10, color, fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</p>
+      <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginTop: 4, lineHeight: 1 }}>{count}</p>
+      <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>R{total.toLocaleString()}</p>
+    </div>
+  );
+}
+
+/** Tiny labelled fact for the invoice-detail modal grid. */
+function DetailFact({ label, value, tone }: { label: string; value: string; tone?: 'cyan' | 'rose' }) {
+  const color = tone === 'rose' ? 'var(--rose)' : tone === 'cyan' ? 'var(--cyan)' : 'var(--text)';
+  return (
+    <div>
+      <p style={{ fontSize: 9, color: 'var(--text4)', fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</p>
+      <p style={{ fontSize: 13, fontWeight: 500, color, marginTop: 2 }}>{value}</p>
+    </div>
   );
 }
 

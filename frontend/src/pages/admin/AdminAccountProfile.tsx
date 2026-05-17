@@ -129,7 +129,18 @@ export default function AdminAccountProfile() {
   const invoices        = documents.filter(d => d.type === 'INVOICE');
   const contracts       = documents.filter(d => d.type === 'CONTRACT');
   const unpaid          = invoices.filter(i => i.status !== 'Paid');
-  const totalAttention  = (stats.docsSubmitted ?? 0) + stats.openTickets + stats.monthsUnpaid;
+  // "Awaiting student" compliance gap — out of the 4 expected types,
+  // how many is the student still on the hook for? Counts both
+  // Missing (no row exists) and Rejected (admin sent it back). Mirrors
+  // the count the student sees on her Profile sidebar badge.
+  const EXPECTED_DOC_TYPES = 4;
+  const docsAwaitingStudent = EXPECTED_DOC_TYPES - complianceDocs.filter(
+    d => d.status === 'Submitted' || d.status === 'Approved',
+  ).length;
+  const totalAttention  = (stats.docsSubmitted ?? 0)
+                        + stats.openTickets
+                        + stats.monthsUnpaid
+                        + (isStudent ? docsAwaitingStudent : 0);
 
   return (
     <div className="space-y-5 appear">
@@ -195,6 +206,14 @@ export default function AdminAccountProfile() {
             {(stats.docsSubmitted ?? 0) > 0 && (
               <a href="#compliance" className="badge badge-rose" style={{ fontSize: 11, textDecoration: 'none' }}>
                 {stats.docsSubmitted} doc{stats.docsSubmitted === 1 ? '' : 's'} to review
+              </a>
+            )}
+            {/* Student-side compliance gap — distinct from "to review"
+                which is admin work. This chip flags docs the STUDENT
+                still owes (Missing + Rejected combined). */}
+            {isStudent && docsAwaitingStudent > 0 && (
+              <a href="#compliance" className="badge badge-rose" style={{ fontSize: 11, textDecoration: 'none' }}>
+                {docsAwaitingStudent} doc{docsAwaitingStudent === 1 ? '' : 's'} awaiting student
               </a>
             )}
             {stats.openTickets > 0 && (
