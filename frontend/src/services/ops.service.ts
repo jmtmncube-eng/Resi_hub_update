@@ -18,6 +18,9 @@ export interface OpsService {
   proofUrl: string | null;
   meta: Record<string, unknown> | null;
   createdById: string;
+  /** Admin who logged the entry — included by the backend so the UI
+   *  can show "logged by Alistair" without an extra fetch per row. */
+  createdBy?: { id: string; name: string } | null;
   createdAt: string;
 }
 

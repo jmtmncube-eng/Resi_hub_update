@@ -196,6 +196,7 @@ model User {
   voucherClaims      VoucherClaim[]
   notifications      Notification[]
   passwordResets     PasswordResetToken[]
+  opsServicesLogged  OpsService[]         @relation("OpsServiceCreatedBy")
 
   @@index([role])
   @@index([email])
@@ -669,10 +670,15 @@ model OpsService {
   createdAt   DateTime       @default(now())
 
   residence Residence? @relation(fields: [residenceId], references: [id], onDelete: SetNull)
+  // Relation back to the admin who logged the entry. Used by the
+  // Operations UI to render "Logged by Alistair" on each entry row
+  // (audit context without an extra round-trip).
+  createdBy User       @relation("OpsServiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([type, date])
   @@index([date])
   @@index([residenceId])
+  @@index([createdById])
 }
 
 /// Current stock level for consumables we want to know are running out

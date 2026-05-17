@@ -33,7 +33,14 @@ export async function listOpsServices(filters: { type?: OpsType; from?: string; 
     if (filters.to)   dateClause.lte = new Date(filters.to);
     where.date = dateClause;
   }
-  return prisma.opsService.findMany({ where, orderBy: { date: 'desc' } });
+  return prisma.opsService.findMany({
+    where,
+    orderBy: { date: 'desc' },
+    // Include the admin who logged the entry so the UI can show
+    // "logged by Alistair" on each row — audit context without a
+    // round-trip per entry.
+    include: { createdBy: { select: { id: true, name: true } } },
+  });
 }
 
 export async function createOpsService(adminId: string, input: CreateOpsServiceInput) {

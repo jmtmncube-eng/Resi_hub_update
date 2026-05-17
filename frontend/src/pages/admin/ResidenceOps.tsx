@@ -354,27 +354,27 @@ function SectionCard({
         })}
       </div>
 
-      {/* Recent entries — list view only; cards view drops this to
-          stay compact. In cards mode the stat strip's "{n} entries"
-          hint on Cadence still tells you how many exist. */}
-      {!compact && (
-        recent.length === 0 ? (
-          <p style={{
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)',
-            textAlign: 'center', padding: '12px 0',
-          }}>
-            No entries yet — click <b style={{ color: section.accent }}>Log entry</b> to start tracking.
+      {/* Recent entries — list view shows the 5 most recent;
+          cards view shows just the latest so the admin still has a
+          sense of what's been logged without the section bloating. */}
+      {recent.length === 0 ? (
+        <p style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: 'var(--text3)',
+          textAlign: 'center', padding: '12px 0',
+        }}>
+          No entries yet — click <b style={{ color: section.accent }}>Log entry</b> to start tracking.
+        </p>
+      ) : (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+          <p className="micro-label" style={{ marginBottom: 8 }}>
+            {compact ? 'Last entry' : 'Recent entries'}
           </p>
-        ) : (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <p className="micro-label" style={{ marginBottom: 8 }}>Recent entries</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {recent.map(s => (
-                <EntryRow key={s.id} entry={s} onDelete={() => onDelete(s.id)} accent={section.accent} />
-              ))}
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {(compact ? recent.slice(0, 1) : recent).map(s => (
+              <EntryRow key={s.id} entry={s} onDelete={() => onDelete(s.id)} accent={section.accent} />
+            ))}
           </div>
-        )
+        </div>
       )}
     </div>
   );
@@ -429,6 +429,11 @@ function EntryRow({ entry, onDelete, accent }: { entry: OpsService; onDelete: ()
         {entry.note && (
           <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {entry.note}
+          </p>
+        )}
+        {entry.createdBy?.name && (
+          <p style={{ fontSize: 10, color: 'var(--text4)', marginTop: 2, fontFamily: "'IBM Plex Mono', monospace" }}>
+            Logged by {entry.createdBy.name}
           </p>
         )}
       </div>

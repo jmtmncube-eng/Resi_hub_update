@@ -5,11 +5,13 @@ import {
   DoorOpen, RefreshCw, ChevronUp, Plus, Minus, UserPlus, UserMinus, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import {
   getSettings, updateSettings, getOccupancy,
   setupRooms, setupRoomsMixed, ResidenceSettings,
   AdminRoom, getAccounts, createAllocation, removeAllocation, moveAllocation,
   deleteRoom, createRoom,
+  getAccountOverview,
 } from '../../services/admin.service';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useResidence } from '../../contexts/ResidenceContext';
@@ -51,9 +53,14 @@ interface AdminSettingsProps {
 export default function AdminSettings({ hideHeader = false, initialTab = 'info' }: AdminSettingsProps = {}) {
   usePageTitle(hideHeader ? '' : 'Residence · Admin');
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'info' | 'rooms'>(initialTab);
   const { selectedId: residenceId } = useResidence();
   const confirm = useConfirm();
+  // Tenant quick-peek — clicking a tenant chip in a room card opens
+  // a popover showing identity + bio + program + payment status. "Open
+  // full profile" link inside navigates to /admin/accounts/:id.
+  const [peekUserId, setPeekUserId] = useState<string | null>(null);
 
   // ── Info form state ─────────────────────────────────────────
   const [form, setForm] = useState<Partial<ResidenceSettings>>(BLANK);
@@ -843,16 +850,27 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
                                 background: t.status === 'RESERVED' ? 'rgba(251,146,60,.08)' : 'rgba(0,204,204,.07)',
                                 border: `1px solid ${t.status === 'RESERVED' ? 'rgba(251,146,60,.2)' : 'rgba(0,204,204,.18)'}`,
                               }}>
-                                <span style={{
-                                  fontSize: 11, color: 'var(--text)', fontWeight: 500,
-                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                  flex: 1, minWidth: 0,
-                                }} title={t.user.email}>
+                                <button
+                                  onClick={() => setPeekUserId(t.user.id)}
+                                  className="press-soft"
+                                  title={`Quick view — ${t.user.email}`}
+                                  style={{
+                                    background: 'transparent', border: 'none', cursor: 'pointer',
+                                    padding: 0, textAlign: 'left',
+                                    fontSize: 11, color: 'var(--text)', fontWeight: 500,
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                    flex: 1, minWidth: 0,
+                                    textDecoration: 'underline',
+                                    textDecorationStyle: 'dotted',
+                                    textDecorationColor: 'rgba(0,204,204,.3)',
+                                    textUnderlineOffset: 3,
+                                  }}
+                                >
                                   {t.user.name}
                                   {t.status === 'RESERVED' && (
                                     <span style={{ fontSize: 9, color: '#fb923c', marginLeft: 5, fontFamily: "'IBM Plex Mono', monospace" }}>res</span>
                                   )}
-                                </span>
+                                </button>
                                 <button
                                   onClick={async () => {
                                     const ok = await confirm({
@@ -947,6 +965,7 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
       {addTenantRoom && (
         <AddTenantModal
           room={addTenantRoom}
+          targetResidenceId={residenceId ?? null}
           accounts={accountsList}
           onClose={() => setAddTenantRoom(null)}
           onSubmitNew={(userId, status, electricitySelfManaged) => addTenantMut.mutate({
@@ -965,6 +984,137 @@ export default function AdminSettings({ hideHeader = false, initialTab = 'info' 
           loading={addTenantMut.isPending || moveTenantMut.isPending}
         />
       )}
+
+      {/* Tenant quick-peek popup — opened from a tenant chip in any
+          room card. Read-only snapshot with a "View full profile"
+          link that navigates to the dedicated account profile page. */}
+      <TenantPeekModal
+        userId={peekUserId}
+        onClose={() => setPeekUserId(null)}
+        onViewFull={(id) => { setPeekUserId(null); navigate(`/admin/accounts/${id}`); }}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Tenant quick-peek — fetched on demand via getAccountOverview so
+// we get a rich summary (lease, payments, compliance) without making
+// the room cards heavier on initial load.
+// ─────────────────────────────────────────────────────────────────
+
+function TenantPeekModal({
+  userId, onClose, onViewFull,
+}: {
+  userId: string | null;
+  onClose: () => void;
+  onViewFull: (id: string) => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-account-overview', userId],
+    queryFn:  () => getAccountOverview(userId!),
+    enabled:  !!userId,
+  });
+
+  return (
+    <Modal open={!!userId} onClose={onClose} maxWidth={420}>
+      {isLoading || !data ? (
+        <div style={{ padding: 32, textAlign: 'center' }}>
+          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--cyan)' }} />
+        </div>
+      ) : (() => {
+        const invoices  = data.documents.filter(d => d.type === 'INVOICE');
+        const unpaid    = invoices.filter(i => i.status !== 'Paid').length;
+        const allocation = data.allocation;
+        const room      = allocation?.room;
+        return (
+          <>
+            {/* Avatar + identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+              {data.avatarUrl ? (
+                <img src={data.avatarUrl} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div className="avatar avatar-cyan" style={{ width: 56, height: 56, fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+                  {data.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {data.name}
+                </p>
+                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                  {data.email}
+                </p>
+                {data.phone && (
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
+                    {data.phone}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {data.bio && (
+              <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.55, marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+                {data.bio}
+              </p>
+            )}
+
+            {/* Quick facts */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
+              <PeekFact label="Programme"  value={data.program ?? '—'} />
+              <PeekFact label="University" value={data.university ?? '—'} />
+              <PeekFact label="Room"       value={room ? `Blk ${room.block} – ${room.number}` : '—'} />
+              <PeekFact label="Rent"       value={allocation ? `R${Number(allocation.rent).toLocaleString()}/mo` : '—'} />
+            </div>
+
+            {/* Payment + compliance status — the two things admin cares about
+                most when looking at a tenant chip in a room. */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+              <span className={`badge ${unpaid > 0 ? 'badge-rose' : 'badge-cyan'}`} style={{ fontSize: 11 }}>
+                {unpaid > 0 ? `${unpaid} unpaid invoice${unpaid === 1 ? '' : 's'}` : 'Payments up to date'}
+              </span>
+              {(data.stats.docsRejected ?? 0) > 0 && (
+                <span className="badge badge-rose" style={{ fontSize: 11 }}>
+                  {data.stats.docsRejected} doc{data.stats.docsRejected === 1 ? '' : 's'} rejected
+                </span>
+              )}
+              {(data.stats.docsSubmitted ?? 0) > 0 && (
+                <span className="badge badge-rose" style={{ fontSize: 11 }}>
+                  {data.stats.docsSubmitted} to review
+                </span>
+              )}
+              {data.stats.openTickets > 0 && (
+                <span className="badge badge-rose" style={{ fontSize: 11 }}>
+                  {data.stats.openTickets} open ticket{data.stats.openTickets === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={onClose} className="btn-ghost" style={{ padding: '8px 16px', fontSize: 13 }}>
+                Close
+              </button>
+              <button onClick={() => onViewFull(data.id)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 13 }}>
+                Open full profile →
+              </button>
+            </div>
+          </>
+        );
+      })()}
+    </Modal>
+  );
+}
+
+function PeekFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p style={{ fontSize: 9, color: 'var(--text4)', fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
+        {label}
+      </p>
+      <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -1087,13 +1237,23 @@ function AddRoomModal({ existingRooms, loading, onClose, onSubmit }: {
 
 interface AccountListItem {
   id: string; name: string; email: string; role: string;
-  allocation: { room: { number: string; block: string } } | null;
+  allocation: {
+    room: {
+      number: string; block: string;
+      residence?: { id: string; name: string } | null;
+    };
+  } | null;
 }
 
 function AddTenantModal({
-  room, accounts, onClose, onSubmitNew, onSubmitMove, loading,
+  room, targetResidenceId, accounts, onClose, onSubmitNew, onSubmitMove, loading,
 }: {
   room: AdminRoom;
+  /** Residence the room belongs to — passed in from the page (we can't
+   *  derive it from AdminRoom alone since the backend doesn't surface
+   *  residenceId on the occupancy endpoint). Used to bucket students
+   *  by within-residence vs cross-residence in the picker. */
+  targetResidenceId: string | null;
   accounts: AccountListItem[];
   onClose: () => void;
   /** Called when student has no current allocation. */
@@ -1103,15 +1263,33 @@ function AddTenantModal({
   loading: boolean;
 }) {
   const confirm = useConfirm();
-  // Show every non-admin student. Allocated ones surface a "move from"
-  // label so admin sees the cost of the action.
-  const eligible = accounts.filter(a => a.role !== 'ADMIN');
+  // Only STUDENTS can be tenants — staff roles (MANAGER, MAINTENANCE,
+  // ADMIN) are never assigned to rooms. Previously this filter only
+  // excluded ADMIN which let Manager/Maintenance leak through.
+  const STUDENT_ROLES = ['ACTIVE_STUDENT', 'PENDING_STUDENT'];
+  const eligible = accounts.filter(a => STUDENT_ROLES.includes(a.role));
   const [userId, setUserId] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'RESERVED'>('ACTIVE');
   const [electricitySelfManaged, setElectricitySelfManaged] = useState(false);
 
   const selectedStudent = eligible.find(s => s.id === userId);
   const currentRoom = selectedStudent?.allocation?.room;
+
+  // Bucket students by allocation state so admin can see at a glance
+  // who's easy to assign (unallocated), who's a within-residence
+  // shuffle, and who'd be a cross-residence move (rare, flag it).
+  const byName = (a: AccountListItem, b: AccountListItem) => a.name.localeCompare(b.name);
+  const unallocated = eligible.filter(s => !s.allocation?.room).sort(byName);
+  const inThisResidence = eligible.filter(s => {
+    const r = s.allocation?.room;
+    // If targetResidenceId is null, treat anyone with an allocation
+    // as in-residence to avoid hiding everyone. Otherwise compare by id.
+    return r && (targetResidenceId == null || r.residence?.id === targetResidenceId);
+  }).sort(byName);
+  const inOtherResidences = eligible.filter(s => {
+    const r = s.allocation?.room;
+    return r && targetResidenceId != null && r.residence?.id !== targetResidenceId;
+  }).sort(byName);
 
   async function handleSubmit() {
     if (!userId) return;
@@ -1142,16 +1320,37 @@ function AddTenantModal({
       <label className="field-label">Student</label>
       <select value={userId} onChange={e => setUserId(e.target.value)} className="input-base" style={{ marginBottom: 6 }}>
         <option value="">— pick a student —</option>
-        {eligible.length === 0 ? (
+        {eligible.length === 0 && (
           <option disabled>No students available</option>
-        ) : eligible.map(s => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-            {s.allocation?.room
-              ? ` · currently in ${s.allocation.room.block}-${s.allocation.room.number}`
-              : ` · ${s.email}`}
-          </option>
-        ))}
+        )}
+        {/* Unallocated students first — easiest case. */}
+        {unallocated.length > 0 && (
+          <optgroup label={`Unallocated (${unallocated.length})`}>
+            {unallocated.map(s => (
+              <option key={s.id} value={s.id}>{s.name} · {s.email}</option>
+            ))}
+          </optgroup>
+        )}
+        {/* Within-residence — shuffles, no cross-residence move warning. */}
+        {inThisResidence.length > 0 && (
+          <optgroup label={`In this residence (${inThisResidence.length})`}>
+            {inThisResidence.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name} · currently in {s.allocation!.room.block}-{s.allocation!.room.number}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {/* Cross-residence — admin should know this is a different campus. */}
+        {inOtherResidences.length > 0 && (
+          <optgroup label={`In another residence (${inOtherResidences.length})`}>
+            {inOtherResidences.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.allocation!.room.residence?.name ?? 'other'} {s.allocation!.room.block}-{s.allocation!.room.number}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
 
       {/* Hint when re-allocating */}
