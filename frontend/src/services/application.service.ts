@@ -142,3 +142,46 @@ export async function setDocExpiry(docId: string, expiresAt: string | null): Pro
   );
   return res.data.data;
 }
+
+// ── Admin: per-doc compliance review ───────────────────────────
+
+export interface PendingDocReview {
+  id:        string;
+  type:      ApplicationDocType;
+  status:    string;
+  fileUrl:   string | null;
+  createdAt: string;
+  user:      { id: string; name: string; email: string; role: string };
+}
+
+/** Admin / manager: list every compliance doc currently awaiting review
+ *  (Submitted status), across both pending applicants and active students
+ *  who re-uploaded — sorted oldest-first so the queue is FIFO. */
+export async function listDocsAwaitingReview(): Promise<PendingDocReview[]> {
+  const res = await api.get<ApiResponse<PendingDocReview[]>>('/application/admin/docs/awaiting-review');
+  return res.data.data;
+}
+
+/** Admin / manager: nudge a student to upload one or more missing
+ *  compliance documents. Sends a single in-app notification + email
+ *  listing every type. Backend skips any types already uploaded. */
+export async function remindCompliance(userId: string, types: ApplicationDocType[]): Promise<{ remindedTypes: ApplicationDocType[] }> {
+  const res = await api.post<ApiResponse<{ remindedTypes: ApplicationDocType[] }>>(
+    `/application/admin/${userId}/remind-docs`, { types },
+  );
+  return res.data.data;
+}
+
+/** Admin / manager: per-doc verdict. Rejection requires a note — the
+ *  student gets an in-app notification + email with the reason and
+ *  a deep-link back to /profile to re-upload. */
+export async function decideDocument(
+  docId: string,
+  decision: 'APPROVED' | 'REJECTED',
+  note?: string,
+): Promise<ApplicationDocument> {
+  const res = await api.post<ApiResponse<ApplicationDocument>>(
+    `/application/admin/docs/${docId}/decide`, { decision, note },
+  );
+  return res.data.data;
+}

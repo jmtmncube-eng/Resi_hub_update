@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Camera, Loader2, Save } from 'lucide-react';
+import { Camera, Loader2, Save, User as UserIcon, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { updateProfile, uploadAvatar } from '../../services/profile.service';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +11,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import ComplianceDocsCard from '../../components/ComplianceDocsCard';
 import LeaseDocsCard from '../../components/LeaseDocsCard';
 import MyLeaseCard from '../../components/MyLeaseCard';
+import { getMyApplicationDocs } from '../../services/application.service';
 
 const ACCEPTED_AVATAR = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -39,7 +40,12 @@ export default function Profile() {
   const fileRef              = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  const isAdmin = user?.role === 'ADMIN';
+  // Role gates — the page is shared across every role, but only students
+  // get the lease + compliance + room cards and the university/programme
+  // fields. Staff roles see identity + personal details only.
+  const role      = user?.role;
+  const isStudent = role === 'ACTIVE_STUDENT' || role === 'PENDING_STUDENT';
+  const isStaff   = role === 'ADMIN' || role === 'MANAGER' || role === 'MAINTENANCE';
 
   const { register, handleSubmit, formState: { errors, isDirty } } = useForm<FormData>({
     defaultValues: {
@@ -98,20 +104,57 @@ export default function Profile() {
     uploadAv(file);
   }
 
-  const roleLabel = isAdmin ? 'Admin' : user?.role === 'ACTIVE_STUDENT' ? 'Resident' : 'Applicant';
+  const roleLabel =
+    role === 'ADMIN'           ? 'Admin'       :
+    role === 'MANAGER'         ? 'Manager'     :
+    role === 'MAINTENANCE'     ? 'Maintenance' :
+    role === 'ACTIVE_STUDENT'  ? 'Resident'    :
+                                 'Applicant';
+
+  // Tab state — students only. Defaults to 'personal'; sticky in localStorage
+  // so the page reopens on whichever tab the user last used.
+  const [tab, setTab] = useState<'personal' | 'documents'>(() => {
+    try {
+      const v = localStorage.getItem('profile-tab');
+      return v === 'documents' ? 'documents' : 'personal';
+    } catch { return 'personal'; }
+  });
+  function selectTab(t: 'personal' | 'documents') {
+    setTab(t);
+    try { localStorage.setItem('profile-tab', t); } catch { /* ignore */ }
+  }
+
+  // Counter on the Documents tab — mirrors the sidebar Profile badge:
+  // compliance docs that are Missing OR Rejected (i.e. need the student
+  // to upload). Submitted + Approved are not counted.
+  const { data: myDocsByType } = useQuery({
+    queryKey: ['my-application-docs'],
+    queryFn:  getMyApplicationDocs,
+    enabled:  isStudent,
+  });
+  const docsTabBadge = myDocsByType
+    ? (Object.keys(myDocsByType) as Array<keyof typeof myDocsByType>).filter(t => {
+        const d = myDocsByType[t];
+        return !d || d.status === 'Rejected';
+      }).length
+    : 0;
 
   return (
     <div className="space-y-5 appear" style={{ maxWidth: 680 }}>
       <div>
         <h1 className="page-title">Profile</h1>
-        <p className="page-sub">Your personal details, bio and compliance documents</p>
+        <p className="page-sub">
+          {isStudent
+            ? 'Your personal details, bio and compliance documents'
+            : 'Your personal details and profile picture'}
+        </p>
       </div>
 
       {/* Avatar section — always first, identity at the top of the page */}
       <div className="card" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{ position: 'relative' }}>
-            <div className={`avatar ${isAdmin ? 'avatar-rose' : 'avatar-cyan'}`} style={{ width: 72, height: 72, fontSize: 22, fontWeight: 700, overflow: 'hidden', position: 'relative' }}>
+            <div className={`avatar ${isStaff ? 'avatar-rose' : 'avatar-cyan'}`} style={{ width: 72, height: 72, fontSize: 22, fontWeight: 700, overflow: 'hidden', position: 'relative' }}>
               {preview || user?.avatarUrl
                 ? <img src={preview ?? user!.avatarUrl!} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : user?.name?.slice(0,2).toUpperCase()
@@ -144,7 +187,7 @@ export default function Profile() {
           <div>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{user?.name}</p>
             <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>{user?.email}</p>
-            <span className={`badge ${isAdmin ? 'badge-rose' : 'badge-cyan'}`}>{roleLabel}</span>
+            <span className={`badge ${isStaff ? 'badge-rose' : 'badge-cyan'}`}>{roleLabel}</span>
           </div>
         </div>
         <input
@@ -159,57 +202,82 @@ export default function Profile() {
         </p>
       </div>
 
-      {/* Edit form */}
-      <form onSubmit={handleSubmit(d => save(d))} className="card" style={{ padding: '20px 24px' }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 20 }}>Personal Details</p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ marginBottom: 16 }}>
-          <Field label="Full Name" error={errors.name?.message}>
-            <input {...register('name')} className="input-base" />
-          </Field>
-          <Field label="Phone Number">
-            <input {...register('phone')} placeholder="+27 ..." className="input-base" />
-          </Field>
-          <Field label="University">
-            <input {...register('university')} className="input-base" />
-          </Field>
-          <Field label="Programme / Degree">
-            <input {...register('program')} className="input-base" />
-          </Field>
-        </div>
-
-        <Field label="Bio (max 300 characters)" error={errors.bio?.message}>
-          <textarea {...register('bio')} rows={3} placeholder="Tell your housemates a bit about yourself…" className="input-base" />
-        </Field>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
-          <button type="submit" disabled={saving || !isDirty} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
-      </form>
-
-      {/* Room info (read-only) */}
-      {user?.allocation && (
-        <div className="card" style={{ padding: '20px 24px' }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>Room Information</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <InfoTile label="Room"   value={`Room ${user.allocation.room.number}`} />
-            <InfoTile label="Block"  value={user.allocation.room.block} />
-            <InfoTile label="Type"   value={user.allocation.room.type} />
-            <InfoTile label="Rent"   value={`R${Number(user.allocation.rent).toLocaleString()}/mo`} />
-            <InfoTile label="Status" value={user.allocation.status} />
-          </div>
+      {/* Tabs — students only. Staff have nothing to put on a Documents
+          tab (no lease, no compliance), so we render their slim form
+          inline below instead. */}
+      {isStudent && (
+        <div role="tablist" style={{
+          display: 'flex', gap: 2, borderBottom: '1px solid var(--border)',
+        }}>
+          <ProfileTab label="Personal"  icon={UserIcon} active={tab === 'personal'}  onClick={() => selectTab('personal')} />
+          <ProfileTab label="Documents" icon={FileText} active={tab === 'documents'} onClick={() => selectTab('documents')} badge={docsTabBadge} />
         </div>
       )}
 
-      {/* Personal paperwork — students only; admins skip these cards.
-          Sits below identity + details so the page reads top-down:
-          who you are → your details → your room → your lease → your documents. */}
-      {!isAdmin && <MyLeaseCard />}
-      {!isAdmin && <LeaseDocsCard />}
-      {!isAdmin && <ComplianceDocsCard />}
+      {/* PERSONAL — personal details form + room info. Staff render this
+          block directly (no tab chrome) since their page is short. */}
+      {(!isStudent || tab === 'personal') && (
+        <>
+          <form onSubmit={handleSubmit(d => save(d))} className="card" style={{ padding: '20px 24px' }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 20 }}>Personal Details</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ marginBottom: 16 }}>
+              <Field label="Full Name" error={errors.name?.message}>
+                <input {...register('name')} className="input-base" />
+              </Field>
+              <Field label="Phone Number">
+                <input {...register('phone')} placeholder="+27 ..." className="input-base" />
+              </Field>
+              {/* University + programme are student-only — staff roles don't have
+                  an academic record so we hide the fields entirely. */}
+              {isStudent && (
+                <>
+                  <Field label="University">
+                    <input {...register('university')} className="input-base" />
+                  </Field>
+                  <Field label="Programme / Degree">
+                    <input {...register('program')} className="input-base" />
+                  </Field>
+                </>
+              )}
+            </div>
+
+            <Field label="Bio (max 300 characters)" error={errors.bio?.message}>
+              <textarea {...register('bio')} rows={3} placeholder="Tell your housemates a bit about yourself…" className="input-base" />
+            </Field>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
+              <button type="submit" disabled={saving || !isDirty} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13 }}>
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+
+          {/* Room info (read-only) — students only; staff don't have allocations */}
+          {isStudent && user?.allocation && (
+            <div className="card" style={{ padding: '20px 24px' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 16 }}>Room Information</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <InfoTile label="Room"   value={`Room ${user.allocation.room.number}`} />
+                <InfoTile label="Block"  value={user.allocation.room.block} />
+                <InfoTile label="Type"   value={user.allocation.room.type} />
+                <InfoTile label="Rent"   value={`R${Number(user.allocation.rent).toLocaleString()}/mo`} />
+                <InfoTile label="Status" value={user.allocation.status} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* DOCUMENTS — lease + lease docs + compliance docs. Students only. */}
+      {isStudent && tab === 'documents' && (
+        <>
+          <MyLeaseCard />
+          <LeaseDocsCard />
+          <ComplianceDocsCard />
+        </>
+      )}
     </div>
   );
 }
@@ -230,5 +298,53 @@ function InfoTile({ label, value }: { label: string; value: string }) {
       <p className="micro-label" style={{ marginBottom: 4 }}>{label}</p>
       <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{value}</p>
     </div>
+  );
+}
+
+// Profile tab — same shape as the residence tabs on the Accounts page.
+// Optional rose badge for action counts (Documents tab uses it for the
+// compliance-docs-needing-action count, matching the sidebar Profile
+// badge). Hidden when the count is zero so the tab reads clean.
+function ProfileTab({
+  label, icon: Icon, active, onClick, badge,
+}: {
+  label: string;
+  icon: React.ComponentType<{ size?: number | string }>;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      className="press-soft"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '10px 16px', borderRadius: 0, border: 'none',
+        background: 'transparent',
+        color:      active ? 'var(--text)' : 'var(--text3)',
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        cursor: 'pointer', whiteSpace: 'nowrap',
+        borderBottom: active ? '2px solid var(--cyan)' : '2px solid transparent',
+        marginBottom: -1,
+      }}
+    >
+      <Icon size={14} />
+      {label}
+      {badge !== undefined && badge > 0 && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          minWidth: 18, height: 18, padding: '0 6px',
+          borderRadius: 999, fontSize: 10, fontWeight: 700,
+          background: 'var(--rose)', color: '#fff',
+          fontFamily: "'IBM Plex Mono', monospace",
+          lineHeight: 1,
+        }}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+    </button>
   );
 }

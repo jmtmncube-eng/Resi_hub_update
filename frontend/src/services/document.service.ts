@@ -32,8 +32,18 @@ export interface BulkInvoiceResult {
   invoices: Array<{ id: string; userId: string; userName: string; amount: string }>;
 }
 
-/** Admin generates rent invoices for all active students for a chosen month. */
-export async function bulkCreateInvoices(period: string, includeOwing: boolean): Promise<BulkInvoiceResult> {
-  const res = await api.post<ApiResponse<BulkInvoiceResult>>('/documents/admin/invoices/bulk', { period, includeOwing });
+/** Admin generates rent invoices for all active students for a chosen month.
+ *
+ *  `notifyByEmail` is opt-in (default false) so testing doesn't burn the
+ *  monthly Resend quota. In-app notifications fire regardless. */
+export async function bulkCreateInvoices(
+  period: string,
+  includeOwing: boolean,
+  notifyByEmail: boolean = false,
+): Promise<BulkInvoiceResult> {
+  const res = await api.post<ApiResponse<BulkInvoiceResult>>(
+    '/documents/admin/invoices/bulk',
+    { period, includeOwing, notifyByEmail },
+  );
   return res.data.data;
 }

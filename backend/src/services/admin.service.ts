@@ -95,6 +95,23 @@ export async function getAdminStats(residenceId?: string) {
   ]);
   const monthlyRevenue = allocations.reduce((sum, a) => sum + Number(a.rent), 0);
 
+  // Actual collected (last 30 days) — sum of cleared invoices. This is the
+  // number that should move when admin marks an invoice paid; the
+  // monthlyRevenue figure above is projected and never reflects payments.
+  const clearedInvoices = await prisma.document.findMany({
+    where: {
+      type:        'INVOICE',
+      proofStatus: 'CLEARED',
+      clearedAt:   { gte: thirtyDaysAgo },
+      ...(residenceId ? { user: { allocation: { is: { room: { is: { residenceId } } } } } } : {}),
+    },
+    select: { amount: true },
+  });
+  const revenueCollected30d = clearedInvoices.reduce(
+    (s, inv) => s + Number(inv.amount?.replace(/[^0-9.]/g, '') ?? 0),
+    0,
+  );
+
   // Slot maths — capacity falls back to 1 if not set
   const totalSlots  = allRooms.reduce((s, r) => s + (r.capacity || TYPE_CAPACITY[r.type] || 1), 0);
   const filledSlots = allocations.length;
@@ -139,6 +156,7 @@ export async function getAdminStats(residenceId?: string) {
     visitors:      { total: totalVisitors, today: todayVisitors },
     vouchers:      { active: totalVouchers },
     monthlyRevenue,
+    revenueCollected30d,
     monthlyOpsCost,
     monthlyContractorCost,
     monthlyTotalCost,
@@ -486,8 +504,14 @@ export async function updateAllocation(id: string, data: UpdateAllocationInput) 
 }
 
 // ── Accounts ──────────────────────────────────────────────────
+//
+// Returns every account plus three "needs attention" counts per user
+// (compliance docs awaiting review, open maintenance tickets, unpaid
+// invoices) so the accounts list can highlight rows that have something
+// pending — without making N+1 calls per row. residenceId/Name are
+// surfaced via allocation → room → residence for grouping + filtering.
 export async function getAllAccounts(search?: string) {
-  return prisma.user.findMany({
+  const users = await prisma.user.findMany({
     where: search
       ? {
           OR: [
@@ -497,25 +521,81 @@ export async function getAllAccounts(search?: string) {
         }
       : undefined,
     select: {
-      id:         true,
-      name:       true,
-      email:      true,
-      role:       true,
-      phone:      true,
-      university: true,
-      program:    true,
-      year:       true,
-      bio:        true,
-      avatarUrl:  true,
-      isActive:   true,
-      createdAt:  true,
-      wallet:     { select: { credits: true } },
+      id:                 true,
+      name:               true,
+      email:              true,
+      role:               true,
+      phone:              true,
+      university:         true,
+      program:            true,
+      year:               true,
+      bio:                true,
+      avatarUrl:          true,
+      isActive:           true,
+      createdAt:          true,
+      applicationStatus:  true,
+      wallet:             { select: { credits: true } },
       allocation: {
-        select: { room: { select: { number: true, block: true } } },
+        select: {
+          room: {
+            select: {
+              number: true, block: true,
+              residence: { select: { id: true, name: true } },
+            },
+          },
+        },
       },
     },
     orderBy: { createdAt: 'desc' },
   });
+
+  if (users.length === 0) return [];
+
+  const userIds = users.map(u => u.id);
+
+  // Three batched roll-up queries instead of N round-trips.
+  const [submittedDocs, openTicketRows, unpaidInvoiceRows] = await Promise.all([
+    prisma.document.groupBy({
+      by:      ['userId'],
+      where:   {
+        userId: { in: userIds },
+        type:   { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] },
+        status: 'Submitted',
+      },
+      _count:  { _all: true },
+    }),
+    prisma.maintenanceTicket.groupBy({
+      by:      ['studentId'],
+      where:   { studentId: { in: userIds }, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      _count:  { _all: true },
+    }),
+    prisma.document.groupBy({
+      by:      ['userId'],
+      where:   {
+        userId: { in: userIds },
+        type:   'INVOICE',
+        OR:     [{ status: 'Pending' }, { status: 'Overdue' }],
+        // Cleared invoices still have status Pending until admin marks
+        // them Paid, so guard via proofStatus too — only count rows that
+        // haven't been cleared.
+        NOT:    { proofStatus: 'CLEARED' },
+      },
+      _count:  { _all: true },
+    }),
+  ]);
+
+  const docsMap     = new Map(submittedDocs.map(r => [r.userId,    r._count._all]));
+  const ticketsMap  = new Map(openTicketRows.map(r => [r.studentId, r._count._all]));
+  const invoicesMap = new Map(unpaidInvoiceRows.map(r => [r.userId, r._count._all]));
+
+  return users.map(u => ({
+    ...u,
+    pending: {
+      docsToReview:   docsMap.get(u.id)     ?? 0,
+      openTickets:    ticketsMap.get(u.id)  ?? 0,
+      unpaidInvoices: invoicesMap.get(u.id) ?? 0,
+    },
+  }));
 }
 
 export async function updateAccount(id: string, data: UpdateAccountInput, actorRole: string) {
@@ -582,6 +662,11 @@ export async function getAccountOverview(id: string) {
       allocation: {
         select: {
           id: true, status: true, moveIn: true, rent: true, balance: true, createdAt: true,
+          // Lease lifecycle fields — surfaced on the profile page so admin
+          // can see start/end, deposit state and move-out plans at a glance.
+          leaseStart: true, leaseEnd: true,
+          depositAmount: true, depositStatus: true,
+          noticeGivenAt: true, moveOutDate: true, moveOutCompletedAt: true,
           room: {
             select: {
               id: true, number: true, block: true, type: true, capacity: true, price: true,
@@ -590,33 +675,67 @@ export async function getAccountOverview(id: string) {
           },
         },
       },
+      // Pull invoices/contracts AND compliance docs (the latter so the
+      // profile can show which docs have been approved, rejected, or
+      // are still pending — including the rejection reason).
       documents: {
-        where: { type: { in: ['INVOICE', 'CONTRACT'] } },
         orderBy: { createdAt: 'desc' },
-        take: 12,
         select: {
           id: true, type: true, period: true, amount: true, status: true,
-          proofStatus: true, signedAt: true, clearedAt: true, createdAt: true,
+          fileUrl: true, proofStatus: true, signedAt: true, clearedAt: true,
+          reviewedAt: true, reviewedBy: true, reviewNote: true,
+          expiresAt: true, createdAt: true,
         },
       },
     },
   });
   if (!user) throw new AppError('User not found', 404);
 
-  const [openTickets, totalTickets, upcomingPasses, totalPasses] = await Promise.all([
+  const [openTickets, totalTickets, upcomingPasses, totalPasses, recentTickets, walletTxns] = await Promise.all([
     prisma.maintenanceTicket.count({ where: { studentId: id, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
     prisma.maintenanceTicket.count({ where: { studentId: id } }),
     prisma.visitorPass.count({ where: { hostId: id, status: 'UPCOMING' } }),
     prisma.visitorPass.count({ where: { hostId: id } }),
+    // Latest 5 tickets surface on the profile page (status + title + priority)
+    prisma.maintenanceTicket.findMany({
+      where:   { studentId: id },
+      orderBy: { createdAt: 'desc' },
+      take:    5,
+      select:  { id: true, category: true, location: true, status: true, priority: true, createdAt: true },
+    }),
+    // Wallet history — EARN / REDEEM / ADJUST. Includes the chore that
+    // earned credits and the voucher that was redeemed when present, so
+    // the profile shows both chore activity AND rewards in one timeline.
+    prisma.walletTransaction.findMany({
+      where:   { wallet: { userId: id } },
+      orderBy: { createdAt: 'desc' },
+      take:    20,
+      select:  {
+        id: true, type: true, amount: true, note: true, createdAt: true,
+        // Voucher name surfaces on REDEEM rows; chore activity is
+        // already captured in the `note` field for EARN rows.
+        redemption: { select: { voucher: { select: { name: true } } } },
+      },
+    }),
   ]);
 
   // Quick-summary: months unpaid, total paid year-to-date
   const invoices = user.documents.filter(d => d.type === 'INVOICE');
   const monthsUnpaid = invoices.filter(i => i.status !== 'Paid').length;
   const monthsPaid   = invoices.filter(i => i.status === 'Paid').length;
+  // Compliance breakdown — how many docs are submitted / approved /
+  // rejected so the profile can show a status chip per type.
+  const complianceDocs = user.documents.filter(d =>
+    d.type === 'ID_DOC' || d.type === 'PROOF_REGISTRATION' || d.type === 'PROOF_FUNDING' || d.type === 'SIGNATURE',
+  );
+  const docsSubmitted = complianceDocs.filter(d => d.status === 'Submitted').length;
+  const docsApproved  = complianceDocs.filter(d => d.status === 'Approved').length;
+  const docsRejected  = complianceDocs.filter(d => d.status === 'Rejected').length;
 
   return {
     ...user,
+    recentTickets,
+    walletTxns,
     stats: {
       openTickets,
       totalTickets,
@@ -624,6 +743,9 @@ export async function getAccountOverview(id: string) {
       totalPasses,
       monthsUnpaid,
       monthsPaid,
+      docsSubmitted,
+      docsApproved,
+      docsRejected,
     },
   };
 }
@@ -810,7 +932,10 @@ export async function getRevenueReport(residenceId?: string) {
     const amount  = Number(inv.amount?.replace(/[^0-9.]/g, '') ?? 0);
     bucket.expected += amount;
     if (inv.proofStatus === 'CLEARED') bucket.cleared   += amount;
-    if (inv.proofStatus === 'SUBMITTED') bucket.submitted += amount;
+    // "Submitted" bucket = anything mid-flight (student uploaded proof,
+    // admin may have acknowledged it). Both SUBMITTED and ACKNOWLEDGED
+    // represent money that's in the pipe but not yet in the bank.
+    if (inv.proofStatus === 'SUBMITTED' || inv.proofStatus === 'ACKNOWLEDGED') bucket.submitted += amount;
     if (!inv.proofStatus || inv.proofStatus === 'REJECTED') bucket.pending += amount;
   }
 

@@ -70,6 +70,14 @@ export function NotificationBell() {
     enabled:  !!user && open,
   });
 
+  // Whenever the dropdown opens, force-refresh the unread count too.
+  // Without this the count badge can drift from the actual list (e.g.
+  // another tab marked something read, the 45 s poll hasn't ticked yet,
+  // so the badge still says "1" while the panel shows "All caught up").
+  useEffect(() => {
+    if (open) qc.invalidateQueries({ queryKey: ['notifications-unread'] });
+  }, [open, qc]);
+
   const readOne = useMutation({
     mutationFn: markNotificationRead,
     onSuccess: () => {

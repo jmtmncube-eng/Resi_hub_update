@@ -26,7 +26,8 @@ import Gate from './pages/Gate';
 
 // ── Active Student ─────────────────────────────────────────────
 import Dashboard   from './pages/student/Dashboard';
-import Maintenance from './pages/student/Maintenance';
+import Maintenance         from './pages/student/Maintenance';
+import StudentTicketDetail from './pages/student/StudentTicketDetail';
 import Updates     from './pages/student/Updates';
 import Visitors    from './pages/student/Visitors';
 import Housemates  from './pages/student/Housemates';
@@ -41,12 +42,15 @@ import BrowseRooms       from './pages/student/BrowseRooms';
 // ── Admin ───────────────────────────────────────────────────────
 import AdminOverview    from './pages/admin/AdminOverview';
 import AdminResidence   from './pages/admin/AdminResidence';
-import AdminMaintenance from './pages/admin/AdminMaintenance';
+import AdminMaintenance   from './pages/admin/AdminMaintenance';
+import AdminTicketDetail from './pages/admin/AdminTicketDetail';
 import AdminNews        from './pages/admin/AdminNews';
 import AdminVisitors    from './pages/admin/AdminVisitors';
 import AdminRewards     from './pages/admin/AdminRewards';
 import AdminChores      from './pages/admin/AdminChores';
-import AdminAccounts    from './pages/admin/AdminAccounts';
+import AdminAccounts        from './pages/admin/AdminAccounts';
+import AdminAccountProfile  from './pages/admin/AdminAccountProfile';
+import AdminCompliance      from './pages/admin/AdminCompliance';
 import AdminAudit       from './pages/admin/AdminAudit';
 import AdminPayments    from './pages/admin/AdminPayments';
 
@@ -70,6 +74,9 @@ const ADMIN:   Role[] = ['ADMIN'];
 // includes the maintenance handyman.
 const MANAGEMENT: Role[] = ['ADMIN', 'MANAGER'];
 const OPS_STAFF:  Role[] = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
+// Everyone signed in — used for personal pages like /profile that
+// every role should reach from the user menu.
+const ALL_ROLES:  Role[] = ['ACTIVE_STUDENT', 'PENDING_STUDENT', 'ADMIN', 'MANAGER', 'MAINTENANCE'];
 
 function App() {
   return (
@@ -92,7 +99,8 @@ function App() {
 
           {/* ── Active Student ─────────────────────────────── */}
           <Route path={ROUTES.DASHBOARD}   element={<Page roles={ACTIVE}><Dashboard /></Page>} />
-          <Route path={ROUTES.MAINTENANCE} element={<Page roles={ACTIVE}><Maintenance /></Page>} />
+          <Route path={ROUTES.MAINTENANCE}        element={<Page roles={ACTIVE}><Maintenance /></Page>} />
+          <Route path={ROUTES.MAINTENANCE_TICKET} element={<Page roles={ACTIVE}><StudentTicketDetail /></Page>} />
           <Route path={ROUTES.VISITORS}    element={<Page roles={ACTIVE}><Visitors /></Page>} />
           <Route path={ROUTES.HOUSEMATES}  element={<Page roles={ACTIVE}><Housemates /></Page>} />
           <Route path={ROUTES.WALLET}      element={<Page roles={ACTIVE}><Wallet /></Page>} />
@@ -100,7 +108,7 @@ function App() {
 
           {/* ── Active + Pending ───────────────────────────── */}
           <Route path={ROUTES.UPDATES}  element={<Page roles={BOTH}><Updates /></Page>} />
-          <Route path={ROUTES.PROFILE}  element={<Page roles={BOTH}><Profile /></Page>} />
+          <Route path={ROUTES.PROFILE}  element={<Page roles={ALL_ROLES}><Profile /></Page>} />
 
           {/* ── Pending Student ────────────────────────────── */}
           <Route path={ROUTES.APPLICATION} element={<Page roles={PENDING}><ApplicationStatus /></Page>} />
@@ -118,11 +126,14 @@ function App() {
           <Route path={ROUTES.ADMIN_ALLOCATIONS} element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=rooms`} replace />} />
           <Route path={ROUTES.ADMIN_SETTINGS}    element={<Navigate to={`${ROUTES.ADMIN_RESIDENCE}?tab=info`} replace />} />
           <Route path={ROUTES.ADMIN_MAINTENANCE} element={<Page roles={OPS_STAFF}><AdminMaintenance /></Page>} />
+          <Route path={ROUTES.ADMIN_TICKET}      element={<Page roles={OPS_STAFF}><AdminTicketDetail /></Page>} />
           <Route path={ROUTES.ADMIN_NEWS}        element={<Page roles={MANAGEMENT}><AdminNews /></Page>} />
           <Route path={ROUTES.ADMIN_VISITORS}    element={<Page roles={MANAGEMENT}><AdminVisitors /></Page>} />
           <Route path={ROUTES.ADMIN_REWARDS}     element={<Page roles={MANAGEMENT}><AdminRewards /></Page>} />
           <Route path={ROUTES.ADMIN_CHORES}      element={<Page roles={MANAGEMENT}><AdminChores /></Page>} />
           <Route path={ROUTES.ADMIN_ACCOUNTS}    element={<Page roles={MANAGEMENT}><AdminAccounts /></Page>} />
+          <Route path={ROUTES.ADMIN_ACCOUNT}     element={<Page roles={MANAGEMENT}><AdminAccountProfile /></Page>} />
+          <Route path={ROUTES.ADMIN_COMPLIANCE}  element={<Page roles={MANAGEMENT}><AdminCompliance /></Page>} />
           <Route path={ROUTES.ADMIN_AUDIT}       element={<Page roles={ADMIN}><AdminAudit /></Page>} />
           <Route path={ROUTES.ADMIN_PAYMENTS}    element={<Page roles={MANAGEMENT}><AdminPayments /></Page>} />
 

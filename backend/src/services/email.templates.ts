@@ -56,6 +56,12 @@ interface MaintenanceTriagedData{ studentName: string; ticketTitle: string; stat
 interface AccountApprovedData   { name: string; }
 interface AccountDeactivatedData{ name: string; }
 interface PasswordResetData    { name: string; resetUrl: string; expiresInMinutes: number; }
+interface ComplianceDocUploadedData { adminName: string; studentName: string; docType: string; }
+interface ComplianceDocRejectedData { name: string; docType: string; reason: string; }
+interface ComplianceDocReminderData { name: string; docTypes: string[]; }
+interface PaymentProofAcknowledgedData { name: string; period: string; }
+interface PaymentProofClearedData      { name: string; period: string; amount: string; }
+interface PaymentProofRejectedData     { name: string; period: string; }
 
 export const templates = {
   invoiceCreated: (d: InvoiceCreatedData): Rendered => {
@@ -101,6 +107,41 @@ export const templates = {
     const subject = `Your ResiHub account has been deactivated`;
     const intro   = `Hi ${escapeHtml(d.name)}, your account was deactivated by an administrator. Please contact your residence office if you think this is a mistake.`;
     return { subject, html: shell({ title: 'Account deactivated', intro, body: '' }), text: stripHtml(intro) };
+  },
+  complianceDocUploaded: (d: ComplianceDocUploadedData): Rendered => {
+    const subject = `Compliance doc to review — ${d.studentName}`;
+    const intro   = `Hi ${escapeHtml(d.adminName)}, <b>${escapeHtml(d.studentName)}</b> just uploaded their <b>${escapeHtml(d.docType)}</b> for review.`;
+    return { subject, html: shell({ title: 'Compliance doc submitted', intro, body: '', cta: { label: 'Open compliance review', url: `${APP_URL}/admin/compliance` } }), text: stripHtml(intro) };
+  },
+  complianceDocReminder: (d: ComplianceDocReminderData): Rendered => {
+    const list   = d.docTypes.map(t => `<li>${escapeHtml(t)}</li>`).join('');
+    const plural = d.docTypes.length === 1 ? 'a compliance document' : 'compliance documents';
+    const subject = `Reminder: please upload your ${plural}`;
+    const intro   = `Hi ${escapeHtml(d.name)}, this is a friendly reminder to upload the following compliance ${d.docTypes.length === 1 ? 'document' : 'documents'} to your ResiHub profile.`;
+    const body    = `<ul style="margin:0 0 8px;padding-left:20px;color:rgba(255,255,255,.78);">${list}</ul>`;
+    return { subject, html: shell({ title: 'Compliance docs needed', intro, body, cta: { label: 'Upload from your profile', url: `${APP_URL}/profile` } }), text: stripHtml(intro + ' ' + d.docTypes.join(', ')) };
+  },
+  complianceDocRejected: (d: ComplianceDocRejectedData): Rendered => {
+    const subject = `Your ${d.docType} needs re-uploading`;
+    const intro   = `Hi ${escapeHtml(d.name)}, an admin reviewed your <b>${escapeHtml(d.docType)}</b> and it didn't pass. Please upload a clearer / corrected version.`;
+    const body    = d.reason ? `<p style="margin:0 0 8px;color:rgba(255,255,255,.78);">Reason: <em>${escapeHtml(d.reason)}</em></p>` : '';
+    return { subject, html: shell({ title: 'Compliance doc rejected', intro, body, cta: { label: 'Re-upload from your profile', url: `${APP_URL}/profile` } }), text: stripHtml(intro + ' ' + body) };
+  },
+  paymentProofAcknowledged: (d: PaymentProofAcknowledgedData): Rendered => {
+    const subject = `We've received your proof — ${d.period}`;
+    const intro   = `Hi ${escapeHtml(d.name)}, admin has reviewed your payment proof for <b>${escapeHtml(d.period)}</b>. Your invoice will be marked Paid once the funds reflect in the residence account (usually 1–3 business days for EFT).`;
+    return { subject, html: shell({ title: 'Proof received', intro, body: '', cta: { label: 'Open Invoices', url: `${APP_URL}/documents` } }), text: stripHtml(intro) };
+  },
+  paymentProofCleared: (d: PaymentProofClearedData): Rendered => {
+    const subject = `Payment cleared — ${d.period}`;
+    const intro   = `Hi ${escapeHtml(d.name)}, your <b>R${escapeHtml(d.amount)}</b> rent payment for <b>${escapeHtml(d.period)}</b> has been confirmed in the residence account. Your invoice is now marked <b>Paid</b>. Thank you!`;
+    return { subject, html: shell({ title: 'Payment cleared 🎉', intro, body: '', cta: { label: 'View receipt', url: `${APP_URL}/documents` } }), text: stripHtml(intro) };
+  },
+  paymentProofRejected: (d: PaymentProofRejectedData): Rendered => {
+    const subject = `Re-upload needed — ${d.period}`;
+    const intro   = `Hi ${escapeHtml(d.name)}, your payment proof for <b>${escapeHtml(d.period)}</b> couldn't be verified — please upload a clearer screenshot or the correct one.`;
+    const body    = `<p style="margin:0;color:rgba(255,255,255,.62);font-size:12px;">Common reasons: image too blurry, wrong reference / period, amount doesn't match the invoice.</p>`;
+    return { subject, html: shell({ title: 'Proof needs re-uploading', intro, body, cta: { label: 'Re-upload from Invoices', url: `${APP_URL}/documents` } }), text: stripHtml(intro + ' ' + body) };
   },
   passwordReset: (d: PasswordResetData): Rendered => {
     const subject = `Reset your ResiHub password`;

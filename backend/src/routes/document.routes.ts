@@ -16,6 +16,7 @@ router.post('/:id/proof',                ctrl.submitPaymentProof);
 // Admin routes
 router.get('/admin/invoices',            requireRole(...MANAGEMENT), ctrl.getAllInvoices);
 router.post('/admin/invoices/bulk',      requireRole(...MANAGEMENT), ctrl.bulkCreateInvoices);
+router.post('/:id/acknowledge',          requireRole(...MANAGEMENT), ctrl.acknowledgePayment);
 router.post('/:id/clear',                requireRole(...MANAGEMENT), ctrl.clearPayment);
 router.post('/:id/reject-proof',         requireRole(...MANAGEMENT), ctrl.rejectPaymentProof);
 

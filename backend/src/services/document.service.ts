@@ -41,13 +41,62 @@ export async function submitPaymentProof(id: string, userId: string, proofUrl: s
   return updated;
 }
 
-/** Admin clears an invoice (paid / sponsor payment) */
-export async function clearPayment(id: string, adminId: string) {
-  const doc = await prisma.document.findUnique({ where: { id } });
-  if (!doc) throw new AppError('Document not found', 404);
-  if (doc.type !== 'INVOICE') throw new AppError('Only invoices can be cleared', 400);
+/**
+ * Admin acknowledges a payment proof — step 1 of the two-step clearance.
+ *
+ * Admin has reviewed the proof image and it looks legitimate, but the
+ * money may not yet reflect in the bank account (EFT takes 1–3 business
+ * days). The invoice stays Unpaid but proofStatus flips to ACKNOWLEDGED
+ * so the admin queue can distinguish "needs review" from "waiting on
+ * bank reconciliation". Student is notified.
+ *
+ * Step 2 is `clearPayment` — admin sees the money in the account and
+ * marks the invoice Paid.
+ */
+export async function acknowledgePayment(id: string) {
+  const doc = await prisma.document.findUnique({
+    where:  { id },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  });
+  if (!doc)                              throw new AppError('Document not found', 404);
+  if (doc.type !== 'INVOICE')            throw new AppError('Only invoices can be acknowledged', 400);
+  if (doc.proofStatus !== 'SUBMITTED')   throw new AppError('Only freshly-submitted proofs can be acknowledged', 400);
 
-  return prisma.document.update({
+  const updated = await prisma.document.update({
+    where: { id },
+    data:  { proofStatus: 'ACKNOWLEDGED' },
+  });
+
+  // Best-effort student notification.
+  void sendEmail({
+    to:       doc.user.email,
+    template: 'paymentProofAcknowledged',
+    data:     { name: doc.user.name, period: prettyPeriod(doc.period) },
+  });
+  void createNotification(doc.user.id, {
+    type:  'INVOICE',
+    title: `Proof received for ${prettyPeriod(doc.period)}`,
+    body:  'Awaiting bank confirmation — your invoice will be marked Paid once the funds reflect.',
+    link:  '/documents',
+  });
+
+  return updated;
+}
+
+/**
+ * Admin clears an invoice — step 2 of the two-step clearance, OR a
+ * direct one-step clear (used for sponsor payments / cash where there
+ * was no proof to acknowledge first). Always notifies the student.
+ */
+export async function clearPayment(id: string, adminId: string) {
+  const doc = await prisma.document.findUnique({
+    where:  { id },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  });
+  if (!doc)                       throw new AppError('Document not found', 404);
+  if (doc.type !== 'INVOICE')     throw new AppError('Only invoices can be cleared', 400);
+
+  const updated = await prisma.document.update({
     where: { id },
     data:  {
       status:      'Paid',
@@ -56,11 +105,32 @@ export async function clearPayment(id: string, adminId: string) {
       clearedBy:   adminId,
     },
   });
+
+  void sendEmail({
+    to:       doc.user.email,
+    template: 'paymentProofCleared',
+    data:     {
+      name:   doc.user.name,
+      period: prettyPeriod(doc.period),
+      amount: String(doc.amount ?? '').replace(/[^0-9.]/g, '') || '0',
+    },
+  });
+  void createNotification(doc.user.id, {
+    type:  'INVOICE',
+    title: `Payment cleared for ${prettyPeriod(doc.period)}`,
+    body:  `Your invoice is now Paid. Thank you!`,
+    link:  '/documents',
+  });
+
+  return updated;
 }
 
-/** Admin rejects a proof submission */
+/** Admin rejects a proof submission — student is notified to re-upload. */
 export async function rejectPaymentProof(id: string) {
-  const doc = await prisma.document.findUnique({ where: { id } });
+  const doc = await prisma.document.findUnique({
+    where:  { id },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  });
   if (!doc) throw new AppError('Document not found', 404);
 
   const updated = await prisma.document.update({
@@ -69,6 +139,19 @@ export async function rejectPaymentProof(id: string) {
   });
   // The rejected proof is cleared off the row — clean it off disk too.
   deletePersistedFile(doc.proofUrl);
+
+  void sendEmail({
+    to:       doc.user.email,
+    template: 'paymentProofRejected',
+    data:     { name: doc.user.name, period: prettyPeriod(doc.period) },
+  });
+  void createNotification(doc.user.id, {
+    type:  'INVOICE',
+    title: `Proof rejected for ${prettyPeriod(doc.period)}`,
+    body:  'Please re-upload a clearer or corrected proof of payment.',
+    link:  '/documents',
+  });
+
   return updated;
 }
 
@@ -194,6 +277,10 @@ interface BulkInvoiceArgs {
   /** When true, also tag the new invoice with the user's prior overdue
    *  balance in the status line so admins/students see what's owing. */
   includeOwing?: boolean;
+  /** When true, send each student an email via the existing
+   *  `invoiceCreated` template. Off by default so testing doesn't
+   *  burn through the Resend monthly quota — admin opts in per run. */
+  notifyByEmail?: boolean;
 }
 
 interface BulkInvoiceResult {
@@ -210,7 +297,7 @@ interface BulkInvoiceResult {
  * invoice for that period. Returns counts so the UI can summarise.
  */
 export async function bulkCreateInvoices(args: BulkInvoiceArgs): Promise<BulkInvoiceResult> {
-  const { period, includeOwing = false } = args;
+  const { period, includeOwing = false, notifyByEmail = false } = args;
   assertValidPeriod(period);
 
   // Active students with a current allocation
@@ -276,6 +363,26 @@ export async function bulkCreateInvoices(args: BulkInvoiceArgs): Promise<BulkInv
       body:  `R${Number(c.amount ?? 0).toLocaleString()} due. Upload your proof of payment.`,
       link:  '/documents',
     });
+  }
+
+  // Email per student — gated by the opt-in flag. Done in parallel with
+  // Promise.allSettled so one delivery failure doesn't drop the rest.
+  // Each student row already has their email loaded above (`students`).
+  if (notifyByEmail && created.length > 0) {
+    const studentById = new Map(students.map(s => [s.id, s] as const));
+    void Promise.allSettled(created.map(c => {
+      const s = studentById.get(c.userId);
+      if (!s) return Promise.resolve();
+      return sendEmail({
+        to:       s.email,
+        template: 'invoiceCreated',
+        data:     {
+          name:   s.name,
+          period: prettyPeriod(period),
+          amount: Number(c.amount ?? 0).toLocaleString(),
+        },
+      });
+    }));
   }
 
   return {

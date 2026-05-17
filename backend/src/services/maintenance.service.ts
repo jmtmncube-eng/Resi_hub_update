@@ -5,9 +5,12 @@ import { CreateTicketInput, UpdateTicketInput } from '../validators/maintenance.
 
 /** Include shape used everywhere we return a ticket — pulls the audit
  *  trail in newest-first order so the frontend can show the latest
- *  update without re-sorting. */
+ *  update without re-sorting. Also bundles the student identity so the
+ *  detail view can render "From: Sarah <sarah@campus.edu>" headers in
+ *  the conversation thread without an extra round-trip. */
 const TICKET_INCLUDE = {
   updates: { orderBy: { createdAt: 'desc' as const } },
+  student: { select: { id: true, name: true, email: true, avatarUrl: true } },
 };
 
 export async function getMyTickets(userId: string) {
@@ -21,7 +24,10 @@ export async function getMyTickets(userId: string) {
 export async function getTicketById(id: string, userId: string, role: string) {
   const ticket = await prisma.maintenanceTicket.findUnique({ where: { id }, include: TICKET_INCLUDE });
   if (!ticket) throw new AppError('Ticket not found', 404);
-  if (role !== 'ADMIN' && ticket.studentId !== userId) {
+  // Any ops-staff role (admin / manager / maintenance) can view any ticket;
+  // students can only see their own. Mirrors the route-level guard.
+  const isStaff = role === 'ADMIN' || role === 'MANAGER' || role === 'MAINTENANCE';
+  if (!isStaff && ticket.studentId !== userId) {
     throw new AppError('Not authorised to view this ticket', 403);
   }
   return ticket;

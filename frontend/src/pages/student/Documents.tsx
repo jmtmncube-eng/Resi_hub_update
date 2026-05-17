@@ -30,10 +30,13 @@ const TYPE_STYLE: Record<string, { bg: string; color: string }> = {
 /** Proof status pill */
 function ProofBadge({ status }: { status?: string }) {
   if (!status) return null;
+  // Mirrors the admin palette + adds the new ACKNOWLEDGED state.
+  // Student-facing labels are plain English, not the technical enum.
   const map: Record<string, { label: string; color: string }> = {
-    SUBMITTED: { label: 'Under Review',    color: '#a78bfa'       },
-    CLEARED:   { label: 'Payment Cleared', color: 'var(--cyan)'   },
-    REJECTED:  { label: 'Proof Rejected',  color: 'var(--rose)'   },
+    SUBMITTED:    { label: 'Under Review',           color: '#a78bfa'       },
+    ACKNOWLEDGED: { label: 'Awaiting Bank Confirm',  color: '#f59e0b'       },
+    CLEARED:      { label: 'Payment Cleared',        color: 'var(--cyan)'   },
+    REJECTED:     { label: 'Proof Rejected',         color: 'var(--rose)'   },
   };
   const s = map[status];
   if (!s) return null;
@@ -116,8 +119,15 @@ export default function Documents() {
   // letters moved to the Profile page (grouped with personal docs).
   const invoices  = docs.filter(d => d.type === 'INVOICE');
 
+  // "Needs payment" = invoices with no action yet from student.
+  // Once they've uploaded proof (SUBMITTED) or admin has acknowledged
+  // it (ACKNOWLEDGED), it's out of the student's hands and shouldn't
+  // appear in this nudge list.
   const needsPayment = invoices.filter(
-    d => d.status !== 'Paid' && d.proofStatus !== 'CLEARED' && d.proofStatus !== 'SUBMITTED'
+    d => d.status !== 'Paid'
+      && d.proofStatus !== 'CLEARED'
+      && d.proofStatus !== 'SUBMITTED'
+      && d.proofStatus !== 'ACKNOWLEDGED'
   );
 
   // ── Render ───────────────────────────────────────────────────
@@ -523,10 +533,14 @@ function DocRow({
   const needsSign   = doc.type === 'CONTRACT' && doc.status === 'Pending';
   const isInvoice   = doc.type === 'INVOICE';
   const isPaid      = doc.status === 'Paid' || doc.proofStatus === 'CLEARED';
-  const isSubmitted = doc.proofStatus === 'SUBMITTED';
+  // "In-flight" = anything past the student's first upload but not yet
+  // Paid. Covers both SUBMITTED (awaiting admin review) and ACKNOWLEDGED
+  // (admin saw it, waiting for funds to reflect in the bank).
+  const isInFlight  = doc.proofStatus === 'SUBMITTED' || doc.proofStatus === 'ACKNOWLEDGED';
   const isRejected  = doc.proofStatus === 'REJECTED';
-  // Show upload button when: it's an invoice, not already cleared/paid, and not currently under review
-  const canPay      = isInvoice && !isPaid && !isSubmitted;
+  // Show upload button when: it's an invoice, not already cleared/paid,
+  // and not currently in-flight (ball isn't in the student's court).
+  const canPay      = isInvoice && !isPaid && !isInFlight;
 
   return (
     <div
@@ -638,13 +652,16 @@ function DocRow({
           </button>
         )}
 
-        {/* Under review indicator */}
-        {isSubmitted && (
+        {/* In-flight indicator — distinguishes SUBMITTED from ACKNOWLEDGED
+            so the student knows whether admin has looked yet. */}
+        {isInFlight && (
           <span style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: '#a78bfa',
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+            color: doc.proofStatus === 'ACKNOWLEDGED' ? '#f59e0b' : '#a78bfa',
           }}>
-            <Clock size={11} /> Reviewing
+            <Clock size={11} />
+            {doc.proofStatus === 'ACKNOWLEDGED' ? 'Awaiting bank' : 'Reviewing'}
           </span>
         )}
 
@@ -653,8 +670,8 @@ function DocRow({
           <CheckCircle2 size={14} style={{ color: 'var(--cyan)' }} />
         )}
 
-        {/* Download icon for paid/submitted invoices */}
-        {isInvoice && !canPay && !isSubmitted && (
+        {/* Download icon for paid/in-flight invoices */}
+        {isInvoice && !canPay && !isInFlight && (
           <button
             onClick={onOpen}
             style={{ display: 'flex', alignItems: 'center', color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}

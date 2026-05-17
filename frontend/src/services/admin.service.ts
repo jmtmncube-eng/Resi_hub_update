@@ -143,6 +143,16 @@ export const getAllInvoices = async () => {
   return res.data.data as AdminInvoice[];
 };
 
+/** Step 1 of two-step clearance — admin saw the proof, money not yet
+ *  reflected in the bank. Student notified; invoice stays Unpaid; row
+ *  moves from "Awaiting Review" to "Pending bank confirm". */
+export const acknowledgePayment = async (id: string) => {
+  const res = await api.post(`/documents/${id}/acknowledge`);
+  return res.data.data;
+};
+
+/** Step 2 of two-step clearance, OR a direct one-step clear (sponsor /
+ *  cash payments that didn't go through the proof-upload flow). */
 export const clearPayment = async (id: string) => {
   const res = await api.post(`/documents/${id}/clear`);
   return res.data.data;
@@ -198,6 +208,13 @@ export interface AccountOverview {
     rent: string;
     balance: string;
     createdAt: string;
+    leaseStart: string | null;
+    leaseEnd: string | null;
+    depositAmount: string | null;
+    depositStatus: string | null;
+    noticeGivenAt: string | null;
+    moveOutDate: string | null;
+    moveOutCompletedAt: string | null;
     room: {
       id: string; number: string; block: string;
       type: 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'STUDIO';
@@ -205,16 +222,34 @@ export interface AccountOverview {
       residence: { id: string; name: string } | null;
     };
   } | null;
+  // Allocation lease fields (when present) — surfaced on the profile page.
+  // Older callers won't see these; the AccountOverviewDrawer ignores them.
   documents: Array<{
-    id: string; type: 'INVOICE' | 'CONTRACT';
+    id: string;
+    type: 'INVOICE' | 'CONTRACT' | 'ID_DOC' | 'PROOF_REGISTRATION' | 'PROOF_FUNDING' | 'SIGNATURE';
     period: string; amount: string | null; status: string;
+    fileUrl: string | null;
     proofStatus: string | null; signedAt: string | null; clearedAt: string | null;
+    reviewedAt: string | null; reviewedBy: string | null; reviewNote: string | null;
+    expiresAt: string | null;
     createdAt: string;
+  }>;
+  recentTickets: Array<{
+    id: string; category: string; location: string;
+    status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+    priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+    createdAt: string;
+  }>;
+  walletTxns: Array<{
+    id: string; type: 'EARN' | 'REDEEM' | 'ADJUST'; amount: number; note: string;
+    createdAt: string;
+    redemption: { voucher: { name: string } } | null;
   }>;
   stats: {
     openTickets: number; totalTickets: number;
     upcomingPasses: number; totalPasses: number;
     monthsUnpaid: number; monthsPaid: number;
+    docsSubmitted: number; docsApproved: number; docsRejected: number;
   };
 }
 
@@ -285,6 +320,11 @@ export interface AdminStats {
   vouchers:      { active: number };
   /** Sum of all active rents — what the residence WOULD collect if everyone paid. */
   monthlyRevenue: number;
+  /** Sum of invoices CLEARED (admin marked paid) in the last 30 days.
+   *  This is the number that moves when an admin clears an invoice; the
+   *  monthlyRevenue figure above is projected and is unaffected by
+   *  payment status. */
+  revenueCollected30d: number;
   /** OpsService entries logged in the last 30 days (pool, gas, electricity, etc). */
   monthlyOpsCost: number;
   /** ContractorInvoice paid in the last 30 days — gardener, cleaner, etc. */
@@ -333,8 +373,22 @@ export interface AdminAccount {
   avatarUrl: string | null;
   isActive?: boolean;
   createdAt: string;
+  applicationStatus?: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
   wallet: { credits: number } | null;
-  allocation: { room: { number: string; block: string } } | null;
+  /** Includes residence so the list can group + filter. */
+  allocation: {
+    room: {
+      number: string;
+      block: string;
+      residence: { id: string; name: string } | null;
+    };
+  } | null;
+  /** "Needs attention" counters — drives the unread/highlight indicator. */
+  pending?: {
+    docsToReview:   number;
+    openTickets:    number;
+    unpaidInvoices: number;
+  };
 }
 
 export interface AdminVoucher {

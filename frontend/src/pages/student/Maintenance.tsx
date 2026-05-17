@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +10,7 @@ import { getMyTickets, createTicket } from '../../services/maintenance.service';
 import { TicketStatus, TicketPriority } from '../../types/domain.types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
+import { TicketSLAChip } from '../../components/TicketSLAChip';
 import { format } from 'date-fns';
 
 /** Open = needs work (OPEN, IN_PROGRESS). Closed = done (RESOLVED, CLOSED). */
@@ -25,11 +27,14 @@ const formSchema = z.object({
 });
 type FormData = z.infer<typeof formSchema>;
 
-const STATUS_STYLE: Record<TicketStatus, { badge: string; bg: string; text: string }> = {
-  OPEN:        { badge: 'badge-rose',  bg: 'rgba(232,25,122,.1)',   text: '#E8197A' },
-  IN_PROGRESS: { badge: 'badge-cyan',  bg: 'rgba(0,204,204,.1)',    text: '#00CCCC' },
-  RESOLVED:    { badge: 'badge-cyan',  bg: 'rgba(0,204,204,.08)',   text: '#00CCCC' },
-  CLOSED:      { badge: 'badge-gray',  bg: 'rgba(128,128,128,.08)', text: 'rgba(128,128,128,.8)' },
+// Industry-standard ITSM ticket status palette — mirrors the admin
+// page's STATUS_ACCENT so a student sees the same colour grammar on
+// her own tickets as the admin sees on the queue.
+const STATUS_STYLE: Record<TicketStatus, { badge: string; bg: string; text: string; border: string }> = {
+  OPEN:        { badge: 'badge-rose',  bg: 'rgba(232,25,122,.06)',  text: '#E8197A', border: '#E8197A' },
+  IN_PROGRESS: { badge: 'badge-cyan',  bg: 'rgba(245,158,11,.06)',  text: '#f59e0b', border: '#f59e0b' },
+  RESOLVED:    { badge: 'badge-cyan',  bg: 'rgba(34,197,94,.06)',   text: '#22c55e', border: '#22c55e' },
+  CLOSED:      { badge: 'badge-gray',  bg: 'rgba(107,114,128,.04)', text: 'rgba(128,128,128,.8)', border: '#6b7280' },
 };
 
 const PRIORITY_COLOR: Record<TicketPriority, string> = {
@@ -46,6 +51,7 @@ export default function Maintenance() {
   const [listFilter, setListFilter] = useState<ListFilter>('open');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ['tickets'],
@@ -210,7 +216,25 @@ export default function Maintenance() {
                   : shown.map(t => {
                       const s = STATUS_STYLE[t.status];
                       return (
-                        <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
+                        <div
+                          key={t.id}
+                          onClick={() => navigate(`/maintenance/${t.id}`)}
+                          role="link"
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              navigate(`/maintenance/${t.id}`);
+                            }
+                          }}
+                          className="card-sm hover-lift"
+                          style={{
+                            padding: '16px 18px',
+                            borderLeft: `4px solid ${s.border}`,
+                            background: s.bg,
+                            cursor: 'pointer',
+                          }}
+                        >
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(0,204,204,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyan)', flexShrink: 0 }}>
@@ -223,9 +247,12 @@ export default function Maintenance() {
                             </div>
                             {/* Prefixed with "Ticket status:" so it reads as a
                                 state label, not a clickable button. */}
-                            <span className={`badge ${s.badge}`} style={{ flexShrink: 0, textTransform: 'none' }}>
-                              Ticket status: {t.status.replace('_',' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              <TicketSLAChip ticket={t} compact />
+                              <span className={`badge ${s.badge}`} style={{ textTransform: 'none' }}>
+                                Ticket status: {t.status.replace('_',' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())}
+                              </span>
+                            </div>
                           </div>
 
                           <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 12, lineHeight: 1.6 }}>{t.description}</p>
@@ -236,7 +263,7 @@ export default function Maintenance() {
                               {t.mediaUrls.map((url, i) => (
                                 <button
                                   key={i}
-                                  onClick={() => setPhotoPreview(url)}
+                                  onClick={e => { e.stopPropagation(); setPhotoPreview(url); }}
                                   style={{
                                     width: 64, height: 64, borderRadius: 8, overflow: 'hidden',
                                     border: '1px solid var(--border)', cursor: 'pointer', padding: 0,

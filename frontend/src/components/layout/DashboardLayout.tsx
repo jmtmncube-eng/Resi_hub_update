@@ -1,10 +1,20 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  listDocsAwaitingReview, listSubmittedApplications,
+  getApplicationStatus, getMyApplicationDocs,
+} from '../../services/application.service';
+import { getTickets } from '../../services/maintenance.service';
+import { getAllInvoices, AdminInvoice } from '../../services/admin.service';
+import { getChorePendingApprovals } from '../../services/chore.service';
+import { getMyDocuments } from '../../services/document.service';
+import { getNews } from '../../services/news.service';
 import {
   LayoutDashboard, Wrench, Newspaper, Users, QrCode,
   Wallet, User, FileText, LogOut, Menu, X,
   Building2, Ticket, Megaphone, ClipboardList, Gift, BookUser,
-  Sun, Moon, CreditCard, Activity, ListChecks,
+  Sun, Moon, CreditCard, Activity, ListChecks, FileCheck,
 } from 'lucide-react';
 import { useAuth }     from '../../contexts/AuthContext';
 import { useTheme }    from '../../contexts/ThemeContext';
@@ -37,6 +47,7 @@ const adminNav = [
   { to: ROUTES.ADMIN,             label: 'Overview',  icon: LayoutDashboard },
   { to: ROUTES.ADMIN_RESIDENCE,   label: 'Residence', icon: Building2       },
   { to: ROUTES.ADMIN_ACCOUNTS,    label: 'Accounts',  icon: BookUser        },
+  { to: ROUTES.ADMIN_COMPLIANCE,  label: 'Compliance', icon: FileCheck      },
   { to: ROUTES.ADMIN_PAYMENTS,    label: 'Payments',  icon: CreditCard      },
   { to: ROUTES.ADMIN_MAINTENANCE, label: 'Tickets',   icon: Ticket          },
   { to: ROUTES.ADMIN_NEWS,        label: 'News',      icon: Megaphone       },
@@ -67,6 +78,157 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     user?.role === 'MANAGER'         ? managerNav      :
     user?.role === 'MAINTENANCE'     ? maintenanceNav  :
     user?.role === 'ACTIVE_STUDENT'  ? studentNav      : pendingNav;
+
+  // Sidebar badge counters — keyed by route. Only fetch the queries the
+  // current role's nav actually shows. React Query caches + refetches in
+  // the background so badges stay fresh without manual polling, and
+  // shares the cache with the pages that own the data (so a verdict
+  // taken on the Compliance page ticks the badge down instantly via
+  // the existing invalidateQueries calls).
+  const isManagement   = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const seesTickets    = isManagement || user?.role === 'MAINTENANCE';
+  const isActive       = user?.role === 'ACTIVE_STUDENT';
+  const isPending      = user?.role === 'PENDING_STUDENT';
+  const REFRESH_MS     = 60_000;
+  const STALE_MS       = 30_000;
+
+  // ── Admin / Manager queries ──────────────────────────────────
+
+  // Compliance docs awaiting review.
+  const { data: pendingDocs = [] } = useQuery({
+    queryKey: ['admin-compliance-queue'],
+    queryFn:  listDocsAwaitingReview,
+    enabled:  isManagement,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+
+  // Pending applications awaiting verdict. Shares cache with AdminAccounts.
+  const { data: applications = [] } = useQuery({
+    queryKey: ['admin-applications'],
+    queryFn:  listSubmittedApplications,
+    enabled:  isManagement,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const pendingApplications = applications.filter(a => a.applicationStatus === 'SUBMITTED').length;
+
+  // Invoices with student-submitted proof awaiting admin clearance.
+  // Shares cache with AdminPayments.
+  const { data: invoicesAll = [] as AdminInvoice[] } = useQuery({
+    queryKey: ['admin-invoices'],
+    queryFn:  getAllInvoices,
+    enabled:  isManagement,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  // Both SUBMITTED (needs first look) and ACKNOWLEDGED (needs bank
+  // confirmation) require admin action — the badge counts the union,
+  // matching the two clickable KPI tiles on the Payments page.
+  const proofsAwaitingClear = invoicesAll.filter(
+    i => i.proofStatus === 'SUBMITTED' || i.proofStatus === 'ACKNOWLEDGED',
+  ).length;
+
+  // Chore proofs awaiting admin approval. Shares cache with AdminChores.
+  const { data: choreApprovals = [] } = useQuery({
+    queryKey: ['admin-chore-approvals'],
+    queryFn:  getChorePendingApprovals,
+    enabled:  isManagement,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+
+  // ── Maintenance handyman query (also visible to admin/manager) ─
+
+  // "Actionable" tickets = OPEN + IN_PROGRESS, matching the "Open" tab
+  // on the maintenance page. Without IN_PROGRESS the sidebar would
+  // under-count by however many tickets the admin has started work on
+  // but not yet resolved — the sidebar would say "4" while the Open
+  // tab says "7". Two queries (one per status) share their caches
+  // with the Overview's SLA-breach calculation and the maintenance
+  // page itself.
+  const { data: openOnly       = [] } = useQuery({
+    queryKey: ['admin-tickets', { status: 'OPEN' }],
+    queryFn:  () => getTickets({ status: 'OPEN' }),
+    enabled:  seesTickets,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const { data: inProgressOnly = [] } = useQuery({
+    queryKey: ['admin-tickets', { status: 'IN_PROGRESS' }],
+    queryFn:  () => getTickets({ status: 'IN_PROGRESS' }),
+    enabled:  seesTickets,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const actionableTickets = openOnly.length + inProgressOnly.length;
+
+  // ── Active student queries ───────────────────────────────────
+
+  // Own compliance docs — count anything that needs action:
+  //   • Missing (null slot — never uploaded)
+  //   • Rejected (uploaded but admin asked for a re-upload)
+  // Approved + Submitted (awaiting verdict) are NOT counted — the student
+  // has nothing to do for those. This is also the value the admin's
+  // "Send reminder" action targets, so the badge is in lockstep with the
+  // reminder email/in-app notification.
+  // Shares cache key with the Profile page's ComplianceDocsCard.
+  const { data: myDocsByType } = useQuery({
+    queryKey: ['my-application-docs'],
+    queryFn:  getMyApplicationDocs,
+    enabled:  isActive,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const myDocsNeedingAction = myDocsByType
+    ? (Object.keys(myDocsByType) as Array<keyof typeof myDocsByType>).filter(t => {
+        const d = myDocsByType[t];
+        return !d || d.status === 'Rejected';
+      }).length
+    : 0;
+
+  // Own invoices — count unpaid (status !== 'Paid').
+  const { data: myDocuments = [] } = useQuery({
+    queryKey: ['my-documents'],
+    queryFn:  getMyDocuments,
+    enabled:  isActive,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const myUnpaidInvoices = myDocuments.filter(d => d.type === 'INVOICE' && d.status !== 'Paid').length;
+
+  // Unread news — server-side `read` flag per item (the NewsItem.read
+  // field is computed against the user's read-receipts table). The
+  // Updates page already calls markNewsRead / markAllNewsRead which
+  // flips items to read, so this badge ticks down naturally when the
+  // student opens a news item.
+  const { data: news = [] } = useQuery({
+    queryKey: ['news'],
+    queryFn:  () => getNews(),
+    enabled:  isActive,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const unreadNews = news.filter(n => !n.read).length;
+
+  // ── Pending student query ────────────────────────────────────
+
+  // Application status — show `1` only if REJECTED (so the applicant
+  // notices the admin note and re-submits). Approved + Submitted +
+  // Draft → no badge.
+  const { data: myApp } = useQuery({
+    queryKey: ['my-application-status'],
+    queryFn:  getApplicationStatus,
+    enabled:  isPending,
+    refetchInterval: REFRESH_MS, staleTime: STALE_MS,
+  });
+  const applicationNeedsAttention = myApp?.applicationStatus === 'REJECTED' ? 1 : 0;
+
+  const navBadges: Record<string, number> = {
+    // Admin / manager
+    [ROUTES.ADMIN_COMPLIANCE]:  pendingDocs.length,
+    [ROUTES.ADMIN_ACCOUNTS]:    pendingApplications,
+    [ROUTES.ADMIN_MAINTENANCE]: actionableTickets,
+    [ROUTES.ADMIN_PAYMENTS]:    proofsAwaitingClear,
+    [ROUTES.ADMIN_CHORES]:      choreApprovals.length,
+    // Active student
+    [ROUTES.PROFILE]:           myDocsNeedingAction,
+    [ROUTES.DOCUMENTS]:         myUnpaidInvoices,
+    [ROUTES.UPDATES]:           unreadNews,
+    // Pending student
+    [ROUTES.APPLICATION]:       applicationNeedsAttention,
+  };
 
   const roleLabel =
     user?.role === 'ADMIN'           ? 'Admin'       :
@@ -121,21 +283,39 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <li key={to}>
-              <NavLink
-                to={to}
-                end={to === ROUTES.ADMIN}
-                onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) =>
-                  `nav-item${isActive ? ' active' : ''}`
-                }
-              >
-                <Icon size={15} />
-                <span style={{ fontSize: 13 }}>{label}</span>
-              </NavLink>
-            </li>
-          ))}
+          {navItems.map(({ to, label, icon: Icon }) => {
+            const badge = navBadges[to] ?? 0;
+            return (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={to === ROUTES.ADMIN}
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? ' active' : ''}`
+                  }
+                >
+                  <Icon size={15} />
+                  <span style={{ fontSize: 13, flex: 1 }}>{label}</span>
+                  {/* Numeric badge for nav items with pending action.
+                      Rose tone signals "needs attention"; capped at 99+
+                      so the pill never blows the sidebar width. */}
+                  {badge > 0 && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: 18, height: 18, padding: '0 6px',
+                      borderRadius: 999, fontSize: 10, fontWeight: 700,
+                      background: 'var(--rose)', color: '#fff',
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      lineHeight: 1,
+                    }}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
@@ -240,15 +420,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           zIndex: 100,
           boxShadow: '0 1px 14px var(--shadow)',
         }}>
-          {/* Mobile-only hamburger — opens the sidebar (which carries the brand) */}
+          {/* Mobile-only hamburger — opens the sidebar (which carries the brand).
+              Inline `display` would beat Tailwind's `md:hidden`, so we set the
+              breakpoint via a scoped class + @media rule instead. */}
+          <style>{`
+            .rh-mobile-menu-btn { display: flex; }
+            @media (min-width: 768px) { .rh-mobile-menu-btn { display: none; } }
+          `}</style>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            className="press-soft md:hidden"
+            className="press-soft rh-mobile-menu-btn"
             style={{
               background: 'var(--bg3)', border: '1px solid var(--border)',
               borderRadius: 8, color: 'var(--text2)',
-              padding: 8, display: 'flex',
+              padding: 8,
             }}
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}

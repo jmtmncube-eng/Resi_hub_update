@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getTicketSLA } from '../../lib/ticketSLA';
 import { Wrench, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -8,12 +10,25 @@ import type { MaintenanceTicket } from '../../types';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
 import { ExportCsvButton } from '../../components/ExportCsvButton';
+import { TicketSLAChip } from '../../components/TicketSLAChip';
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN:        'badge-rose',
   IN_PROGRESS: 'badge-gray',
   RESOLVED:    'badge-cyan',
   CLOSED:      'badge-gray',
+};
+
+// Industry-standard ITSM ticket status palette (matches ServiceNow,
+// Freshdesk, Jira Service Management conventions): rose = needs attention,
+// amber = active work, green = success, gray = archived. Each card gets
+// a 4px left border + a 6%-tinted background in the corresponding hue
+// so admins can scan the queue by colour without reading every chip.
+const STATUS_ACCENT: Record<string, { border: string; tint: string }> = {
+  OPEN:        { border: '#E8197A', tint: 'rgba(232,25,122,.06)' },
+  IN_PROGRESS: { border: '#f59e0b', tint: 'rgba(245,158,11,.06)' },
+  RESOLVED:    { border: '#22c55e', tint: 'rgba(34,197,94,.06)'  },
+  CLOSED:      { border: '#6b7280', tint: 'rgba(107,114,128,.04)' },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -25,20 +40,27 @@ const PRIORITY_COLOR: Record<string, string> = {
 
 const PRIORITIES = ['ALL', 'EMERGENCY', 'HIGH', 'NORMAL', 'LOW'];
 
-/** Status tabs — "Open" groups the two active states so admins triage
- *  what needs work vs what's done in one click. */
+/** Status tabs — "All" leads as the anchor (mirrors the Accounts page's
+ *  tab order); "Open" groups the two active states so admins still get
+ *  triage-what-needs-work-vs-done in one click. The default tab is
+ *  still OPEN_GROUP, so the action-first view loads on arrival. */
 const TABS = [
+  { key: 'ALL',        label: 'All',         statuses: [] },
   { key: 'OPEN_GROUP', label: 'Open',        statuses: ['OPEN', 'IN_PROGRESS'] },
   { key: 'RESOLVED',   label: 'Resolved',    statuses: ['RESOLVED'] },
   { key: 'CLOSED',     label: 'Closed',      statuses: ['CLOSED'] },
-  { key: 'ALL',        label: 'All',         statuses: [] },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
 export default function AdminMaintenance() {
   usePageTitle('Maintenance · Admin');
   const qc = useQueryClient();
-  const [tab, setTab]                       = useState<TabKey>('OPEN_GROUP');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Deep-link from the Admin Overview "SLA breach" widget lands here
+  // with `?filter=overdue` — scope the table to overdue tickets only.
+  const slaFilter = searchParams.get('filter');
+  const [tab, setTab]                       = useState<TabKey>(slaFilter === 'overdue' ? 'OPEN_GROUP' : 'OPEN_GROUP');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [search, setSearch]                 = useState('');
   const [editId, setEditId]                 = useState<string | null>(null);
@@ -64,9 +86,18 @@ export default function AdminMaintenance() {
   });
 
   const activeTab = TABS.find(t => t.key === tab)!;
-  const tickets = activeTab.statuses.length === 0
+  let tickets = activeTab.statuses.length === 0
     ? allTickets
     : allTickets.filter(t => activeTab.statuses.includes(t.status as never));
+  // SLA URL filter — applied AFTER the status tab so the user can still
+  // toggle tabs but stay scoped to overdue tickets until they clear it.
+  if (slaFilter === 'overdue') {
+    tickets = tickets.filter(t => getTicketSLA(t)?.tone === 'overdue');
+  }
+  function clearSLAFilter() {
+    searchParams.delete('filter');
+    setSearchParams(searchParams, { replace: true });
+  }
   const countFor = (statuses: readonly string[]) =>
     statuses.length === 0 ? allTickets.length : allTickets.filter(t => statuses.includes(t.status)).length;
 
@@ -123,6 +154,25 @@ export default function AdminMaintenance() {
         ))}
       </div>
 
+      {/* SLA filter banner — only renders when the user landed here via
+          the Overview's "SLA breach" widget. Click the × to clear and
+          see all tickets again. */}
+      {slaFilter === 'overdue' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          padding: '10px 14px', borderRadius: 8,
+          background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)',
+        }}>
+          <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>
+            Showing only tickets past their SLA budget
+          </span>
+          <span style={{ flex: 1 }} />
+          <button onClick={clearSLAFilter} className="btn-ghost press-soft" style={{ padding: '4px 10px', fontSize: 11 }}>
+            Clear filter ×
+          </button>
+        </div>
+      )}
+
       {/* Search + priority filter */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <input
@@ -155,8 +205,48 @@ export default function AdminMaintenance() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {tickets.map(t => (
-            <div key={t.id} className="card-sm" style={{ padding: '16px 18px' }}>
+          {tickets.map(t => {
+            const accent = STATUS_ACCENT[t.status] ?? STATUS_ACCENT.CLOSED;
+            const isEmergency = t.priority === 'EMERGENCY' && (t.status === 'OPEN' || t.status === 'IN_PROGRESS');
+            const inlineEdit  = editId === t.id;
+            return (
+            <div
+              key={t.id}
+              onClick={() => { if (!inlineEdit) navigate(`/admin/maintenance/${t.id}`); }}
+              role={inlineEdit ? undefined : 'link'}
+              tabIndex={inlineEdit ? undefined : 0}
+              onKeyDown={e => {
+                if (inlineEdit) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/admin/maintenance/${t.id}`);
+                }
+              }}
+              className="card-sm"
+              style={{
+                padding: '16px 18px',
+                borderLeft: `4px solid ${accent.border}`,
+                background: accent.tint,
+                position: 'relative',
+                cursor: inlineEdit ? 'default' : 'pointer',
+              }}
+            >
+              {/* Emergency overlay — pulsing red dot top-right. Only on
+                  unresolved emergencies, so a closed-out emergency doesn't
+                  keep flashing in the archive view. */}
+              {isEmergency && (
+                <span
+                  title="EMERGENCY priority"
+                  aria-label="Emergency"
+                  style={{
+                    position: 'absolute', top: 12, right: 12,
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: '#ef4444',
+                    boxShadow: '0 0 0 0 rgba(239,68,68,.6)',
+                    animation: 'rh-pulse 1.6s ease-in-out infinite',
+                  }}
+                />
+              )}
               {editId === t.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -211,6 +301,7 @@ export default function AdminMaintenance() {
                       <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600, color: PRIORITY_COLOR[t.priority] ?? 'var(--text3)' }}>
                         {t.priority}
                       </span>
+                      <TicketSLAChip ticket={t} compact />
                     </div>
                     <p style={{ fontSize: 13, color: 'var(--text2)' }}>{t.description}</p>
                     <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
@@ -223,7 +314,7 @@ export default function AdminMaintenance() {
                         {t.mediaUrls.map((url, i) => (
                           <button
                             key={i}
-                            onClick={() => setPhotoPreview(url)}
+                            onClick={e => { e.stopPropagation(); setPhotoPreview(url); }}
                             title="Open photo"
                             style={{
                               width: 56, height: 56, borderRadius: 8, overflow: 'hidden',
@@ -241,7 +332,8 @@ export default function AdminMaintenance() {
                     )}
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={e => {
+                      e.stopPropagation();
                       setEditId(t.id);
                       setEditForm({ status: '', priority: '', adminNote: t.adminNote ?? '' });
                     }}
@@ -270,7 +362,7 @@ export default function AdminMaintenance() {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => toggleUpdates(t.id)}
+                      onClick={e => { e.stopPropagation(); toggleUpdates(t.id); }}
                       aria-expanded={expandedUpdates.has(t.id)}
                       aria-controls={`updates-${t.id}`}
                       className="btn-ghost press-soft"
@@ -313,9 +405,19 @@ export default function AdminMaintenance() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* Pulsing keyframes for the emergency dot. Inline so we don't
+          add a global CSS rule for a single component. */}
+      <style>{`
+        @keyframes rh-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.55); }
+          50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0);  }
+        }
+      `}</style>
 
       {/* Full-size photo viewer */}
       <Modal open={!!photoPreview} onClose={() => setPhotoPreview(null)} maxWidth={680}>

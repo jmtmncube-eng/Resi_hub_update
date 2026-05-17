@@ -37,7 +37,15 @@ export async function submitPaymentProof(req: AuthRequest, res: Response, next: 
   } catch (err) { next(err); }
 }
 
-/** POST /documents/:id/clear — admin clears payment */
+/** POST /documents/:id/acknowledge — step 1 of two-step clearance */
+export async function acknowledgePayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const doc = await svc.acknowledgePayment(req.params.id);
+    res.json({ success: true, data: doc });
+  } catch (err) { next(err); }
+}
+
+/** POST /documents/:id/clear — admin clears payment (step 2 / or direct) */
 export async function clearPayment(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const doc = await svc.clearPayment(req.params.id, req.user!.userId);
@@ -74,9 +82,11 @@ export async function initiateRentInvoice(req: AuthRequest, res: Response, next:
 /** POST /documents/admin/invoices/bulk — admin generates invoices for all active students */
 export async function bulkCreateInvoices(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { period, includeOwing } = req.body as { period?: string; includeOwing?: boolean };
+    const { period, includeOwing, notifyByEmail } = req.body as {
+      period?: string; includeOwing?: boolean; notifyByEmail?: boolean;
+    };
     if (!period) { res.status(400).json({ success: false, error: 'period (YYYY-MM) is required' }); return; }
-    const result = await svc.bulkCreateInvoices({ period, includeOwing });
+    const result = await svc.bulkCreateInvoices({ period, includeOwing, notifyByEmail });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }

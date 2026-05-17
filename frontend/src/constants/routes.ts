@@ -13,6 +13,8 @@ export const ROUTES = {
   // Active student
   DASHBOARD:   '/dashboard',
   MAINTENANCE: '/maintenance',
+  /** Per-ticket conversation view for the student — append `/:ticketId`. */
+  MAINTENANCE_TICKET: '/maintenance/:ticketId',
   UPDATES:     '/updates',
   VISITORS:    '/visitors',
   HOUSEMATES:  '/housemates',
@@ -29,11 +31,16 @@ export const ROUTES = {
   ADMIN_OCCUPANCY:    '/admin/occupancy',
   ADMIN_ALLOCATIONS:  '/admin/allocations',
   ADMIN_MAINTENANCE:  '/admin/maintenance',
+  /** Per-ticket conversation view — append `/:ticketId`. */
+  ADMIN_TICKET:       '/admin/maintenance/:ticketId',
   ADMIN_NEWS:         '/admin/news',
   ADMIN_VISITORS:     '/admin/visitors',
   ADMIN_REWARDS:      '/admin/rewards',
   ADMIN_CHORES:       '/admin/chores',
   ADMIN_ACCOUNTS:     '/admin/accounts',
+  /** Per-user admin profile page — append `/:userId`. */
+  ADMIN_ACCOUNT:      '/admin/accounts/:userId',
+  ADMIN_COMPLIANCE:   '/admin/compliance',
   ADMIN_AUDIT:        '/admin/activity',
   ADMIN_PAYMENTS:     '/admin/payments',
   ADMIN_SETTINGS:     '/admin/settings',

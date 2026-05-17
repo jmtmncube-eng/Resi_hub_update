@@ -11,6 +11,8 @@ import {
 import { getOpsInsights } from '../../services/ops.service';
 import { listContractors, listContractorInvoices } from '../../services/residence.service';
 import { getNews } from '../../services/news.service';
+import { getTickets } from '../../services/maintenance.service';
+import { getTicketSLA } from '../../lib/ticketSLA';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ResiMark } from '../../components/Brand';
 import { Modal } from '../../components/Modal';
@@ -43,6 +45,28 @@ export default function AdminOverview() {
     queryFn: getChorePendingApprovals,
     refetchInterval: 30_000,
   });
+
+  // Pull all OPEN + IN_PROGRESS tickets so we can compute the SLA-breach
+  // count. Two batched calls (one per status) — keeps cache shape simple
+  // and lets us share the OPEN slice with the sidebar badge cache.
+  const { data: openTickets       = [] } = useQuery({
+    queryKey: ['admin-tickets', { status: 'OPEN' }],
+    queryFn:  () => getTickets({ status: 'OPEN' }),
+    refetchInterval: 60_000,
+  });
+  const { data: inProgressTickets = [] } = useQuery({
+    queryKey: ['admin-tickets', { status: 'IN_PROGRESS' }],
+    queryFn:  () => getTickets({ status: 'IN_PROGRESS' }),
+    refetchInterval: 60_000,
+  });
+  const slaBreachCount = [...openTickets, ...inProgressTickets].filter(t => {
+    const sla = getTicketSLA(t);
+    return sla?.tone === 'overdue';
+  }).length;
+  const slaWarnCount = [...openTickets, ...inProgressTickets].filter(t => {
+    const sla = getTicketSLA(t);
+    return sla?.tone === 'warn';
+  }).length;
 
   const { data: news = [] } = useQuery({
     queryKey: ['news', 'admin-overview'],
@@ -135,15 +159,30 @@ export default function AdminOverview() {
     ? `${stats.rooms.filledSlots} / ${stats.rooms.totalSlots} bed-slots`
     : `${stats.rooms.vacant} vacant`;
   const revenueCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
-    { label: 'Monthly Revenue',  value: `R${stats.monthlyRevenue.toLocaleString()}`, note: `expected from active leases`, color: 'cyan', icon: '💰' },
+    // Headline now reflects ACTUAL money cleared in the last 30 days — i.e.
+    // it moves when admins clear invoices in Payments. The projected
+    // "would collect" figure stays available as a sub-label so the
+    // shortfall is still visible at a glance.
+    { label: 'Collected (30d)',  value: `R${stats.revenueCollected30d.toLocaleString()}`, note: `of R${stats.monthlyRevenue.toLocaleString()} projected`, color: stats.revenueCollected30d < stats.monthlyRevenue ? 'rose' : 'cyan', icon: '💰' },
     { label: 'Net (Rev − Cost)', value: `R${stats.netMonthly.toLocaleString()}`,     note: `cost R${stats.monthlyTotalCost.toLocaleString()} (ops + contractors)`, color: stats.netMonthly < 0 ? 'rose' : 'cyan', icon: '📈' },
     { label: 'Occupancy',        value: `${occRate}%`,                                note: occHint,                       color: 'cyan', icon: '🏠' },
     { label: 'Active Vouchers',  value: stats.vouchers.active,                        note: 'in reward shop',              color: 'cyan', icon: '🎁' },
   ];
-  const operationalCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string }> = [
+  const operationalCards: Array<{ label: string; value: string | number; note: string; color: CardTone; icon: string; to?: string }> = [
     { label: 'Active Students',  value: stats.students.total,              note: `${stats.students.pending} pending`,    color: 'cyan', icon: '🎓' },
     { label: "Today's Visitors", value: stats.visitors.today,              note: `${stats.visitors.total} total`,        color: 'cyan', icon: '🪪' },
-    { label: 'Open Tickets',     value: stats.maintenance.open,            note: `${stats.maintenance.urgent} urgent`,   color: stats.maintenance.urgent > 0 ? 'rose' : 'cyan', icon: '🔧' },
+    { label: 'Open Tickets',     value: stats.maintenance.open,            note: `${stats.maintenance.urgent} urgent`,   color: stats.maintenance.urgent > 0 ? 'rose' : 'cyan', icon: '🔧', to: '/admin/maintenance' },
+    // SLA breach widget — only renders when there's something to flag,
+    // so a clean queue doesn't waste a tile slot. Click → maintenance
+    // page filtered to overdue tickets only.
+    ...(slaBreachCount > 0 || slaWarnCount > 0 ? [{
+      label: 'SLA breach',
+      value: slaBreachCount,
+      note:  slaWarnCount > 0 ? `${slaWarnCount} due soon` : 'tickets overdue',
+      color: 'rose' as const,
+      icon:  '⏰',
+      to:    '/admin/maintenance?filter=overdue',
+    }] : []),
   ];
 
   const recentNews = news.slice(0, 5);
@@ -216,18 +255,34 @@ export default function AdminOverview() {
           </h2>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 stagger">
-          {operationalCards.map(c => (
-            <div key={c.label} className={`kpi-card ${c.color === 'rose' ? 'rose' : ''}`} style={{ padding: '14px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 18 }}>{c.icon}</span>
-                <span className={`badge ${c.color === 'rose' ? 'badge-rose' : 'badge-cyan'}`} style={{ fontSize: 9, padding: '2px 7px' }}>{c.note}</span>
+          {operationalCards.map(c => {
+            // Cards with a `to` render as <Link> so they navigate; the rest
+            // stay as plain divs. The link class strips the underline +
+            // colour inheritance so the card looks identical either way.
+            const inner = (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 18 }}>{c.icon}</span>
+                  <span className={`badge ${c.color === 'rose' ? 'badge-rose' : 'badge-cyan'}`} style={{ fontSize: 9, padding: '2px 7px' }}>{c.note}</span>
+                </div>
+                <p style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: 'var(--text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-.01em' }}>
+                  {c.value}
+                </p>
+                <p className="kpi-card-label" style={{ marginTop: 4, marginBottom: 0, fontSize: 10 }}>{c.label}</p>
+              </>
+            );
+            return c.to ? (
+              <Link key={c.label} to={c.to}
+                className={`kpi-card hover-lift ${c.color === 'rose' ? 'rose' : ''}`}
+                style={{ padding: '14px 18px', textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                {inner}
+              </Link>
+            ) : (
+              <div key={c.label} className={`kpi-card ${c.color === 'rose' ? 'rose' : ''}`} style={{ padding: '14px 18px' }}>
+                {inner}
               </div>
-              <p style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: 'var(--text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-.01em' }}>
-                {c.value}
-              </p>
-              <p className="kpi-card-label" style={{ marginTop: 4, marginBottom: 0, fontSize: 10 }}>{c.label}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

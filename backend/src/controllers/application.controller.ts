@@ -84,6 +84,45 @@ export async function setDocExpiry(req: AuthRequest, res: Response, next: NextFu
   }
 }
 
+// ── Admin: list compliance docs awaiting review (per-doc, not whole-app) ──
+export async function listDocsToReview(_req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await service.listDocsAwaitingReview() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Admin: per-doc approve / reject (with rejection reason) ────
+export async function decideDoc(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { decision, note } = req.body as { decision?: 'APPROVED' | 'REJECTED'; note?: string };
+    if (decision !== 'APPROVED' && decision !== 'REJECTED') {
+      res.status(400).json({ success: false, error: 'decision must be APPROVED or REJECTED' });
+      return;
+    }
+    const data = await service.decideDocument(req.params.docId, decision, req.user!.userId, note);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Admin: nudge a student to upload missing compliance doc(s) ──
+export async function remindDocs(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { types } = req.body as { types?: string[] };
+    if (!types || !Array.isArray(types)) {
+      res.status(400).json({ success: false, error: 'types[] required' });
+      return;
+    }
+    const data = await service.sendComplianceReminder(req.params.userId, types);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Admin: approve / reject ────────────────────────────────────
 export async function decide(req: AuthRequest, res: Response, next: NextFunction) {
   try {

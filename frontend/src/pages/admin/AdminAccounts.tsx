@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck, AlertTriangle, FileSearch, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Loader2, Check, Pencil, X, Sparkles, ShieldCheck, UserX, UserCheck, AlertTriangle, FileSearch, AlertCircle, MoreVertical, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAccounts, updateAccount, approveAccount, setAccountActive, AdminAccount } from '../../services/admin.service';
 import { listSubmittedApplications } from '../../services/application.service';
@@ -10,7 +12,6 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { Modal } from '../../components/Modal';
 import { useConfirm } from '../../components/useConfirm';
 import ApplicationReviewModal from '../../components/ApplicationReviewModal';
-import AccountOverviewDrawer from '../../components/AccountOverviewDrawer';
 import { ExportCsvButton } from '../../components/ExportCsvButton';
 import { HelpHint } from '../../components/HelpHint';
 import { UserX as UserXIcon } from 'lucide-react';
@@ -38,13 +39,17 @@ const roleLabel: Record<string, string> = {
 /** Owner + delegated staff. */
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'MAINTENANCE'];
 
-type RoleFilter = 'all' | 'pending' | 'active' | 'staff';
+// Role filter for the STUDENT table only — staff is its own collapsible
+// block above the table, so a "Staff" pill here would be redundant.
+// 'to-review' is the strict subset of pending students who have actually
+// submitted their application (i.e. the actionable backlog) — clicking
+// the "To review" KPI tile drops the list to just this set.
+type RoleFilter = 'all' | 'pending' | 'to-review' | 'active' | 'staff';
 
 const FILTERS: { value: RoleFilter; label: string }[] = [
   { value: 'all',     label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'active',  label: 'Active' },
-  { value: 'staff',   label: 'Staff' },
 ];
 
 function extractError(err: unknown, fallback: string): string {
@@ -62,15 +67,32 @@ function extractError(err: unknown, fallback: string): string {
 export default function AdminAccounts() {
   usePageTitle('Accounts · Admin');
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user: me } = useAuth();
   const confirm = useConfirm();
 
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<RoleFilter>('all');
+  // Residence tab — null = "All residences"; '__none__' = Unassigned bucket
+  // (applicants + students without an allocation). The student table renders
+  // only what matches the active tab, so swapping tabs scopes the dataset
+  // the same way Stripe / Linear do — search + role pills filter WITHIN
+  // the active tab.
+  const [residenceTab, setResidenceTab] = useState<string | null>(null);
+  // Management section starts collapsed — admins don't need to see staff
+  // every time they open the page; click the chevron to expand. Persisted
+  // in localStorage so the choice survives navigation.
+  const [showManagement, setShowManagement] = useState<boolean>(() => {
+    try { return localStorage.getItem('admin-accounts-show-management') === '1'; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('admin-accounts-show-management', showManagement ? '1' : '0'); }
+    catch { /* ignore */ }
+  }, [showManagement]);
   const [editing, setEditing]   = useState<AdminAccount | null>(null);
   const [promoting, setPromoting] = useState<AdminAccount | null>(null);
   const [reviewing, setReviewing] = useState<AdminAccount | null>(null);
-  const [viewingId, setViewingId] = useState<string | null>(null);
 
   // Pre-fetch submitted apps so we know which pending students have docs ready
   const { data: submittedApps = [] } = useQuery({
@@ -87,18 +109,53 @@ export default function AdminAccounts() {
     queryFn:  () => getAccounts(search || undefined),
   });
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return accounts;
-    if (filter === 'pending') return accounts.filter(a => a.role === 'PENDING_STUDENT');
-    if (filter === 'active')  return accounts.filter(a => a.role === 'ACTIVE_STUDENT');
-    return accounts.filter(a => STAFF_ROLES.includes(a.role));
-  }, [accounts, filter]);
+  // Split staff out — they live in their own collapsible block, never in
+  // the residence tabs.
+  const staff    = useMemo(() => accounts.filter(a => STAFF_ROLES.includes(a.role)), [accounts]);
+  const students = useMemo(() => accounts.filter(a => !STAFF_ROLES.includes(a.role)), [accounts]);
+
+  // Discover every residence represented in the student set — drives the
+  // tab strip. We also count students per residence so the tab can show "N".
+  const residences = useMemo(() => {
+    const map = new Map<string, { name: string; count: number }>();
+    let orphan = 0;
+    for (const a of students) {
+      const r = a.allocation?.room?.residence;
+      if (r) {
+        const prev = map.get(r.id);
+        map.set(r.id, { name: r.name, count: (prev?.count ?? 0) + 1 });
+      } else {
+        orphan++;
+      }
+    }
+    return {
+      list:   Array.from(map.entries()).map(([id, v]) => ({ id, name: v.name, count: v.count })),
+      orphan,
+    };
+  }, [students]);
+
+  // Apply tab + role + search filters to the student list.
+  const filteredStudents = useMemo(() => {
+    let list = students;
+    if (residenceTab === '__none__') {
+      list = list.filter(a => !a.allocation?.room?.residence);
+    } else if (residenceTab) {
+      list = list.filter(a => a.allocation?.room?.residence?.id === residenceTab);
+    }
+    if (filter === 'pending')        list = list.filter(a => a.role === 'PENDING_STUDENT');
+    else if (filter === 'to-review') list = list.filter(a => a.role === 'PENDING_STUDENT' && submittedIds.has(a.id));
+    else if (filter === 'active')    list = list.filter(a => a.role === 'ACTIVE_STUDENT');
+    return list;
+  }, [students, residenceTab, filter, submittedIds]);
 
   const totals = {
-    all:     accounts.length,
-    active:  accounts.filter(a => a.role === 'ACTIVE_STUDENT').length,
-    pending: accounts.filter(a => a.role === 'PENDING_STUDENT').length,
-    staff:   accounts.filter(a => STAFF_ROLES.includes(a.role)).length,
+    all:      accounts.length,
+    active:   accounts.filter(a => a.role === 'ACTIVE_STUDENT').length,
+    pending:  accounts.filter(a => a.role === 'PENDING_STUDENT').length,
+    // Actionable subset of pending — applications that have been submitted
+    // and now await your verdict. Matches the sidebar Accounts badge.
+    toReview: accounts.filter(a => a.role === 'PENDING_STUDENT' && submittedIds.has(a.id)).length,
+    staff:    accounts.filter(a => STAFF_ROLES.includes(a.role)).length,
   };
 
   // ── Mutations ──────────────────────────────────────────────────
@@ -158,14 +215,112 @@ export default function AdminAccounts() {
           (when there's nothing to review), which is different from
           the interaction hint we moved out. */}
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-        <KpiPill label="Pending review" value={totals.pending} accent="rose"  hint={totals.pending === 0 ? 'all clear' : undefined}
-                 onClick={() => setFilter('pending')} active={filter === 'pending'} />
-        <KpiPill label="Active students" value={totals.active}  accent="cyan"  onClick={() => setFilter('active')}  active={filter === 'active'} />
-        <KpiPill label="Staff"           value={totals.staff}   accent="rose"  onClick={() => setFilter('staff')}   active={filter === 'staff'} />
+        {/* Total first as the "you are here" anchor — establishes the
+            population the other tiles slice through. */}
         <KpiPill label="Total accounts"  value={totals.all}     accent="text"  onClick={() => setFilter('all')}     active={filter === 'all'} />
+        {/* Lead with the ACTIONABLE count (matches the sidebar badge);
+            total pending follows as context. Mirrors the Revenue card's
+            "Collected (30d) / of R{projected}" pattern. */}
+        <KpiPill
+          label="To review"
+          value={totals.toReview}
+          accent="rose"
+          hint={totals.toReview === 0
+            ? (totals.pending === 0 ? 'all clear' : `${totals.pending} pending, none submitted`)
+            : `of ${totals.pending} pending`}
+          onClick={() => setFilter('to-review')}
+          active={filter === 'to-review'}
+        />
+        <KpiPill label="Active students" value={totals.active}  accent="cyan"  onClick={() => setFilter('active')}  active={filter === 'active'} />
+        <KpiPill label="Staff"           value={totals.staff}   accent="rose"  hint={showManagement ? 'expanded' : 'click to expand'}
+                 onClick={() => setShowManagement(v => !v)} active={showManagement} />
       </div>
 
-      {/* Search + filter */}
+      {/* MANAGEMENT — collapsible block above the student table.
+          Staff don't belong in the residence tabs; they're admin/manager/
+          maintenance roles that scope across every residence. Default
+          collapsed (persisted in localStorage) so the page leads with
+          the student list. Click the header (or the Staff KPI tile) to
+          toggle. */}
+      {staff.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button
+            onClick={() => setShowManagement(v => !v)}
+            aria-expanded={showManagement}
+            className="press-soft"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '12px 18px', background: 'transparent', border: 'none',
+              borderBottom: showManagement ? '1px solid var(--border)' : 'none',
+              cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <ChevronRight size={14} style={{ color: 'var(--text2)', transform: showManagement ? 'rotate(90deg)' : 'none', transition: 'transform 120ms' }} />
+            <span style={{ width: 4, height: 14, background: 'var(--rose)', borderRadius: 2 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              Management
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text4)', fontFamily: "'IBM Plex Mono', monospace" }}>
+              {staff.length} staff
+            </span>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: "'IBM Plex Mono', monospace" }}>
+              {showManagement ? 'Hide' : 'Show'}
+            </span>
+          </button>
+          {showManagement && (
+            <div>
+              {staff.map(a => (
+                <AccountRow key={a.id} a={a}
+                  onOpen={() => navigate(`/admin/accounts/${a.id}`)}
+                  onReview={() => setReviewing(a)}
+                  onApprove={() => approveMut.mutate(a.id)}
+                  onPromote={() => setPromoting(a)}
+                  onEdit={() => setEditing(a)}
+                  onToggleActive={async () => {
+                    if (a.isActive === false) { activeMut.mutate({ id: a.id, isActive: true }); }
+                    else {
+                      const ok = await confirm({
+                        title: `Deactivate ${a.name}?`,
+                        message: `They won't be able to sign in until you reactivate them. Their data, allocation, and history are preserved.`,
+                        confirmLabel: 'Deactivate', tone: 'rose', icon: UserXIcon,
+                      });
+                      if (ok) activeMut.mutate({ id: a.id, isActive: false });
+                    }
+                  }}
+                  meId={me?.id}
+                  submittedIds={submittedIds}
+                  approveBusy={approveMut.isPending && approveMut.variables === a.id}
+                  activeBusy={activeMut.isPending && activeMut.variables?.id === a.id}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RESIDENCE TABS — primary scope for the student table. Stripe /
+          Linear / Notion style: tabs sit above search; search filters
+          within the active tab. */}
+      <div role="tablist" style={{
+        display: 'flex', gap: 2, borderBottom: '1px solid var(--border)',
+        overflowX: 'auto', flexWrap: 'nowrap',
+      }}>
+        <ResTab label="All"   count={students.length}                   active={residenceTab === null}        onClick={() => setResidenceTab(null)} />
+        {residences.list.map(r => (
+          <ResTab key={r.id} label={r.name} count={r.count}             active={residenceTab === r.id}        onClick={() => setResidenceTab(r.id)} />
+        ))}
+        {residences.orphan > 0 && (
+          // "Awaiting allocation" = students with no room yet (applicants
+          // pre-approval, plus the rare active student between rooms).
+          // Clearer than the old "Unassigned" — names the state, not
+          // its absence.
+          <ResTab label="Awaiting allocation" count={residences.orphan}  active={residenceTab === '__none__'}  onClick={() => setResidenceTab('__none__')} />
+        )}
+      </div>
+
+      {/* SEARCH + ROLE PILLS — search left (the standard primary action),
+          role pills (within-tab refinement) right on the same row. */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
@@ -182,10 +337,7 @@ export default function AdminAccounts() {
               onClick={() => setFilter(f.value)}
               className="press-soft"
               style={{
-                padding: '6px 14px',
-                borderRadius: 7,
-                border: 'none',
-                fontSize: 12,
+                padding: '6px 14px', borderRadius: 7, border: 'none', fontSize: 12,
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontWeight: filter === f.value ? 600 : 400,
                 background: filter === f.value ? 'var(--bg2)' : 'transparent',
@@ -199,247 +351,51 @@ export default function AdminAccounts() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* STUDENT TABLE — single list scoped by the active tab. */}
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[...Array(6)].map((_, i) => <div key={i} className="skeleton" style={{ height: 56, borderRadius: 8 }} />)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filteredStudents.length === 0 ? (
         <div className="card empty-state">
           <Users size={28} style={{ color: 'var(--text4)', margin: '0 auto 12px' }} />
-          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No accounts in this view</p>
+          <p style={{ fontWeight: 600, color: 'var(--text2)' }}>No students in this view</p>
+          <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
+            Try a different residence tab or clear the search.
+          </p>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="rh-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>State</th>
-                  <th>Programme</th>
-                  <th>Room</th>
-                  <th>Credits</th>
-                  <th>Joined</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(a => {
-                  const isDeactivated = a.isActive === false;
-                  return (
-                  <tr key={a.id} className="hover-lift" style={{ opacity: isDeactivated ? 0.55 : 1 }}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {a.avatarUrl ? (
-                          <img src={a.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', filter: isDeactivated ? 'grayscale(1)' : 'none' }} />
-                        ) : (
-                          <div className={`avatar ${a.role === 'ADMIN' ? 'avatar-rose' : 'avatar-cyan'}`}
-                               style={{ width: 32, height: 32, fontSize: 11, fontWeight: 700, filter: isDeactivated ? 'grayscale(1)' : 'none' }}>
-                            {a.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ fontWeight: 500, color: 'var(--text)', textDecoration: isDeactivated ? 'line-through' : 'none' }}>{a.name}</p>
-                          <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{a.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${ROLE_BADGE[a.role] ?? 'badge-gray'}`}>
-                        {roleLabel[a.role] ?? a.role}
-                      </span>
-                    </td>
-                    <td>
-                      {isDeactivated ? (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 10, padding: '3px 9px', borderRadius: 999,
-                          background: 'rgba(232,25,122,.12)', color: 'var(--rose)',
-                          border: '1px solid rgba(232,25,122,.3)',
-                          fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em',
-                        }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--rose)' }} />
-                          Disabled
-                        </span>
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 10, padding: '3px 9px', borderRadius: 999,
-                          background: 'rgba(74,222,128,.10)', color: '#4ade80',
-                          border: '1px solid rgba(74,222,128,.25)',
-                          fontFamily: "'IBM Plex Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em',
-                        }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80' }} />
-                          Active
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--text2)' }}>
-                      {a.program
-                        ? <>
-                            <p>{a.program}</p>
-                            {(a.year || a.university) && (
-                              <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-                                {a.university ?? ''}{a.year ? ` · Y${a.year}` : ''}
-                              </p>
-                            )}
-                          </>
-                        : <span style={{ color: 'var(--text4)' }}>—</span>
-                      }
-                    </td>
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text2)' }}>
-                      {a.allocation?.room
-                        ? `Blk ${a.allocation.room.block} – ${a.allocation.room.number}`
-                        : <span style={{ color: 'var(--text4)' }}>No room</span>
-                      }
-                    </td>
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: 'var(--cyan)' }}>
-                      {a.wallet?.credits ?? 0}
-                    </td>
-                    <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text3)' }}>
-                      {new Date(a.createdAt).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        {a.role === 'PENDING_STUDENT' && (
-                          submittedIds.has(a.id) ? (
-                            <button
-                              onClick={() => setReviewing(a)}
-                              className="press-soft"
-                              title="Review submitted application docs"
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                padding: '5px 11px', borderRadius: 7,
-                                fontSize: 12, fontWeight: 600,
-                                background: 'rgba(0,204,204,.12)',
-                                color: 'var(--cyan)',
-                                border: '1px solid rgba(0,204,204,.3)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <FileSearch size={11} /> Review
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => approveMut.mutate(a.id)}
-                              disabled={approveMut.isPending && approveMut.variables === a.id}
-                              className="press-soft"
-                              title="No application submitted — approve directly (legacy bypass)"
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                padding: '5px 11px', borderRadius: 7,
-                                fontSize: 12, fontWeight: 600,
-                                background: 'rgba(74,222,128,.12)',
-                                color: '#4ade80',
-                                border: '1px solid rgba(74,222,128,.3)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              {approveMut.isPending && approveMut.variables === a.id
-                                ? <Loader2 size={11} className="animate-spin" />
-                                : <Check size={11} />} Approve
-                            </button>
-                          )
-                        )}
-                        {a.role === 'ACTIVE_STUDENT' && (
-                          <button
-                            onClick={() => setPromoting(a)}
-                            className="btn-ghost press-soft"
-                            title="Promote to admin"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 5,
-                              padding: '5px 11px', fontSize: 12,
-                            }}
-                          >
-                            <ShieldCheck size={11} /> Promote
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setViewingId(a.id)}
-                          className="btn-ghost press-soft"
-                          title="Open overview"
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 12 }}
-                        >
-                          <Eye size={11} /> View
-                        </button>
-                        <button
-                          onClick={() => setEditing(a)}
-                          className="btn-ghost press-soft"
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 12 }}
-                        >
-                          <Pencil size={11} /> Edit
-                        </button>
-                        {/* Self-protection: don't let the current admin disable their own account */}
-                        {a.id !== me?.id && (
-                          isDeactivated ? (
-                            <button
-                              onClick={() => activeMut.mutate({ id: a.id, isActive: true })}
-                              disabled={activeMut.isPending && activeMut.variables?.id === a.id}
-                              className="press-soft"
-                              title="Reactivate account — student can log in again"
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                padding: '5px 11px', borderRadius: 7,
-                                fontSize: 12, fontWeight: 600,
-                                background: 'rgba(74,222,128,.12)',
-                                color: '#4ade80',
-                                border: '1px solid rgba(74,222,128,.3)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              {activeMut.isPending && activeMut.variables?.id === a.id
-                                ? <Loader2 size={11} className="animate-spin" />
-                                : <UserCheck size={11} />} Activate
-                            </button>
-                          ) : (
-                            <button
-                              onClick={async () => {
-                                const ok = await confirm({
-                                  title: `Deactivate ${a.name}?`,
-                                  message: `They won't be able to sign in until you reactivate them. Their data, allocation, and history are preserved.`,
-                                  confirmLabel: 'Deactivate',
-                                  tone: 'rose',
-                                  icon: UserXIcon,
-                                });
-                                if (ok) activeMut.mutate({ id: a.id, isActive: false });
-                              }}
-                              disabled={activeMut.isPending && activeMut.variables?.id === a.id}
-                              className="press-soft"
-                              title="Block this account from signing in"
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                padding: '5px 11px', borderRadius: 7,
-                                fontSize: 12, fontWeight: 500,
-                                background: 'rgba(232,25,122,.08)',
-                                color: 'var(--rose)',
-                                border: '1px solid rgba(232,25,122,.25)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              {activeMut.isPending && activeMut.variables?.id === a.id
-                                ? <Loader2 size={11} className="animate-spin" />
-                                : <UserX size={11} />} Deactivate
-                            </button>
-                          )
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {filteredStudents.map(a => (
+            <AccountRow key={a.id} a={a}
+              onOpen={() => navigate(`/admin/accounts/${a.id}`)}
+              onReview={() => setReviewing(a)}
+              onApprove={() => approveMut.mutate(a.id)}
+              onPromote={() => setPromoting(a)}
+              onEdit={() => setEditing(a)}
+              onToggleActive={async () => {
+                if (a.isActive === false) { activeMut.mutate({ id: a.id, isActive: true }); }
+                else {
+                  const ok = await confirm({
+                    title: `Deactivate ${a.name}?`,
+                    message: `They won't be able to sign in until you reactivate them. Their data, allocation, and history are preserved.`,
+                    confirmLabel: 'Deactivate', tone: 'rose', icon: UserXIcon,
+                  });
+                  if (ok) activeMut.mutate({ id: a.id, isActive: false });
+                }
+              }}
+              meId={me?.id}
+              submittedIds={submittedIds}
+              approveBusy={approveMut.isPending && approveMut.variables === a.id}
+              activeBusy={activeMut.isPending && activeMut.variables?.id === a.id}
+            />
+          ))}
         </div>
       )}
 
       {editing && <EditAccountModal account={editing} onClose={() => setEditing(null)} />}
 
       {reviewing && <ApplicationReviewModal applicantId={reviewing.id} onClose={() => setReviewing(null)} />}
-
-      <AccountOverviewDrawer accountId={viewingId} onClose={() => setViewingId(null)} />
 
       {/* Promote-to-admin confirmation — replaces the native browser confirm */}
       <PromoteModal
@@ -458,6 +414,326 @@ export default function AdminAccounts() {
 // ─────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────
+
+// ── Residence tab — primary scope selector for the student table ───
+function ResTab({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      className="press-soft"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '10px 16px', borderRadius: 0, border: 'none',
+        background: 'transparent',
+        color:      active ? 'var(--text)' : 'var(--text3)',
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        cursor: 'pointer', whiteSpace: 'nowrap',
+        // The active tab is identified by a thick cyan underline (classic
+        // tab pattern) — sits right on top of the border-bottom of the
+        // parent tablist so it reads as a continuous bar.
+        borderBottom: active ? '2px solid var(--cyan)' : '2px solid transparent',
+        marginBottom: -1,
+      }}
+    >
+      {label}
+      <span style={{
+        fontSize: 10, padding: '2px 7px', borderRadius: 999,
+        background: active ? 'rgba(0,204,204,.15)' : 'var(--bg3)',
+        color:      active ? 'var(--cyan)' : 'var(--text3)',
+        fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600,
+      }}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+// ── Account row — clickable; highlights when something is pending ──
+function AccountRow({
+  a, onOpen, onReview, onApprove, onPromote, onEdit, onToggleActive,
+  meId, submittedIds, approveBusy, activeBusy,
+}: {
+  a: AdminAccount;
+  onOpen: () => void;
+  onReview: () => void;
+  onApprove: () => void;
+  onPromote: () => void;
+  onEdit: () => void;
+  onToggleActive: () => void;
+  meId?: string;
+  submittedIds: Set<string>;
+  approveBusy: boolean;
+  activeBusy: boolean;
+}) {
+  const isDeactivated = a.isActive === false;
+  const pendingTotal  = (a.pending?.docsToReview ?? 0) + (a.pending?.openTickets ?? 0) + (a.pending?.unpaidInvoices ?? 0);
+  const hasPending    = pendingTotal > 0 || submittedIds.has(a.id);
+
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        display: 'grid',
+        // Fixed column tracks so every row uses an identical grid — no
+        // row's content width can shift another row's columns.
+        // avatar · identity (flex) · role+state · room+credits · pending · actions
+        gridTemplateColumns: '36px minmax(0, 1.6fr) 150px minmax(140px, 1fr) 150px 200px',
+        alignItems: 'center', gap: 14,
+        padding: '12px 16px',
+        borderBottom: '1px solid var(--border)',
+        cursor: 'pointer',
+        // The "unread news article" affordance — rows with anything
+        // pending get a thin cyan left edge + faint tint to draw the eye.
+        background: hasPending ? 'linear-gradient(90deg, rgba(0,204,204,.06), transparent 60%)' : 'transparent',
+        borderLeft: hasPending ? '3px solid var(--cyan)' : '3px solid transparent',
+        opacity: isDeactivated ? 0.55 : 1,
+      }}
+      className="hover-lift"
+    >
+      {/* Avatar */}
+      {a.avatarUrl ? (
+        <img src={a.avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', filter: isDeactivated ? 'grayscale(1)' : 'none' }} />
+      ) : (
+        <div className={`avatar ${STAFF_ROLES.includes(a.role) ? 'avatar-rose' : 'avatar-cyan'}`}
+             style={{ width: 36, height: 36, fontSize: 12, fontWeight: 700, filter: isDeactivated ? 'grayscale(1)' : 'none' }}>
+          {a.name.charAt(0).toUpperCase()}
+        </div>
+      )}
+
+      {/* Identity */}
+      <div style={{ minWidth: 0 }}>
+        <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: isDeactivated ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
+          {a.id === meId && (
+            <span title="This is you" style={{
+              fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
+              background: 'rgba(0,204,204,.15)', color: 'var(--cyan)',
+              border: '1px solid rgba(0,204,204,.35)',
+              fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '.04em',
+            }}>
+              YOU
+            </span>
+          )}
+        </p>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {a.email}
+        </p>
+      </div>
+
+      {/* Role + state — single inline row, never stacked, so every row
+          has the same height regardless of whether the user is disabled. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+        <span className={`badge ${ROLE_BADGE[a.role] ?? 'badge-gray'}`} style={{ width: 'fit-content', fontSize: 10 }}>
+          {roleLabel[a.role] ?? a.role}
+        </span>
+        {isDeactivated && (
+          <span className="badge badge-rose" style={{ width: 'fit-content', fontSize: 9 }}>Off</span>
+        )}
+      </div>
+
+      {/* Room / credits */}
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {a.allocation?.room ? `Blk ${a.allocation.room.block} – ${a.allocation.room.number}` : <span style={{ color: 'var(--text4)' }}>No room</span>}
+        </p>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--cyan)', marginTop: 2 }}>
+          {a.wallet?.credits ?? 0} 🪙
+        </p>
+      </div>
+
+      {/* Pending badges — column is a fixed 150px track; content
+          right-aligns so empty rows leave a clean gap rather than
+          pushing other columns. */}
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
+        {(a.pending?.docsToReview ?? 0) > 0 && (
+          <span className="badge badge-rose" style={{ fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <AlertCircle size={9} /> {a.pending!.docsToReview} doc{a.pending!.docsToReview === 1 ? '' : 's'}
+          </span>
+        )}
+        {(a.pending?.openTickets ?? 0) > 0 && (
+          <span className="badge badge-rose" style={{ fontSize: 9 }}>{a.pending!.openTickets} ticket{a.pending!.openTickets === 1 ? '' : 's'}</span>
+        )}
+        {(a.pending?.unpaidInvoices ?? 0) > 0 && (
+          <span className="badge badge-rose" style={{ fontSize: 9 }}>{a.pending!.unpaidInvoices} unpaid</span>
+        )}
+        {submittedIds.has(a.id) && (
+          <span className="badge badge-cyan" style={{ fontSize: 9 }}>App ready</span>
+        )}
+      </div>
+
+      {/* Quick actions — Activate/Deactivate stays visible inline. The
+          self-row renders the SAME button, disabled with a tooltip
+          ("You can't deactivate your own account") — the gold-standard
+          pattern (GitHub / Stripe / AWS IAM): visible-but-disabled
+          affordances teach the rule, missing ones create ambiguity.
+          Column alignment is owned by the parent grid, not this cell. */}
+      <div
+        style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {(() => {
+          const isSelf = a.id === meId;
+          return (
+            <button
+              onClick={isSelf ? undefined : onToggleActive}
+              disabled={isSelf || activeBusy}
+              className="press-soft"
+              title={isSelf
+                ? "You can't deactivate your own account"
+                : isDeactivated ? 'Reactivate — they can sign in again' : 'Block from signing in'}
+              aria-disabled={isSelf}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                background: isDeactivated ? 'rgba(74,222,128,.12)' : 'rgba(232,25,122,.08)',
+                color:      isDeactivated ? '#4ade80' : 'var(--rose)',
+                border:     `1px solid ${isDeactivated ? 'rgba(74,222,128,.3)' : 'rgba(232,25,122,.25)'}`,
+                cursor:     isSelf ? 'not-allowed' : 'pointer',
+                opacity:    isSelf ? 0.4 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {activeBusy
+                ? <Loader2 size={11} className="animate-spin" />
+                : isDeactivated ? <UserCheck size={11} /> : <UserX size={11} />}
+              {isDeactivated ? 'Activate' : 'Deactivate'}
+            </button>
+          );
+        })()}
+        <KebabMenu
+          a={a}
+          submittedIds={submittedIds}
+          approveBusy={approveBusy}
+          onOpen={onOpen}
+          onReview={onReview}
+          onApprove={onApprove}
+          onPromote={onPromote}
+          onEdit={onEdit}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Per-row 3-dot menu ─────────────────────────────────────────────
+function KebabMenu({
+  a, submittedIds, approveBusy,
+  onOpen, onReview, onApprove, onPromote, onEdit,
+}: {
+  a: AdminAccount;
+  submittedIds: Set<string>;
+  approveBusy: boolean;
+  onOpen: () => void;
+  onReview: () => void;
+  onApprove: () => void;
+  onPromote: () => void;
+  onEdit: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos]   = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef   = useRef<HTMLDivElement>(null);
+
+  function toggle() {
+    if (open) { setOpen(false); return; }
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (!r) return;
+    // Anchor under the trigger; portal will render at fixed coords so
+    // sibling rows can't clip the menu via their stacking contexts.
+    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    setOpen(true);
+  }
+
+  // Close on outside click or Escape.
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (buttonRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node))   return;
+      setOpen(false);
+    }
+    function onEsc(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown',   onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown',   onEsc);
+    };
+  }, [open]);
+
+  const items: Array<{ label: string; icon: React.ComponentType<{ size?: number | string }>; onClick: () => void; tone?: 'cyan' | 'rose' }> = [];
+  items.push({ label: 'Open profile', icon: FileSearch, onClick: onOpen });
+  if (a.role === 'PENDING_STUDENT') {
+    if (submittedIds.has(a.id)) {
+      items.push({ label: 'Review application', icon: FileSearch, onClick: onReview, tone: 'cyan' });
+    } else {
+      items.push({
+        label:   approveBusy ? 'Approving…' : 'Approve directly',
+        icon:    approveBusy ? Loader2 : Check,
+        onClick: onApprove,
+        tone:    'cyan',
+      });
+    }
+  }
+  if (a.role === 'ACTIVE_STUDENT') {
+    items.push({ label: 'Promote to admin', icon: ShieldCheck, onClick: onPromote, tone: 'rose' });
+  }
+  items.push({ label: 'Edit details', icon: Pencil, onClick: onEdit });
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={toggle}
+        aria-label="More actions"
+        className="press-soft"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 30, height: 28, borderRadius: 6,
+          background: open ? 'var(--bg3)' : 'transparent',
+          color: 'var(--text2)',
+          border: '1px solid var(--border)',
+          cursor: 'pointer',
+        }}
+      >
+        <MoreVertical size={14} />
+      </button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+            minWidth: 180, padding: 4, borderRadius: 10,
+            background: 'var(--bg2)', border: '1px solid var(--border)',
+            boxShadow: '0 8px 24px rgba(0,0,0,.45)',
+          }}
+        >
+          {items.map(it => (
+            <button
+              key={it.label}
+              onClick={() => { setOpen(false); it.onClick(); }}
+              className="press-soft"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '8px 12px', borderRadius: 6, fontSize: 12,
+                background: 'transparent', border: 'none',
+                color: it.tone === 'rose' ? 'var(--rose)' : it.tone === 'cyan' ? 'var(--cyan)' : 'var(--text2)',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg3)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <it.icon size={13} /> {it.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
 
 function KpiPill({
   label, value, accent, hint, onClick, active,

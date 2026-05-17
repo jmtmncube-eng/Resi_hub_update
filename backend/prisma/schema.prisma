@@ -199,6 +199,11 @@ model User {
 
   @@index([role])
   @@index([email])
+  // Indexed for the admin global-search (which matches name OR email).
+  // Btree alone won't accelerate substring-ILIKE, but it helps exact +
+  // prefix lookups today and lays the groundwork for a future pg_trgm
+  // upgrade once any single residence has more than a few thousand rows.
+  @@index([name])
 }
 
 // Single-use token issued by /api/auth/forgot-password and consumed by
@@ -262,6 +267,8 @@ model Room {
   @@index([block])
   @@index([status])
   @@index([residenceId])
+  // Indexed for the global search (rooms by number / block).
+  @@index([number])
 }
 
 model Allocation {
@@ -341,6 +348,10 @@ model MaintenanceTicket {
   @@index([status])
   @@index([priority])
   @@index([createdAt])
+  // Indexed for the global search (category + location are the
+  // searchable freeform fields on a ticket).
+  @@index([category])
+  @@index([location])
 }
 
 // Audit trail for ticket triage — one row per admin/manager/maintenance
@@ -572,6 +583,12 @@ model Document {
   // student + admins as the date approaches.
   expiresAt    DateTime?
   expiryNotifiedAt DateTime?   // last time an expiry reminder was sent — de-dupes the cron
+  // Compliance-doc review (per-doc verdict — distinct from the whole-application
+  // decide flow). status moves Submitted → Approved | Rejected. On Rejected,
+  // reviewNote carries the reason and the student is notified to re-upload.
+  reviewedAt   DateTime?
+  reviewedBy   String?      // admin User.id who decided
+  reviewNote   String?      // rejection reason; optional on approve
   // Payment proof
   proofUrl     String?
   proofStatus  String?      // SUBMITTED | CLEARED | REJECTED
@@ -586,6 +603,10 @@ model Document {
   @@index([type])
   @@index([proofStatus])
   @@index([expiresAt])
+  @@index([status])
+  // Indexed for the global search (invoices are looked up by period
+  // string like "2026-05").
+  @@index([period])
 }
 
 // Single-row settings table (id always = "settings")

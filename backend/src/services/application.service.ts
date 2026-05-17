@@ -263,7 +263,162 @@ export async function uploadApplicationDoc(userId: string, type: string, fileUrl
     select: { id: true, type: true, status: true, fileUrl: true, createdAt: true },
   });
   priorDocs.forEach(d => deletePersistedFile(d.fileUrl));
+
+  // Notify admins/managers that a doc is awaiting review. Best-effort —
+  // upload must not fail because of email/notification delivery.
+  void notifyAdminsOfDocUpload(userId, type as ApplicationDocType).catch(() => { /* logged inside */ });
+
   return created;
+}
+
+async function notifyAdminsOfDocUpload(userId: string, type: ApplicationDocType): Promise<void> {
+  const [student, admins] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    prisma.user.findMany({
+      where:  { role: { in: ['ADMIN', 'MANAGER'] }, isActive: true },
+      select: { id: true, name: true, email: true },
+    }),
+  ]);
+  if (!student || admins.length === 0) return;
+  const { sendEmail }  = await import('./email.service');
+  const { notifyMany } = await import('./notification.service');
+  const docLabel = DOC_TYPE_LABELS[type];
+  await Promise.all(admins.map(a =>
+    sendEmail({
+      to:       a.email,
+      template: 'complianceDocUploaded',
+      data:     { adminName: a.name, studentName: student.name, docType: docLabel },
+    }),
+  ));
+  void notifyMany(admins.map(a => a.id), {
+    type:  'APPLICATION',
+    title: `Compliance doc to review: ${student.name}`,
+    body:  `${student.name} uploaded their ${docLabel}.`,
+    link:  '/admin/compliance',
+  });
+}
+
+// Per-doc review verdict (separate from whole-application approve/reject).
+// Used by the new admin compliance review page; rejection notifies the
+// student so they know to re-upload, with the admin's reason attached.
+export async function decideDocument(
+  docId: string,
+  decision: 'APPROVED' | 'REJECTED',
+  adminId: string,
+  note?: string,
+) {
+  const doc = await prisma.document.findUnique({
+    where:  { id: docId },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  });
+  if (!doc) throw new AppError('Document not found', 404);
+  if (!APPLICATION_DOC_TYPES.includes(doc.type as ApplicationDocType)) {
+    throw new AppError('Only compliance documents can be reviewed here', 400);
+  }
+  if (decision === 'REJECTED' && !note?.trim()) {
+    throw new AppError('A rejection reason is required so the student knows what to fix.', 400);
+  }
+  const updated = await prisma.document.update({
+    where: { id: docId },
+    data:  {
+      status:     decision === 'APPROVED' ? 'Approved' : 'Rejected',
+      reviewedAt: new Date(),
+      reviewedBy: adminId,
+      reviewNote: note?.trim() || null,
+    },
+    select: { id: true, type: true, status: true, fileUrl: true, reviewedAt: true, reviewNote: true, createdAt: true },
+  });
+  if (decision === 'REJECTED') {
+    // Tell the student (in-app + email) which doc to re-upload and why.
+    const docLabel = DOC_TYPE_LABELS[doc.type as ApplicationDocType];
+    const { sendEmail }  = await import('./email.service');
+    const { createNotification } = await import('./notification.service');
+    void sendEmail({
+      to:       doc.user.email,
+      template: 'complianceDocRejected',
+      data:     { name: doc.user.name, docType: docLabel, reason: note!.trim() },
+    });
+    void createNotification(doc.user.id, {
+      type:   'APPLICATION',
+      title:  `Your ${docLabel} was rejected`,
+      body:   note!.trim(),
+      link:   '/profile',
+    });
+  }
+  return updated;
+}
+
+const DOC_TYPE_LABELS: Record<ApplicationDocType, string> = {
+  ID_DOC:             'ID document',
+  PROOF_REGISTRATION: 'Proof of registration',
+  PROOF_FUNDING:      'Proof of funding',
+  SIGNATURE:          'Signature',
+};
+
+// Admin: nudge a student to upload one or more missing compliance docs.
+// Sends a single in-app notification + email listing every doc type the
+// admin chose to remind about. Defensive: validates the types, and only
+// reminds about types the student hasn't already uploaded (so admins
+// can't accidentally pester someone whose ID is sitting in review).
+export async function sendComplianceReminder(userId: string, types: string[]) {
+  if (!Array.isArray(types) || types.length === 0) {
+    throw new AppError('At least one document type is required', 400);
+  }
+  const invalid = types.find(t => !APPLICATION_DOC_TYPES.includes(t as ApplicationDocType));
+  if (invalid) throw new AppError(`Unknown document type: ${invalid}`, 400);
+
+  const user = await prisma.user.findUnique({
+    where:  { id: userId },
+    select: { id: true, name: true, email: true, isActive: true,
+              documents: {
+                where: { type: { in: types as ApplicationDocType[] } },
+                select: { type: true },
+              } },
+  });
+  if (!user) throw new AppError('User not found', 404);
+  if (!user.isActive) throw new AppError('Cannot remind a deactivated account', 400);
+
+  // Strip out anything they've ALREADY uploaded — the admin sees an
+  // "Uploaded" state on the profile, but they might tick reminder anyway.
+  const alreadyHave = new Set(user.documents.map(d => d.type));
+  const missing     = types.filter(t => !alreadyHave.has(t as ApplicationDocType));
+  if (missing.length === 0) {
+    throw new AppError('Nothing to remind — all selected docs are already uploaded.', 400);
+  }
+  const labels = missing.map(t => DOC_TYPE_LABELS[t as ApplicationDocType]);
+
+  const { sendEmail }          = await import('./email.service');
+  const { createNotification } = await import('./notification.service');
+  void sendEmail({
+    to:       user.email,
+    template: 'complianceDocReminder',
+    data:     { name: user.name, docTypes: labels },
+  });
+  void createNotification(user.id, {
+    type:  'APPLICATION',
+    title: missing.length === 1
+      ? `Reminder: please upload your ${labels[0]}`
+      : `Reminder: ${missing.length} compliance docs needed`,
+    body:  labels.join(' · '),
+    link:  '/profile',
+  });
+  return { remindedTypes: missing };
+}
+
+// Admin: every compliance doc currently awaiting review (Submitted status),
+// across BOTH pending applicants and active students who re-uploaded.
+export async function listDocsAwaitingReview() {
+  return prisma.document.findMany({
+    where: {
+      type:   { in: ['ID_DOC', 'PROOF_REGISTRATION', 'PROOF_FUNDING', 'SIGNATURE'] },
+      status: 'Submitted',
+    },
+    select: {
+      id: true, type: true, status: true, fileUrl: true, createdAt: true,
+      user: { select: { id: true, name: true, email: true, role: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
 }
 
 // ── Admin: review applications ─────────────────────────────────

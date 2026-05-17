@@ -25,7 +25,7 @@ export interface MaintenanceTicket {
   adminNote?:  string;
   createdAt:   string;
   updatedAt:   string;
-  student?: { id: string; name: string; avatarUrl?: string };
+  student?: { id: string; name: string; email?: string; avatarUrl?: string | null };
   /** Audit trail — newest first. Backend includes it on every ticket fetch. */
   updates?: MaintenanceTicketUpdate[];
 }
