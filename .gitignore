@@ -63,3 +63,4 @@ nul
 # get pruned/actioned and removed at the end. Never committed.
 .mcp-*.png
 WALKTHROUGH_NOTES.md
+alistair-claude.md
